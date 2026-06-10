@@ -118,6 +118,8 @@ Rules:
     Example — "Contact | Presence (1-10) | Pressure (1-10)" with rows #1..#5 becomes ONE table item: headers ["Contact","Presence (1-10)","Pressure (1-10)"], and each row = { cells: [ {text:"#1",fieldType:"",options:[]}, {text:"",fieldType:"dropdown",options:["1".."10"]}, {text:"",fieldType:"dropdown",options:["1".."10"]} ] }.
     For table items leave the top-level text "", fieldType "", options [].
 - Convert "□"/checkbox glyphs to checkbox fields. Convert numbered choice questions to a text prompt followed by their checkbox options.
+- IMPORTANT: illustrative examples are read-only "text" items, NOT fields. Lines that show sample messages or comparisons (e.g. 'Pressure: "..."', 'Presence: "..."', anything in quotes given as an example to read) must be "text", never a textarea or input. Only create a field where the learner is explicitly asked to write, rate, or check something.
+- Do not put a field between two example lines. Only add an answer box after a genuine question/prompt directed at the learner.
 - Do not invent content. Keep the learner's wording. Make it clean and well-grouped so the user only needs minor edits.
 - Output ONLY the JSON.`;
 

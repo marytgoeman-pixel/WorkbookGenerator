@@ -267,9 +267,9 @@ export async function generatePDF(
     if (section.pageBreakBefore && y < tmpl.pageHeight - tmpl.marginTop - 1) {
       newPage();
     }
-    // A little breathing room before each section heading (not at the very top of a page)
+    // A small, consistent gap before a heading (level-2 sits closer to its parent)
     if (branded && y < tmpl.pageHeight - tmpl.marginTop - 2) {
-      y -= section.level === 1 ? 10 : 4;
+      y -= section.level === 1 ? 6 : 2;
     }
     ensureSpace(tmpl.headingSize + tmpl.sectionSpacing);
 

@@ -176,15 +176,18 @@ function mapToDocument(ai: AiDoc): DocumentModel {
 export async function structureWithAI(html: string): Promise<DocumentModel> {
   const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
-  const response = await client.messages.create({
+  // Stream the request: it's a long (~30s) generation, and streaming keeps the
+  // connection alive so serverless platforms don't drop it as idle.
+  const stream = client.messages.stream({
     model: 'claude-opus-4-8',
     max_tokens: 16000,
-    thinking: { type: 'adaptive' },
     system: SYSTEM,
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: `Worksheet HTML:\n\n${html}` }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
+
+  const response = await stream.finalMessage();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const textBlock = (response.content as any[]).find((b) => b.type === 'text');

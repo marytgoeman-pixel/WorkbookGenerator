@@ -57,11 +57,15 @@ export default function FileUpload({ onParsed }: Props) {
   const [error, setError] = useState('');
   const [useAI, setUseAI] = useState(true);
   const [loading, setLoading] = useState(false);
+  // When AI fails we DON'T auto-advance — we hold the basic-parsed doc here and
+  // show a visible explanation, so the fallback is never silent.
+  const [fallback, setFallback] = useState<{ doc: DocumentModel; name: string; reason: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function deliver(doc: DocumentModel, name: string) {
     setFileName(name);
     setError('');
+    setFallback(null);
     onParsed(doc);
   }
 
@@ -73,13 +77,14 @@ export default function FileUpload({ onParsed }: Props) {
     }
     setLoading(true);
     setError('');
+    setFallback(null);
     try {
       const result = await aiStructure(html);
       if ('document' in result) {
         deliver(result.document, name);
       } else {
-        deliver(localDoc, name);
-        setError(`⚠️ AI formatting did not run — ${result.reason} Used the basic formatter instead.`);
+        // Stay on this screen and explain — do not silently use the worse output
+        setFallback({ doc: localDoc, name, reason: result.reason });
       }
     } finally {
       setLoading(false);
@@ -172,7 +177,28 @@ export default function FileUpload({ onParsed }: Props) {
       {loading && (
         <div className="flex items-center gap-2 text-sm text-blue-600">
           <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          AI is formatting your workbook…
+          AI is formatting your workbook… (this can take up to a minute)
+        </div>
+      )}
+
+      {fallback && !loading && (
+        <div className="text-sm bg-red-50 border border-red-300 rounded-lg px-3 py-3 space-y-2">
+          <p className="font-semibold text-red-700">⚠️ AI formatting didn&apos;t run</p>
+          <p className="text-red-700">{fallback.reason}</p>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setFallback(null)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-gray-700 hover:border-blue-400"
+            >
+              Dismiss &amp; re-upload
+            </button>
+            <button
+              onClick={() => deliver(fallback.doc, fallback.name)}
+              className="px-3 py-1.5 rounded-lg bg-gray-700 text-white hover:bg-gray-800"
+            >
+              Continue with basic formatting →
+            </button>
+          </div>
         </div>
       )}
 

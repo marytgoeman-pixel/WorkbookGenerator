@@ -23,11 +23,14 @@ export interface Section {
   pageBreakBefore?: boolean;   // force this section to start on a new page
 }
 
+export type Spacing = 'compact' | 'normal' | 'relaxed';
+
 export interface DocumentModel {
   title: string;
   author: string;
   sections: Section[];
   titleCase?: TextCase;        // case transform for the document title
+  bodySpacing?: Spacing;       // extra vertical space between paragraphs/lines
 }
 
 export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum';

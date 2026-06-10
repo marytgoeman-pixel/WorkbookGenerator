@@ -128,7 +128,10 @@ export async function generatePDF(
 
   const branded = templateId === 'jomangum' && !!branding;
 
-  const tmpl = getTemplate(templateId);
+  // Copy the template so we can apply document-level spacing without mutating the shared constant
+  const tmpl = { ...getTemplate(templateId) };
+  const spacingScale = doc.bodySpacing === 'compact' ? 0.5 : doc.bodySpacing === 'relaxed' ? 2 : 1;
+  tmpl.paragraphSpacing = Math.round(tmpl.paragraphSpacing * spacingScale);
   // When branded, colors come from the client brand rather than the theme picker
   const primaryColor = hexToRgb(branded ? branding!.colors.title : theme.primary);
   const secondaryColor = hexToRgb(branded ? branding!.colors.subtitle : theme.secondary);
@@ -563,8 +566,8 @@ function drawBrandedChrome(
     page.drawText('Mangum', { x: tmpl.marginLeft + 18, y: centerY, size: 14, font: italicFont, color: headerColor });
   }
 
-  // Tagline (center, italic)
-  const tagline = branding.tagline.replace(/[^\x20-\x7E]/g, (c) => (c === '·' ? '|' : c));
+  // Tagline (center, italic) — sanitize keeps the middot (·, 0xB7) which Helvetica supports
+  const tagline = sanitize(branding.tagline);
   const tagSize = 8.5;
   const tagWidth = italicFont.widthOfTextAtSize(tagline, tagSize);
   page.drawText(tagline, {

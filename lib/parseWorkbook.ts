@@ -36,6 +36,12 @@ function asCheckbox(text: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+// An open-ended prompt that should become a write-in answer box
+// (e.g. "Why?", "What makes you say that?", "Which statement feels most true?")
+function isAnswerPrompt(text: string): boolean {
+  return /\?\s*$/.test(text) && /^(why|how|what|which|explain|describe|list|share|your|tell)\b/i.test(text);
+}
+
 // Treat a manually-bolded paragraph as a heading only when it looks like one:
 // fully bold, short, and not ending like a sentence or question. This avoids
 // turning emphasized body lines ("Why?", "Pressure comes from agenda.") into headings.
@@ -90,7 +96,30 @@ export function parseWorkbookHtml(html: string): DocumentModel {
     });
   }
 
-  for (const el of blocks) {
+  function addTextarea(label: string) {
+    ensureSection();
+    fieldCounter++;
+    currentSection!.fields.push({
+      id: makeId('field'),
+      label: label || `Field ${fieldCounter}`,
+      type: 'textarea',
+      required: false,
+    });
+  }
+
+  // Text of the next meaningful block (skips empties and <p> inside <li>)
+  function nextText(from: number): string {
+    for (let j = from + 1; j < blocks.length; j++) {
+      const e = blocks[j];
+      if (e.tagName === 'P' && e.closest('li')) continue;
+      const t = (e.textContent || '').replace(/\s+/g, ' ').trim();
+      if (t) return t;
+    }
+    return '';
+  }
+
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const el = blocks[bi];
     // Skip <p> that live inside <li> (handled by the li itself)
     if (el.tagName === 'P' && el.closest('li')) continue;
 
@@ -123,6 +152,12 @@ export function parseWorkbookHtml(html: string): DocumentModel {
     if (field) {
       ensureSection();
       currentSection!.fields.push(field);
+      continue;
+    }
+
+    // Auto: an open-ended prompt NOT followed by a checkbox becomes a write-in box
+    if (isAnswerPrompt(text) && asCheckbox(nextText(bi)) === null) {
+      addTextarea(text);
       continue;
     }
 

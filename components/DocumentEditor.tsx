@@ -77,6 +77,36 @@ export default function DocumentEditor({ doc, onChange }: Props) {
     onChange({ ...doc, sections });
   }
 
+  function deleteSection(sectionId: string) {
+    onChange({ ...doc, sections: doc.sections.filter((s) => s.id !== sectionId) });
+  }
+
+  function insertSection(afterIndex: number) {
+    const sections = [...doc.sections];
+    const newSec: Section = {
+      id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      level: 1,
+      title: 'New Section',
+      bodyLines: [],
+      bullets: [],
+      fields: [],
+    };
+    sections.splice(afterIndex + 1, 0, newSec);
+    onChange({ ...doc, sections });
+    setEditingId(newSec.id);
+  }
+
+  // Turn a body line into a field of the given type and remove it from the body
+  function bodyLineToField(sectionId: string, idx: number, type: FieldType) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    const label = s.bodyLines[idx] ?? '';
+    const newField: FormField = { id: makeId(), label, type, required: false };
+    updateSection(sectionId, {
+      bodyLines: s.bodyLines.filter((_, i) => i !== idx),
+      fields: [...s.fields, newField],
+    });
+  }
+
   const fieldTypeIcon: Record<FieldType, string> = { text: '—', textarea: '≡', checkbox: '☐' };
   const fieldTypeLabel: Record<FieldType, string> = { text: 'Text field', textarea: 'Text area', checkbox: 'Checkbox' };
 
@@ -135,6 +165,18 @@ export default function DocumentEditor({ doc, onChange }: Props) {
             <option value="title">Capitalize Each Word</option>
           </select>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500 w-14">Spacing</span>
+          <select
+            value={doc.bodySpacing ?? 'normal'}
+            onChange={(e) => onChange({ ...doc, bodySpacing: e.target.value as import('@/types/document').Spacing })}
+            className="text-xs border rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+          >
+            <option value="compact">Compact</option>
+            <option value="normal">Normal</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
       </div>
 
       {/* Sections */}
@@ -169,6 +211,13 @@ export default function DocumentEditor({ doc, onChange }: Props) {
             <span className="text-xs text-gray-400 shrink-0">
               {section.fields.length} field{section.fields.length !== 1 ? 's' : ''}
             </span>
+            <button
+              onClick={() => deleteSection(section.id)}
+              className="text-gray-300 hover:text-red-600 text-sm shrink-0"
+              title="Delete this section"
+            >
+              🗑
+            </button>
           </div>
 
           {/* Heading style controls */}
@@ -227,6 +276,8 @@ export default function DocumentEditor({ doc, onChange }: Props) {
                   placeholder="Text line…"
                   onChange={(e) => updateBodyLine(section.id, i, e.target.value)}
                 />
+                <button onClick={() => bodyLineToField(section.id, i, 'textarea')} className="text-[10px] px-1 py-0.5 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600" title="Turn into a write-in box">→box</button>
+                <button onClick={() => bodyLineToField(section.id, i, 'checkbox')} className="text-[10px] px-1 py-0.5 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600" title="Turn into a checkbox">→check</button>
                 <button onClick={() => removeBodyLine(section.id, i)} className="text-red-400 hover:text-red-600 text-xs" title="Remove line">✕</button>
               </div>
             ))}
@@ -284,6 +335,17 @@ export default function DocumentEditor({ doc, onChange }: Props) {
                 {fieldTypeIcon[type]} {type}
               </button>
             ))}
+          </div>
+
+          {/* Insert a new section after this one */}
+          <div className="border-t bg-white px-4 py-1.5 text-center">
+            <button
+              onClick={() => insertSection(idx)}
+              className="text-xs text-gray-400 hover:text-blue-600"
+              title="Insert a new header/section here"
+            >
+              + Insert section below
+            </button>
           </div>
         </div>
       ))}

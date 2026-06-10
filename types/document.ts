@@ -7,6 +7,9 @@ export interface FormField {
   required: boolean;
 }
 
+export type HeadingStyle = 'accent' | 'brand' | 'plain';
+export type TextCase = 'none' | 'upper' | 'sentence' | 'title';
+
 export interface Section {
   id: string;
   level: 1 | 2;
@@ -14,12 +17,16 @@ export interface Section {
   bodyLines: string[];
   bullets: string[];
   fields: FormField[];
+  headingStyle?: HeadingStyle; // how the section heading is drawn (default 'accent')
+  headingCase?: TextCase;      // case transform for the heading (default 'none')
+  callout?: boolean;           // render the body text inside a stylized brand box
 }
 
 export interface DocumentModel {
   title: string;
   author: string;
   sections: Section[];
+  titleCase?: TextCase;        // case transform for the document title
 }
 
 export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum';

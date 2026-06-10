@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { DocumentModel, Section, FormField, FieldType } from '@/types/document';
+import { DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase } from '@/types/document';
 
 interface Props {
   doc: DocumentModel;
@@ -94,6 +94,19 @@ export default function DocumentEditor({ doc, onChange }: Props) {
             </button>
           )}
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500 w-14">Title case</span>
+          <select
+            value={doc.titleCase ?? 'upper'}
+            onChange={(e) => onChange({ ...doc, titleCase: e.target.value as TextCase })}
+            className="text-xs border rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+          >
+            <option value="none">As typed</option>
+            <option value="upper">UPPERCASE</option>
+            <option value="sentence">Sentence case</option>
+            <option value="title">Capitalize Each Word</option>
+          </select>
+        </div>
       </div>
 
       {/* Sections */}
@@ -128,6 +141,43 @@ export default function DocumentEditor({ doc, onChange }: Props) {
             <span className="text-xs text-gray-400 shrink-0">
               {section.fields.length} field{section.fields.length !== 1 ? 's' : ''}
             </span>
+          </div>
+
+          {/* Heading style controls */}
+          <div className="border-t bg-gray-50 px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+            <label className="flex items-center gap-1 text-gray-500">
+              Style
+              <select
+                value={section.headingStyle ?? 'accent'}
+                onChange={(e) => updateSection(section.id, { headingStyle: e.target.value as HeadingStyle })}
+                className="border rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                <option value="accent">Accent + bullet</option>
+                <option value="brand">Brand blue</option>
+                <option value="plain">Plain</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-1 text-gray-500">
+              Case
+              <select
+                value={section.headingCase ?? 'none'}
+                onChange={(e) => updateSection(section.id, { headingCase: e.target.value as TextCase })}
+                className="border rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                <option value="none">As typed</option>
+                <option value="upper">UPPERCASE</option>
+                <option value="sentence">Sentence case</option>
+                <option value="title">Capitalize Each Word</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-1 text-gray-500 cursor-pointer" title="Render this section's text inside a stylized brand box">
+              <input
+                type="checkbox"
+                checked={!!section.callout}
+                onChange={(e) => updateSection(section.id, { callout: e.target.checked })}
+              />
+              Stylize text as callout
+            </label>
           </div>
 
           {/* Fields list */}

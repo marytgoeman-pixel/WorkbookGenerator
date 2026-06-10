@@ -40,6 +40,15 @@ function sanitize(text: string): string {
     });
 }
 
+function applyCase(text: string, c: import('@/types/document').TextCase | undefined): string {
+  switch (c) {
+    case 'upper': return text.toUpperCase();
+    case 'sentence': return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+    case 'title': return text.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    default: return text;
+  }
+}
+
 function hexToRgb(hex: string): RGB {
   const clean = hex.replace('#', '');
   const r = parseInt(clean.slice(0, 2), 16) / 255;
@@ -209,10 +218,11 @@ export async function generatePDF(
     });
   }
 
-  // Title block (uppercase in branded mode to match the brand style)
+  // Title block — case controlled by doc.titleCase (defaults to UPPER in branded mode)
   ensureSpace(tmpl.titleSize + 20);
-  const titleText = sanitize(doc.title || 'Untitled');
-  page.drawText(branded ? titleText.toUpperCase() : titleText, {
+  const rawTitle = sanitize(doc.title || 'Untitled');
+  const titleCase = doc.titleCase ?? (branded ? 'upper' : 'none');
+  page.drawText(applyCase(rawTitle, titleCase), {
     x: tmpl.marginLeft,
     y,
     size: tmpl.titleSize,
@@ -232,38 +242,48 @@ export async function generatePDF(
     y -= tmpl.bodySize + 4;
   }
 
-  // Title underline
-  page.drawLine({
-    start: { x: tmpl.marginLeft, y: y - 4 },
-    end: { x: tmpl.marginLeft + contentWidth, y: y - 4 },
-    thickness: 1.5,
-    color: primaryColor,
-  });
-  y -= 18;
+  // Title underline (skipped in branded mode per Jo's design)
+  if (!branded) {
+    page.drawLine({
+      start: { x: tmpl.marginLeft, y: y - 4 },
+      end: { x: tmpl.marginLeft + contentWidth, y: y - 4 },
+      thickness: 1.5,
+      color: primaryColor,
+    });
+    y -= 18;
+  } else {
+    y -= 10;
+  }
 
   for (const section of doc.sections) {
     ensureSpace(tmpl.headingSize + tmpl.sectionSpacing);
 
     // Section heading
-    if (section.level === 1) {
-      if (branded) {
-        // Square bullet + orange heading, no underline
-        page.drawRectangle({
-          x: tmpl.marginLeft,
-          y: y + 1,
-          width: 9,
-          height: 9,
-          color: accentColor,
-        });
-        page.drawText(sanitize(section.title), {
-          x: tmpl.marginLeft + 16,
-          y,
-          size: tmpl.headingSize,
-          font: boldFont,
-          color: primaryColor,
-        });
-        y -= tmpl.headingSize + 8;
-      } else {
+    if (branded) {
+      // Per-section style applies to BOTH levels: 'accent' = orange + square bullet,
+      // 'brand' = blue (no bullet), 'plain' = dark (no bullet). Size follows the level.
+      const style = section.headingStyle ?? (section.level === 1 ? 'accent' : 'brand');
+      const size = section.level === 1 ? tmpl.headingSize : tmpl.subheadingSize;
+      const headingText = applyCase(sanitize(section.title), section.headingCase);
+      const headingColor =
+        style === 'brand' ? hexToRgb(branding!.colors.subtitle)
+        : style === 'plain' ? rgb(0.15, 0.15, 0.15)
+        : primaryColor; // accent
+      const sq = Math.round(size * 0.55);
+      const textX = style === 'accent' ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
+      if (style === 'accent') {
+        page.drawRectangle({ x: tmpl.marginLeft, y: y + 1, width: sq, height: sq, color: accentColor });
+      }
+      page.drawText(headingText, {
+        x: textX,
+        y,
+        size,
+        font: boldFont,
+        color: headingColor,
+      });
+      y -= size + 8;
+    } else if (section.level === 1) {
+      {
         if (tmpl.headerBarHeight > 0) {
           // Modern template: colored bar behind heading
           ensureSpace(tmpl.headingSize + tmpl.headerBarHeight + 8);
@@ -305,7 +325,7 @@ export async function generatePDF(
         }
       }
     } else {
-      page.drawText(sanitize(section.title), {
+      page.drawText(applyCase(sanitize(section.title), section.headingCase), {
         x: tmpl.marginLeft,
         y,
         size: tmpl.subheadingSize,
@@ -315,21 +335,53 @@ export async function generatePDF(
       y -= tmpl.subheadingSize + 6;
     }
 
-    // Body text
-    for (const line of section.bodyLines) {
-      const wrapped = wrapText(line, mainColWidth, font, tmpl.bodySize);
-      for (const wline of wrapped) {
-        ensureSpace(tmpl.lineHeight);
-        page.drawText(wline, {
-          x: tmpl.marginLeft,
-          y,
-          size: tmpl.bodySize,
-          font,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-        y -= tmpl.lineHeight;
+    // Body text — optionally inside a stylized callout box (branded)
+    const useCallout = branded && section.callout && section.bodyLines.length > 0;
+    if (useCallout) {
+      const calloutBg = hexToRgb(branding!.colors.calloutBg);
+      const pad = 12;
+      const innerW = mainColWidth - pad * 2;
+      // Measure wrapped height first
+      const allWrapped: string[] = [];
+      for (const line of section.bodyLines) {
+        allWrapped.push(...wrapText(line, innerW, font, tmpl.bodySize));
+        allWrapped.push(''); // paragraph gap
       }
-      y -= tmpl.paragraphSpacing;
+      if (allWrapped[allWrapped.length - 1] === '') allWrapped.pop();
+      const boxH = allWrapped.length * tmpl.lineHeight + pad * 2;
+      ensureSpace(boxH + 8);
+      const boxTop = y + tmpl.bodySize;
+      // Filled brand box
+      page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: calloutBg });
+      // Dashed accent inner border
+      page.drawRectangle({
+        x: tmpl.marginLeft + 5, y: boxTop - boxH + 5, width: mainColWidth - 10, height: boxH - 10,
+        borderColor: hexToRgb(branding!.colors.calloutBorder), borderWidth: 1, borderDashArray: [3, 3], color: calloutBg,
+      });
+      let cy = boxTop - pad - tmpl.bodySize + 2;
+      for (const wline of allWrapped) {
+        if (wline) {
+          page.drawText(wline, { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) });
+        }
+        cy -= tmpl.lineHeight;
+      }
+      y = boxTop - boxH - tmpl.paragraphSpacing;
+    } else {
+      for (const line of section.bodyLines) {
+        const wrapped = wrapText(line, mainColWidth, font, tmpl.bodySize);
+        for (const wline of wrapped) {
+          ensureSpace(tmpl.lineHeight);
+          page.drawText(wline, {
+            x: tmpl.marginLeft,
+            y,
+            size: tmpl.bodySize,
+            font,
+            color: rgb(0.1, 0.1, 0.1),
+          });
+          y -= tmpl.lineHeight;
+        }
+        y -= tmpl.paragraphSpacing;
+      }
     }
 
     // Bullets

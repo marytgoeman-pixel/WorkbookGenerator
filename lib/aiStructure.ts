@@ -98,7 +98,7 @@ const SYSTEM = `You convert a real-estate coaching worksheet into a clean, struc
 You receive the worksheet as HTML (converted from a Word document). Produce JSON matching the schema.
 
 Rules:
-- The first title/heading becomes the document title.
+- The document "title" is the SHORT main title only (e.g. "Real Estate Relationship Building"). Do NOT append the subtitle/tagline to it — keep the title under ~8 words.
 - Group content under section headings. Use level 1 for major sections, level 2 for sub-sections. Headings are NEVER bulleted — never prefix a heading with a bullet, dash, or number.
 - If a major section has an introductory tagline/subtitle line, keep it as the first "text" item under that section (don't make it a heading).
 - Set "callout": true for a section that is a short read-only insight, principle, or "big idea" the learner should absorb (no fillable fields) — it renders in a highlighted brand box. Set "callout": false for normal working sections that contain fields. Keep callouts short (1–4 lines).

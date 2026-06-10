@@ -221,18 +221,22 @@ export async function generatePDF(
     });
   }
 
-  // Title block — case controlled by doc.titleCase (defaults to UPPER in branded mode)
-  ensureSpace(tmpl.titleSize + 20);
-  const rawTitle = sanitize(doc.title || 'Untitled');
+  // Title block — case controlled by doc.titleCase (defaults to UPPER in branded mode).
+  // Long titles wrap across lines (and shrink a step if very long) so they never overflow.
   const titleCase = doc.titleCase ?? (branded ? 'upper' : 'none');
-  page.drawText(applyCase(rawTitle, titleCase), {
-    x: tmpl.marginLeft,
-    y,
-    size: tmpl.titleSize,
-    font: boldFont,
-    color: primaryColor,
-  });
-  y -= tmpl.titleSize + 4;
+  const rawTitle = applyCase(sanitize(doc.title || 'Untitled'), titleCase);
+  let titleSize = tmpl.titleSize;
+  let titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
+  if (titleLines.length > 2) {
+    titleSize = Math.max(16, tmpl.titleSize - 4);
+    titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
+  }
+  const titleLineH = titleSize + 4;
+  ensureSpace(titleLines.length * titleLineH + 12);
+  for (const tline of titleLines) {
+    page.drawText(tline, { x: tmpl.marginLeft, y, size: titleSize, font: boldFont, color: primaryColor });
+    y -= titleLineH;
+  }
 
   if (doc.author) {
     page.drawText(sanitize(`by ${doc.author}`), {
@@ -408,16 +412,30 @@ export async function generatePDF(
       const colW = mainColWidth / cols;
       const rowH = 24;
       const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
-      ensureSpace(rowH * 2);
-      let ty = y;
-      page.drawRectangle({ x: tmpl.marginLeft, y: ty - rowH + 4, width: mainColWidth, height: rowH, color: headerColor, opacity: 0.12 });
-      table.headers.forEach((h: string, c: number) => {
-        const lines = wrapText(h, colW - 8, boldFont, 9);
-        page.drawText(lines[0] ?? '', { x: tmpl.marginLeft + c * colW + 4, y: ty - 12, size: 9, font: boldFont, color: headerColor });
-      });
-      ty -= rowH;
+
+      const drawHeader = () => {
+        page.drawRectangle({ x: tmpl.marginLeft, y: y - rowH + 4, width: mainColWidth, height: rowH, color: headerColor, opacity: 0.12 });
+        table.headers.forEach((h: string, c: number) => {
+          const lines = wrapText(h, colW - 8, boldFont, 9);
+          page.drawText(lines[0] ?? '', { x: tmpl.marginLeft + c * colW + 4, y: y - 12, size: 9, font: boldFont, color: headerColor });
+        });
+        y -= rowH;
+      };
+
+      // Keep the table together: if it doesn't fit here but fits on a fresh page, start fresh
+      const tableHeight = (table.rows.length + 1) * rowH;
+      const usable = tmpl.pageHeight - tmpl.marginTop - tmpl.marginBottom;
+      if (y - tableHeight < tmpl.marginBottom && tableHeight <= usable) {
+        newPage();
+      }
+
+      let ty = (drawHeader(), y);
       for (const row of table.rows) {
-        if (ty - rowH < tmpl.marginBottom) { newPage(); ty = y = tmpl.pageHeight - tmpl.marginTop; }
+        if (ty - rowH < tmpl.marginBottom) {
+          newPage();
+          drawHeader();          // repeat the header on the continued page
+          ty = y;
+        }
         for (let c = 0; c < cols; c++) {
           const cell = row[c];
           const cx = tmpl.marginLeft + c * colW;

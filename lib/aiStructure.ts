@@ -18,6 +18,7 @@ interface AiItem {
 interface AiSection {
   title: string;
   level: 1 | 2;
+  callout: boolean;
   items: AiItem[];
 }
 interface AiDoc {
@@ -38,6 +39,7 @@ const SCHEMA = {
         properties: {
           title: { type: 'string' },
           level: { type: 'integer', enum: [1, 2] },
+          callout: { type: 'boolean' },
           items: {
             type: 'array',
             items: {
@@ -53,7 +55,7 @@ const SCHEMA = {
             },
           },
         },
-        required: ['title', 'level', 'items'],
+        required: ['title', 'level', 'callout', 'items'],
       },
     },
   },
@@ -66,7 +68,9 @@ You receive the worksheet as HTML (converted from a Word document). Produce JSON
 
 Rules:
 - The first title/heading becomes the document title.
-- Group content under section headings. Use level 1 for major sections, level 2 for sub-sections.
+- Group content under section headings. Use level 1 for major sections, level 2 for sub-sections. Headings are NEVER bulleted — never prefix a heading with a bullet, dash, or number.
+- If a major section has an introductory tagline/subtitle line, keep it as the first "text" item under that section (don't make it a heading).
+- Set "callout": true for a section that is a short read-only insight, principle, or "big idea" the learner should absorb (no fillable fields) — it renders in a highlighted brand box. Set "callout": false for normal working sections that contain fields. Keep callouts short (1–4 lines).
 - Each section has an ordered "items" array — KEEP DOCUMENT ORDER so prompts, their options, and their answer spaces stay together.
 - Item kinds:
   - "text": a paragraph or instruction the learner reads. Put the sentence in "text"; fieldType "" and options [].
@@ -102,7 +106,7 @@ function mapToDocument(ai: AiDoc): DocumentModel {
       if (it.kind === 'bullet') return { id: uid('c'), kind: 'bullet', text: it.text || '' };
       return { id: uid('c'), kind: 'text', text: it.text || '' };
     });
-    return { id: uid('section'), level: s.level === 2 ? 2 : 1, title: s.title || 'Section', content };
+    return { id: uid('section'), level: s.level === 2 ? 2 : 1, title: s.title || 'Section', content, callout: !!s.callout };
   });
 
   if (sections.length === 0) sections.push({ id: uid('section'), level: 1, title: 'Document', content: [] });

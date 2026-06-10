@@ -162,10 +162,10 @@ export default function DocumentEditor({ doc, onChange }: Props) {
           {/* Style controls */}
           <div className="border-t bg-gray-50 px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
             <label className="flex items-center gap-1 text-gray-500">Style
-              <select value={section.headingStyle ?? (section.level === 1 ? 'accent' : 'brand')}
+              <select value={section.headingStyle ?? (section.level === 1 ? 'title' : 'brand')}
                 onChange={(e) => updateSection(section.id, { headingStyle: e.target.value as HeadingStyle })}
                 className="border rounded px-1.5 py-0.5 bg-white">
-                <option value="accent">Accent + bullet</option><option value="brand">Brand blue</option><option value="plain">Plain</option>
+                <option value="title">Brand (no bullet)</option><option value="brand">Blue (no bullet)</option><option value="accent">Accent + bullet</option><option value="plain">Plain</option>
               </select>
             </label>
             <label className="flex items-center gap-1 text-gray-500">Case

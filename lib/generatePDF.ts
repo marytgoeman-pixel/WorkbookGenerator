@@ -263,22 +263,27 @@ export async function generatePDF(
     if (section.pageBreakBefore && y < tmpl.pageHeight - tmpl.marginTop - 1) {
       newPage();
     }
+    // A little breathing room before each section heading (not at the very top of a page)
+    if (branded && y < tmpl.pageHeight - tmpl.marginTop - 2) {
+      y -= section.level === 1 ? 10 : 4;
+    }
     ensureSpace(tmpl.headingSize + tmpl.sectionSpacing);
 
     // Section heading
     if (branded) {
-      // Per-section style applies to BOTH levels: 'accent' = orange + square bullet,
-      // 'brand' = blue (no bullet), 'plain' = dark (no bullet). Size follows the level.
-      const style = section.headingStyle ?? (section.level === 1 ? 'accent' : 'brand');
+      // Headers/subheaders are NOT bulleted by default. 'accent' (opt-in) adds a square bullet;
+      // default H1 = brand title color, H2 = brand subtitle color, both bold and unbulleted.
+      const style = section.headingStyle ?? (section.level === 1 ? 'title' : 'brand');
       const size = section.level === 1 ? tmpl.headingSize : tmpl.subheadingSize;
       const headingText = applyCase(sanitize(section.title), section.headingCase);
       const headingColor =
         style === 'brand' ? hexToRgb(branding!.colors.subtitle)
         : style === 'plain' ? rgb(0.15, 0.15, 0.15)
-        : primaryColor; // accent
+        : primaryColor; // 'title' and 'accent' both use the primary brand color
       const sq = Math.round(size * 0.55);
-      const textX = style === 'accent' ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
-      if (style === 'accent') {
+      const drawBullet = style === 'accent';
+      const textX = drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
+      if (drawBullet) {
         page.drawRectangle({ x: tmpl.marginLeft, y: y + 1, width: sq, height: sq, color: accentColor });
       }
       page.drawText(headingText, {
@@ -288,7 +293,7 @@ export async function generatePDF(
         font: boldFont,
         color: headingColor,
       });
-      y -= size + 8;
+      y -= size + (section.level === 1 ? 10 : 7);
     } else if (section.level === 1) {
       {
         if (tmpl.headerBarHeight > 0) {

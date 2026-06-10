@@ -20,7 +20,7 @@ export interface DocTable {
   rows: TableCell[][];
 }
 
-export type HeadingStyle = 'accent' | 'brand' | 'plain';
+export type HeadingStyle = 'accent' | 'brand' | 'plain' | 'title';
 export type TextCase = 'none' | 'upper' | 'sentence' | 'title';
 
 // A section's content is an ordered list so document order is preserved

@@ -30,6 +30,116 @@ function parseField(line: string): FormField | null {
   };
 }
 
+// Detect a Word-style checkbox glyph prefix and strip it
+function asCheckbox(text: string): string | null {
+  const m = text.match(/^\s*[□☐■☑✓✔□☐☑☒]\s*(.*)$/);
+  return m ? m[1].trim() : null;
+}
+
+// Treat a manually-bolded paragraph as a heading only when it looks like one:
+// fully bold, short, and not ending like a sentence or question. This avoids
+// turning emphasized body lines ("Why?", "Pressure comes from agenda.") into headings.
+function isBoldHeading(el: Element): boolean {
+  const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+  const bold = el.querySelectorAll('strong, b');
+  if (bold.length === 0) return false;
+  const boldText = Array.from(bold).map((b) => b.textContent || '').join('').trim();
+  const fullyBold = boldText.length >= text.length - 2;
+  if (!fullyBold) return false;
+
+  const wordCount = text.split(' ').length;
+  const endsLikeSentence = /[.?!,;]$/.test(text);
+  return text.length <= 60 && wordCount <= 8 && !endsLikeSentence;
+}
+
+/**
+ * Parse the HTML that mammoth produces from a Word document. Unlike raw-text
+ * extraction, this preserves heading levels, lists, and bold "headings".
+ */
+export function parseWorkbookHtml(html: string): DocumentModel {
+  sectionCounter = 0;
+  fieldCounter = 0;
+
+  const docEl = new DOMParser().parseFromString(html, 'text/html');
+  const blocks = Array.from(docEl.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li'));
+
+  const sections: Section[] = [];
+  let currentSection: Section | null = null;
+  let title = 'Untitled Document';
+  let titleSet = false;
+
+  function pushSection() {
+    if (currentSection) sections.push(currentSection);
+  }
+  function newSection(level: 1 | 2, sectionTitle: string): Section {
+    sectionCounter++;
+    return { id: makeId('section'), level, title: sectionTitle, bodyLines: [], bullets: [], fields: [] };
+  }
+  function ensureSection() {
+    if (!currentSection) currentSection = newSection(1, 'Document');
+  }
+  function addCheckbox(label: string) {
+    ensureSection();
+    fieldCounter++;
+    currentSection!.fields.push({
+      id: makeId('field'),
+      label: label || `Field ${fieldCounter}`,
+      type: 'checkbox',
+      required: false,
+    });
+  }
+
+  for (const el of blocks) {
+    // Skip <p> that live inside <li> (handled by the li itself)
+    if (el.tagName === 'P' && el.closest('li')) continue;
+
+    const tag = el.tagName.toLowerCase();
+    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!text) continue;
+
+    const isHeading = /^h[1-6]$/.test(tag) || (tag === 'p' && isBoldHeading(el));
+
+    if (isHeading) {
+      const level: 1 | 2 = tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6' ? 2 : 1;
+      if (!titleSet) {
+        title = text;
+        titleSet = true;
+      }
+      pushSection();
+      currentSection = newSection(level, text);
+      continue;
+    }
+
+    // List item or paragraph
+    const cb = asCheckbox(text);
+    if (cb !== null) {
+      addCheckbox(cb);
+      continue;
+    }
+
+    // Explicit [field]/[textarea]/[checkbox] markers still work
+    const field = parseField(text);
+    if (field) {
+      ensureSection();
+      currentSection!.fields.push(field);
+      continue;
+    }
+
+    ensureSection();
+    if (tag === 'li') {
+      currentSection!.bullets.push(text);
+    } else {
+      currentSection!.bodyLines.push(text);
+    }
+  }
+
+  pushSection();
+  if (sections.length === 0) sections.push(newSection(1, 'Document'));
+
+  return { title, author: '', sections };
+}
+
 export function parseWorkbook(rawText: string): DocumentModel {
   sectionCounter = 0;
   fieldCounter = 0;

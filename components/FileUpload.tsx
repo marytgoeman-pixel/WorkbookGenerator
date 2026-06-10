@@ -1,12 +1,24 @@
 'use client';
 import { useState, useRef, DragEvent, ChangeEvent } from 'react';
 import { DocumentModel } from '@/types/document';
-import { parseWorkbook } from '@/lib/parseWorkbook';
+import { parseWorkbook, parseWorkbookHtml } from '@/lib/parseWorkbook';
 
-async function extractTextFromDocx(file: File): Promise<string> {
+// Convert a Word doc to HTML so heading styles, lists, and bold structure survive
+async function docxToHtml(file: File): Promise<string> {
   const mammoth = await import('mammoth');
   const arrayBuffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer });
+  const result = await mammoth.convertToHtml(
+    { arrayBuffer },
+    {
+      styleMap: [
+        "p[style-name='Title'] => h1:fresh",
+        "p[style-name='Subtitle'] => h2:fresh",
+        "p[style-name='Heading 1'] => h1:fresh",
+        "p[style-name='Heading 2'] => h2:fresh",
+        "p[style-name='Heading 3'] => h3:fresh",
+      ],
+    }
+  );
   return result.value;
 }
 
@@ -22,12 +34,15 @@ export default function FileUpload({ onParsed }: Props) {
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  function deliver(doc: DocumentModel, name: string) {
+    setFileName(name);
+    setError('');
+    onParsed(doc);
+  }
+
   function processText(text: string, name: string) {
     try {
-      const doc = parseWorkbook(text);
-      setFileName(name);
-      setError('');
-      onParsed(doc);
+      deliver(parseWorkbook(text), name);
     } catch {
       setError('Failed to parse file. Please check the format.');
     }
@@ -39,8 +54,8 @@ export default function FileUpload({ onParsed }: Props) {
       return;
     }
     if (file.name.match(/\.docx$/i)) {
-      extractTextFromDocx(file)
-        .then((text) => processText(text, file.name))
+      docxToHtml(file)
+        .then((html) => deliver(parseWorkbookHtml(html), file.name))
         .catch(() => setError('Failed to read Word document. Please check the file and try again.'));
     } else {
       const reader = new FileReader();

@@ -30,13 +30,15 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding }
     }
   }
 
+  const buttonColor = !doc ? '#9ca3af' : branding?.colors.title || colorTheme.primary || '#2563eb';
+
   return (
     <div className="space-y-3">
       <button
         onClick={handleDownload}
         disabled={!doc || loading}
-        className="w-full py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        style={{ background: doc ? colorTheme.primary : undefined, backgroundColor: doc ? undefined : '#9ca3af' }}
+        className="w-full py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+        style={{ backgroundColor: buttonColor }}
       >
         {loading ? (
           <>

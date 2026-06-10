@@ -256,6 +256,10 @@ export async function generatePDF(
   }
 
   for (const section of doc.sections) {
+    // Force a new page when requested (skip if we're already at the top)
+    if (section.pageBreakBefore && y < tmpl.pageHeight - tmpl.marginTop - 1) {
+      newPage();
+    }
     ensureSpace(tmpl.headingSize + tmpl.sectionSpacing);
 
     // Section heading
@@ -454,16 +458,19 @@ export async function generatePDF(
         });
         y -= 22;
       } else {
-        // Label
-        ensureSpace(tmpl.bodySize + 4 + (field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight) + 8);
-        page.drawText(sanitize(field.label), {
-          x: tmpl.marginLeft,
-          y,
-          size: tmpl.bodySize,
-          font,
-          color: rgb(0.2, 0.2, 0.2),
-        });
-        y -= tmpl.bodySize + 4;
+        // Label (skipped when blank, so a field can be just a fill box)
+        const label = sanitize(field.label).trim();
+        ensureSpace((label ? tmpl.bodySize + 4 : 0) + (field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight) + 8);
+        if (label) {
+          page.drawText(label, {
+            x: tmpl.marginLeft,
+            y,
+            size: tmpl.bodySize,
+            font,
+            color: rgb(0.2, 0.2, 0.2),
+          });
+          y -= tmpl.bodySize + 4;
+        }
 
         const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
         const tf = form.createTextField(fieldName);
@@ -547,7 +554,7 @@ function drawBrandedChrome(
 
   // Logo (left). If not yet uploaded, fall back to styled text.
   if (logo) {
-    const targetH = 28;
+    const targetH = 44;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
     page.drawImage(logo, { x: tmpl.marginLeft, y: centerY - targetH / 2 + 2, width: w, height: targetH });

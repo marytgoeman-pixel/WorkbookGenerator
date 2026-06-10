@@ -41,6 +41,34 @@ export default function DocumentEditor({ doc, onChange }: Props) {
     });
   }
 
+  function updateBodyLine(sectionId: string, idx: number, value: string) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    const bodyLines = s.bodyLines.map((l, i) => (i === idx ? value : l));
+    updateSection(sectionId, { bodyLines });
+  }
+  function removeBodyLine(sectionId: string, idx: number) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    updateSection(sectionId, { bodyLines: s.bodyLines.filter((_, i) => i !== idx) });
+  }
+  function addBodyLine(sectionId: string) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    updateSection(sectionId, { bodyLines: [...s.bodyLines, ''] });
+  }
+
+  function updateBullet(sectionId: string, idx: number, value: string) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    const bullets = s.bullets.map((l, i) => (i === idx ? value : l));
+    updateSection(sectionId, { bullets });
+  }
+  function removeBullet(sectionId: string, idx: number) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    updateSection(sectionId, { bullets: s.bullets.filter((_, i) => i !== idx) });
+  }
+  function addBullet(sectionId: string) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    updateSection(sectionId, { bullets: [...s.bullets, ''] });
+  }
+
   function moveSection(index: number, dir: -1 | 1) {
     const sections = [...doc.sections];
     const target = index + dir;
@@ -178,6 +206,46 @@ export default function DocumentEditor({ doc, onChange }: Props) {
               />
               Stylize text as callout
             </label>
+            <label className="flex items-center gap-1 text-gray-500 cursor-pointer" title="Start this section on a new page">
+              <input
+                type="checkbox"
+                checked={!!section.pageBreakBefore}
+                onChange={(e) => updateSection(section.id, { pageBreakBefore: e.target.checked })}
+              />
+              Start on new page
+            </label>
+          </div>
+
+          {/* Content: body lines + bullets, editable */}
+          <div className="border-t bg-white px-4 py-2 space-y-1.5">
+            {section.bodyLines.map((line, i) => (
+              <div key={`b${i}`} className="flex items-center gap-2">
+                <span className="text-gray-300 text-xs w-4" title="Text line">¶</span>
+                <input
+                  className="flex-1 text-xs border-b border-dashed border-gray-200 bg-transparent focus:outline-none focus:border-blue-400 py-0.5"
+                  value={line}
+                  placeholder="Text line…"
+                  onChange={(e) => updateBodyLine(section.id, i, e.target.value)}
+                />
+                <button onClick={() => removeBodyLine(section.id, i)} className="text-red-400 hover:text-red-600 text-xs" title="Remove line">✕</button>
+              </div>
+            ))}
+            {section.bullets.map((line, i) => (
+              <div key={`l${i}`} className="flex items-center gap-2">
+                <span className="text-gray-400 text-xs w-4" title="Bullet">•</span>
+                <input
+                  className="flex-1 text-xs border-b border-dashed border-gray-200 bg-transparent focus:outline-none focus:border-blue-400 py-0.5"
+                  value={line}
+                  placeholder="Bullet…"
+                  onChange={(e) => updateBullet(section.id, i, e.target.value)}
+                />
+                <button onClick={() => removeBullet(section.id, i)} className="text-red-400 hover:text-red-600 text-xs" title="Remove bullet">✕</button>
+              </div>
+            ))}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => addBodyLine(section.id)} className="text-xs px-2 py-0.5 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600 transition-colors">+ text line</button>
+              <button onClick={() => addBullet(section.id)} className="text-xs px-2 py-0.5 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600 transition-colors">+ bullet</button>
+            </div>
           </div>
 
           {/* Fields list */}

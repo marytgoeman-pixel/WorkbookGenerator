@@ -20,6 +20,7 @@ export interface Section {
   headingStyle?: HeadingStyle; // how the section heading is drawn (default 'accent')
   headingCase?: TextCase;      // case transform for the heading (default 'none')
   callout?: boolean;           // render the body text inside a stylized brand box
+  pageBreakBefore?: boolean;   // force this section to start on a new page
 }
 
 export interface DocumentModel {

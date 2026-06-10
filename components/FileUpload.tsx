@@ -22,19 +22,26 @@ async function docxToHtml(file: File): Promise<string> {
   return result.value;
 }
 
-// Ask the AI endpoint to structure the document; returns null on any failure
-async function aiStructure(html: string): Promise<DocumentModel | null> {
+type AiResult = { document: DocumentModel } | { reason: string };
+
+// Ask the AI endpoint to structure the document; returns a reason string on failure
+async function aiStructure(html: string): Promise<AiResult> {
   try {
     const res = await fetch('/api/structure', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ html }),
     });
-    if (!res.ok) return null;
+    if (res.status === 503) return { reason: 'AI is not configured on the server (missing ANTHROPIC_API_KEY).' };
+    if (res.status === 401) return { reason: 'Your session expired — please sign in again.' };
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { reason: data.error || `AI request failed (${res.status}).` };
+    }
     const data = await res.json();
-    return data.document ?? null;
+    return data.document ? { document: data.document } : { reason: 'AI returned no document.' };
   } catch {
-    return null;
+    return { reason: 'Could not reach the AI service.' };
   }
 }
 
@@ -67,9 +74,13 @@ export default function FileUpload({ onParsed }: Props) {
     setLoading(true);
     setError('');
     try {
-      const aiDoc = await aiStructure(html);
-      deliver(aiDoc ?? localDoc, name);
-      if (!aiDoc) setError('AI formatting was unavailable — used the basic formatter instead.');
+      const result = await aiStructure(html);
+      if ('document' in result) {
+        deliver(result.document, name);
+      } else {
+        deliver(localDoc, name);
+        setError(`⚠️ AI formatting did not run — ${result.reason} Used the basic formatter instead.`);
+      }
     } finally {
       setLoading(false);
     }
@@ -169,7 +180,9 @@ export default function FileUpload({ onParsed }: Props) {
         {pasteMode ? '← Back to file upload' : 'Or paste text directly'}
       </button>
 
-      {error && <p className="text-sm text-amber-600">{error}</p>}
+      {error && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">{error}</p>
+      )}
 
       {fileName && !loading && (
         <div className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">

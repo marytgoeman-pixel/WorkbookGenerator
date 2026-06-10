@@ -1,0 +1,28 @@
+export const jomangumTemplate = {
+  id: 'jomangum' as const,
+  name: 'Jo Mangum',
+  description: 'Branded template: navy header, footer with logo and social links.',
+  pageWidth: 612,
+  pageHeight: 792,
+  // Generous top margin to clear the header bar; bottom margin to clear the footer
+  marginTop: 90,
+  marginBottom: 90,
+  marginLeft: 64,
+  marginRight: 64,
+  titleSize: 22,
+  headingSize: 16,
+  subheadingSize: 15,
+  bodySize: 11,
+  lineHeight: 16,
+  sectionSpacing: 22,
+  paragraphSpacing: 9,
+  fieldHeight: 26,
+  textareaHeight: 60,
+  bulletIndent: 8,
+  headerBarHeight: 0,
+  twoColumn: false,
+  notesColumnWidth: 0,
+  // Branded chrome
+  topBarHeight: 34,
+  footerHeight: 56,
+};

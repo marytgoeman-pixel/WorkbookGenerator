@@ -179,7 +179,7 @@ export async function structureWithAI(html: string): Promise<DocumentModel> {
   // Stream the request: it's a long (~30s) generation, and streaming keeps the
   // connection alive so serverless platforms don't drop it as idle.
   const stream = client.messages.stream({
-    model: 'claude-opus-4-8',
+    model: 'claude-sonnet-4-6',
     max_tokens: 16000,
     system: SYSTEM,
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },

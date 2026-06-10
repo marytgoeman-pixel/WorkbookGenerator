@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, StandardFonts, RGB, PDFString, PDFName, PDFPage, PDFImage } from 'pdf-lib';
-import { DocumentModel, TemplateId, ColorTheme, ClientBranding } from '@/types/document';
+import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable } from '@/types/document';
 import { classicTemplate } from './templates/classic';
 import { modernTemplate } from './templates/modern';
 import { workbookTemplate } from './templates/workbook';
@@ -342,134 +342,87 @@ export async function generatePDF(
       y -= tmpl.subheadingSize + 6;
     }
 
-    // Body text — optionally inside a stylized callout box (branded)
-    const useCallout = branded && section.callout && section.bodyLines.length > 0;
-    if (useCallout) {
-      const calloutBg = hexToRgb(branding!.colors.calloutBg);
-      const pad = 12;
-      const innerW = mainColWidth - pad * 2;
-      // Measure wrapped height first
-      const allWrapped: string[] = [];
-      for (const line of section.bodyLines) {
-        allWrapped.push(...wrapText(line, innerW, font, tmpl.bodySize));
-        allWrapped.push(''); // paragraph gap
+    // ---- ordered content rendering (preserves document order) ----
+    const renderText = (txt: string) => {
+      for (const wline of wrapText(txt, mainColWidth, font, tmpl.bodySize)) {
+        ensureSpace(tmpl.lineHeight);
+        page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
+        y -= tmpl.lineHeight;
       }
-      if (allWrapped[allWrapped.length - 1] === '') allWrapped.pop();
-      const boxH = allWrapped.length * tmpl.lineHeight + pad * 2;
-      ensureSpace(boxH + 8);
-      const boxTop = y + tmpl.bodySize;
-      // Filled brand box
-      page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: calloutBg });
-      // Dashed accent inner border
-      page.drawRectangle({
-        x: tmpl.marginLeft + 5, y: boxTop - boxH + 5, width: mainColWidth - 10, height: boxH - 10,
-        borderColor: hexToRgb(branding!.colors.calloutBorder), borderWidth: 1, borderDashArray: [3, 3], color: calloutBg,
-      });
-      let cy = boxTop - pad - tmpl.bodySize + 2;
-      for (const wline of allWrapped) {
-        if (wline) {
-          page.drawText(wline, { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) });
-        }
-        cy -= tmpl.lineHeight;
-      }
-      y = boxTop - boxH - tmpl.paragraphSpacing;
-    } else {
-      for (const line of section.bodyLines) {
-        const wrapped = wrapText(line, mainColWidth, font, tmpl.bodySize);
-        for (const wline of wrapped) {
-          ensureSpace(tmpl.lineHeight);
-          page.drawText(wline, {
-            x: tmpl.marginLeft,
-            y,
-            size: tmpl.bodySize,
-            font,
-            color: rgb(0.1, 0.1, 0.1),
-          });
-          y -= tmpl.lineHeight;
-        }
-        y -= tmpl.paragraphSpacing;
-      }
-    }
+      y -= tmpl.paragraphSpacing;
+    };
 
-    // Bullets
-    for (const bullet of section.bullets) {
-      const wrapped = wrapText(bullet, mainColWidth - tmpl.bulletIndent - 6, font, tmpl.bodySize);
+    const renderBullet = (txt: string) => {
+      const wrapped = wrapText(txt, mainColWidth - tmpl.bulletIndent - 6, font, tmpl.bodySize);
       ensureSpace(tmpl.lineHeight);
       if (branded) {
-        // Small filled square bullet in the accent color
-        page.drawRectangle({
-          x: tmpl.marginLeft + tmpl.bulletIndent,
-          y: y + 1,
-          width: 6,
-          height: 6,
-          color: accentColor,
-        });
+        page.drawRectangle({ x: tmpl.marginLeft + tmpl.bulletIndent, y: y + 1, width: 6, height: 6, color: accentColor });
       } else {
-        page.drawText('•', {
-          x: tmpl.marginLeft + tmpl.bulletIndent,
-          y,
-          size: tmpl.bodySize,
-          font: boldFont,
-          color: secondaryColor,
-        });
+        page.drawText('•', { x: tmpl.marginLeft + tmpl.bulletIndent, y, size: tmpl.bodySize, font: boldFont, color: secondaryColor });
       }
-      page.drawText(wrapped[0], {
-        x: tmpl.marginLeft + tmpl.bulletIndent + 10,
-        y,
-        size: tmpl.bodySize,
-        font,
-        color: rgb(0.1, 0.1, 0.1),
-      });
+      page.drawText(wrapped[0], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
       y -= tmpl.lineHeight;
       for (let i = 1; i < wrapped.length; i++) {
         ensureSpace(tmpl.lineHeight);
-        page.drawText(wrapped[i], {
-          x: tmpl.marginLeft + tmpl.bulletIndent + 10,
-          y,
-          size: tmpl.bodySize,
-          font,
-          color: rgb(0.1, 0.1, 0.1),
-        });
+        page.drawText(wrapped[i], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
         y -= tmpl.lineHeight;
       }
-    }
+    };
 
-    if (section.bullets.length > 0) y -= tmpl.paragraphSpacing;
+    const renderField = (field: FormField) => {
+      const fieldName = `${section.id}__${field.id}`;
+      if (field.type === 'checkbox') {
+        ensureSpace(20);
+        page.drawText(sanitize(field.label), { x: tmpl.marginLeft + 20, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) });
+        const cb = form.createCheckBox(fieldName);
+        cb.addToPage(page, { x: tmpl.marginLeft, y: y - 2, width: 14, height: 14, borderColor: primaryColor, backgroundColor: rgb(1, 1, 1) });
+        y -= 22;
+      } else if (field.type === 'dropdown') {
+        const label = sanitize(field.label).trim();
+        ensureSpace((label ? tmpl.bodySize + 4 : 0) + tmpl.fieldHeight + 8);
+        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize + 4; }
+        const dd = form.createDropdown(fieldName);
+        dd.addOptions(field.options ?? []);
+        dd.addToPage(page, { x: tmpl.marginLeft, y: y - tmpl.fieldHeight, width: Math.min(160, mainColWidth), height: tmpl.fieldHeight, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
+        y -= tmpl.fieldHeight + 10;
+      } else {
+        const label = sanitize(field.label).trim();
+        const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
+        ensureSpace((label ? tmpl.bodySize + 4 : 0) + fh + 8);
+        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize + 4; }
+        const tf = form.createTextField(fieldName);
+        if (field.type === 'textarea') tf.enableMultiline();
+        tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: branded ? hexToRgb(branding.colors.grayBox) : rgb(0.98, 0.98, 0.98) });
+        y -= fh + 10;
+      }
+    };
 
-    // Tables (fillable grids)
-    for (const table of section.tables ?? []) {
+    const renderTable = (table: DocTable) => {
       const cols = table.headers.length || (table.rows[0]?.length ?? 0);
-      if (cols === 0) continue;
+      if (cols === 0) return;
       const colW = mainColWidth / cols;
       const rowH = 24;
-      const headerColor = branded ? hexToRgb(branding!.colors.subtitle) : primaryColor;
-
-      // Header row
+      const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
       ensureSpace(rowH * 2);
       let ty = y;
       page.drawRectangle({ x: tmpl.marginLeft, y: ty - rowH + 4, width: mainColWidth, height: rowH, color: headerColor, opacity: 0.12 });
-      table.headers.forEach((h, c) => {
+      table.headers.forEach((h: string, c: number) => {
         const lines = wrapText(h, colW - 8, boldFont, 9);
         page.drawText(lines[0] ?? '', { x: tmpl.marginLeft + c * colW + 4, y: ty - 12, size: 9, font: boldFont, color: headerColor });
       });
       ty -= rowH;
-
-      // Data rows
       for (const row of table.rows) {
         if (ty - rowH < tmpl.marginBottom) { newPage(); ty = y = tmpl.pageHeight - tmpl.marginTop; }
         for (let c = 0; c < cols; c++) {
           const cell = row[c];
           const cx = tmpl.marginLeft + c * colW;
-          // cell border
-          page.drawRectangle({ x: cx, y: ty - rowH + 4, width: colW, height: rowH, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1), opacity: 1 });
+          page.drawRectangle({ x: cx, y: ty - rowH + 4, width: colW, height: rowH, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1) });
           if (!cell) continue;
           if (cell.field) {
-            fieldIndex++;
             const name = `${section.id}__${cell.field.id}`;
             const fw = colW - 10, fh = 15, fx = cx + 5, fy = ty - rowH + 4 + (rowH - fh) / 2;
             if (cell.field.type === 'dropdown' && cell.field.options) {
-              const dd = form.createDropdown(name);
-              dd.addOptions(cell.field.options);
+              const dd = form.createDropdown(name); dd.addOptions(cell.field.options);
               dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
             } else {
               const tf = form.createTextField(name);
@@ -483,77 +436,39 @@ export async function generatePDF(
         ty -= rowH;
       }
       y = ty - tmpl.paragraphSpacing;
-    }
+    };
 
-    // Form fields
-    for (const field of section.fields) {
-      fieldIndex++;
-      const fieldName = `${section.id}__${field.id}`;
+    const renderCalloutBox = (lines: string[]) => {
+      const calloutBg = hexToRgb(branding!.colors.calloutBg);
+      const pad = 12;
+      const innerW = mainColWidth - pad * 2;
+      const allWrapped = [];
+      for (const line of lines) { allWrapped.push(...wrapText(line, innerW, font, tmpl.bodySize)); allWrapped.push(''); }
+      if (allWrapped[allWrapped.length - 1] === '') allWrapped.pop();
+      const boxH = allWrapped.length * tmpl.lineHeight + pad * 2;
+      ensureSpace(boxH + 8);
+      const boxTop = y + tmpl.bodySize;
+      page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: calloutBg });
+      page.drawRectangle({ x: tmpl.marginLeft + 5, y: boxTop - boxH + 5, width: mainColWidth - 10, height: boxH - 10, borderColor: hexToRgb(branding!.colors.calloutBorder), borderWidth: 1, borderDashArray: [3, 3], color: calloutBg });
+      let cy = boxTop - pad - tmpl.bodySize + 2;
+      for (const wline of allWrapped) { if (wline) page.drawText(wline, { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) }); cy -= tmpl.lineHeight; }
+      y = boxTop - boxH - tmpl.paragraphSpacing;
+    };
 
-      if (field.type === 'checkbox') {
-        ensureSpace(20);
-        page.drawText(sanitize(field.label), {
-          x: tmpl.marginLeft + 20,
-          y,
-          size: tmpl.bodySize,
-          font,
-          color: rgb(0.2, 0.2, 0.2),
-        });
-        const cb = form.createCheckBox(fieldName);
-        cb.addToPage(page, {
-          x: tmpl.marginLeft,
-          y: y - 2,
-          width: 14,
-          height: 14,
-          borderColor: primaryColor,
-          backgroundColor: rgb(1, 1, 1),
-        });
-        y -= 22;
-      } else if (field.type === 'dropdown') {
-        const label = sanitize(field.label).trim();
-        ensureSpace((label ? tmpl.bodySize + 4 : 0) + tmpl.fieldHeight + 8);
-        if (label) {
-          page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) });
-          y -= tmpl.bodySize + 4;
-        }
-        const dd = form.createDropdown(fieldName);
-        dd.addOptions(field.options ?? []);
-        dd.addToPage(page, {
-          x: tmpl.marginLeft,
-          y: y - tmpl.fieldHeight,
-          width: Math.min(160, mainColWidth),
-          height: tmpl.fieldHeight,
-          borderColor: branded ? accentColor : primaryColor,
-          backgroundColor: rgb(1, 1, 1),
-        });
-        y -= tmpl.fieldHeight + 10;
-      } else {
-        // Label (skipped when blank, so a field can be just a fill box)
-        const label = sanitize(field.label).trim();
-        ensureSpace((label ? tmpl.bodySize + 4 : 0) + (field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight) + 8);
-        if (label) {
-          page.drawText(label, {
-            x: tmpl.marginLeft,
-            y,
-            size: tmpl.bodySize,
-            font,
-            color: rgb(0.2, 0.2, 0.2),
-          });
-          y -= tmpl.bodySize + 4;
-        }
-
-        const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
-        const tf = form.createTextField(fieldName);
-        if (field.type === 'textarea') tf.enableMultiline();
-        tf.addToPage(page, {
-          x: tmpl.marginLeft,
-          y: y - fh,
-          width: mainColWidth,
-          height: fh,
-          borderColor: branded ? accentColor : primaryColor,
-          backgroundColor: branded ? hexToRgb(branding!.colors.grayBox) : rgb(0.98, 0.98, 0.98),
-        });
-        y -= fh + 10;
+    if (branded && section.callout) {
+      const texts = section.content.filter((i) => i.kind === 'text').map((i) => i.text);
+      if (texts.length) renderCalloutBox(texts);
+      for (const item of section.content) {
+        if (item.kind === 'bullet') renderBullet(item.text);
+        else if (item.kind === 'field') renderField(item.field);
+        else if (item.kind === 'table') renderTable(item.table);
+      }
+    } else {
+      for (const item of section.content) {
+        if (item.kind === 'text') renderText(item.text);
+        else if (item.kind === 'bullet') renderBullet(item.text);
+        else if (item.kind === 'field') renderField(item.field);
+        else if (item.kind === 'table') renderTable(item.table);
       }
     }
 

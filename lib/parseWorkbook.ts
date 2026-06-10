@@ -1,4 +1,4 @@
-import { DocumentModel, Section, FormField, FieldType, DocTable, TableCell } from '@/types/document';
+import { DocumentModel, Section, FormField, FieldType, DocTable, TableCell, ContentItem } from '@/types/document';
 
 let sectionCounter = 0;
 let fieldCounter = 0;
@@ -7,64 +7,50 @@ function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function parseField(line: string): FormField | null {
+function newField(type: FieldType, label: string, options?: string[]): FormField {
+  fieldCounter++;
+  return { id: makeId('field'), label: label || `Field ${fieldCounter}`, type, required: false, ...(options ? { options } : {}) };
+}
+
+function parseFieldMarker(line: string): FormField | null {
   const textMatch = line.match(/^\[field\]\s*(.*)/i);
   const textareaMatch = line.match(/^\[textarea\]\s*(.*)/i);
   const checkboxMatch = line.match(/^\[checkbox\]\s*(.*)/i);
-
-  let type: FieldType | null = null;
-  let label = '';
-
-  if (textMatch) { type = 'text'; label = textMatch[1].trim(); }
-  else if (textareaMatch) { type = 'textarea'; label = textareaMatch[1].trim(); }
-  else if (checkboxMatch) { type = 'checkbox'; label = checkboxMatch[1].trim(); }
-
-  if (!type) return null;
-
-  fieldCounter++;
-  return {
-    id: makeId('field'),
-    label: label || `Field ${fieldCounter}`,
-    type,
-    required: false,
-  };
+  if (textMatch) return newField('text', textMatch[1].trim());
+  if (textareaMatch) return newField('textarea', textareaMatch[1].trim());
+  if (checkboxMatch) return newField('checkbox', checkboxMatch[1].trim());
+  return null;
 }
 
-// Detect a Word-style checkbox glyph prefix and strip it
+// ---- shared content helpers --------------------------------------------------
+
 function asCheckbox(text: string): string | null {
-  const m = text.match(/^\s*[□☐■☑✓✔□☐☑☒]\s*(.*)$/);
+  const m = text.match(/^\s*[□☐■☑✓✔☒]\s*(.*)$/);
   return m ? m[1].trim() : null;
 }
 
 // An open-ended prompt that should become a write-in answer box
-// (e.g. "Why?", "What makes you say that?", "Which statement feels most true?")
 function isAnswerPrompt(text: string): boolean {
   return /\?\s*$/.test(text) && /^(why|how|what|which|explain|describe|list|share|your|tell)\b/i.test(text);
 }
 
-// Treat a manually-bolded paragraph as a heading only when it looks like one:
-// fully bold, short, and not ending like a sentence or question. This avoids
-// turning emphasized body lines ("Why?", "Pressure comes from agenda.") into headings.
 function isBoldHeading(el: Element): boolean {
   const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
   if (!text) return false;
   const bold = el.querySelectorAll('strong, b');
   if (bold.length === 0) return false;
   const boldText = Array.from(bold).map((b) => b.textContent || '').join('').trim();
-  const fullyBold = boldText.length >= text.length - 2;
-  if (!fullyBold) return false;
-
+  if (boldText.length < text.length - 2) return false;
   const wordCount = text.split(' ').length;
-  const endsLikeSentence = /[.?!,;]$/.test(text);
-  return text.length <= 60 && wordCount <= 8 && !endsLikeSentence;
+  return text.length <= 60 && wordCount <= 8 && !/[.?!,;]$/.test(text);
 }
 
-// A cell that is empty or just underscores/dots is a fill-in
+// ---- table parsing -----------------------------------------------------------
+
 function isBlankCell(text: string): boolean {
   return text === '' || /^[_.\s]{2,}$/.test(text);
 }
 
-// Detect a numeric rating range like "(1-10)" in a column header
 function rangeOptions(header: string): string[] | null {
   const m = header.match(/\(?\s*(\d+)\s*[-–]\s*(\d+)\s*\)?/);
   if (!m) return null;
@@ -83,11 +69,8 @@ function cellText(td: Element): string {
 function parseTable(tableEl: Element): DocTable {
   const headerCells = Array.from(tableEl.querySelectorAll('thead th, thead td'));
   let headers = headerCells.map(cellText);
+  let dataRows = Array.from(tableEl.querySelectorAll('tbody tr'));
 
-  const bodyRows = Array.from(tableEl.querySelectorAll('tbody tr'));
-  let dataRows = bodyRows;
-
-  // No <thead>? Use the first row as the header.
   if (headers.length === 0) {
     const allRows = Array.from(tableEl.querySelectorAll('tr'));
     if (allRows.length) {
@@ -98,35 +81,29 @@ function parseTable(tableEl: Element): DocTable {
 
   const colOptions = headers.map(rangeOptions);
 
-  const rows: TableCell[][] = dataRows.map((tr) => {
-    const cells = Array.from(tr.children);
-    return cells.map((td, col): TableCell => {
+  const rows: TableCell[][] = dataRows.map((tr) =>
+    Array.from(tr.children).map((td, col): TableCell => {
       const text = cellText(td);
       if (isBlankCell(text)) {
-        fieldCounter++;
         const opts = colOptions[col];
-        return {
-          text: '',
-          field: {
-            id: makeId('field'),
-            label: '',
-            type: opts ? 'dropdown' : 'text',
-            required: false,
-            ...(opts ? { options: opts } : {}),
-          },
-        };
+        return { text: '', field: newField(opts ? 'dropdown' : 'text', '', opts ?? undefined) };
       }
       return { text };
-    });
-  });
+    })
+  );
 
   return { id: makeId('table'), headers, rows };
 }
 
-/**
- * Parse the HTML that mammoth produces from a Word document. Unlike raw-text
- * extraction, this preserves heading levels, lists, and bold "headings".
- */
+// ---- section builder ---------------------------------------------------------
+
+function makeSection(level: 1 | 2, title: string): Section {
+  sectionCounter++;
+  return { id: makeId('section'), level, title, content: [] };
+}
+
+// ---- HTML parser (Word docs via mammoth) -------------------------------------
+
 export function parseWorkbookHtml(html: string): DocumentModel {
   sectionCounter = 0;
   fieldCounter = 0;
@@ -135,48 +112,19 @@ export function parseWorkbookHtml(html: string): DocumentModel {
   const blocks = Array.from(docEl.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, table'));
 
   const sections: Section[] = [];
-  let currentSection: Section | null = null;
+  let current: Section | null = null;
   let title = 'Untitled Document';
   let titleSet = false;
 
-  function pushSection() {
-    if (currentSection) sections.push(currentSection);
-  }
-  function newSection(level: 1 | 2, sectionTitle: string): Section {
-    sectionCounter++;
-    return { id: makeId('section'), level, title: sectionTitle, bodyLines: [], bullets: [], fields: [] };
-  }
-  function ensureSection() {
-    if (!currentSection) currentSection = newSection(1, 'Document');
-  }
-  function addCheckbox(label: string) {
-    ensureSection();
-    fieldCounter++;
-    currentSection!.fields.push({
-      id: makeId('field'),
-      label: label || `Field ${fieldCounter}`,
-      type: 'checkbox',
-      required: false,
-    });
-  }
+  const push = () => { if (current) sections.push(current); };
+  const ensure = () => { if (!current) current = makeSection(1, 'Document'); };
+  const text = (el: Element) => (el.textContent || '').replace(/\s+/g, ' ').trim();
 
-  function addTextarea(label: string) {
-    ensureSection();
-    fieldCounter++;
-    currentSection!.fields.push({
-      id: makeId('field'),
-      label: label || `Field ${fieldCounter}`,
-      type: 'textarea',
-      required: false,
-    });
-  }
-
-  // Text of the next meaningful block (skips empties, table cells, and <p> inside <li>)
   function nextText(from: number): string {
     for (let j = from + 1; j < blocks.length; j++) {
       const e = blocks[j];
       if ((e.tagName === 'P' || e.tagName === 'LI') && e.closest('table, li')) continue;
-      const t = (e.textContent || '').replace(/\s+/g, ' ').trim();
+      const t = text(e);
       if (t) return t;
     }
     return '';
@@ -186,141 +134,106 @@ export function parseWorkbookHtml(html: string): DocumentModel {
     const el = blocks[bi];
     const tag = el.tagName.toLowerCase();
 
-    // Tables become fillable grids on the current section
     if (tag === 'table') {
-      ensureSection();
-      (currentSection!.tables ||= []).push(parseTable(el));
+      ensure();
+      current!.content.push({ id: makeId('c'), kind: 'table', table: parseTable(el) });
       continue;
     }
 
-    // Skip <p>/<li> that live inside a table or list item (handled elsewhere)
     if ((el.tagName === 'P' || el.tagName === 'LI') && el.closest('table')) continue;
     if (el.tagName === 'P' && el.closest('li')) continue;
 
-    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-    if (!text) continue;
+    const t = text(el);
+    if (!t) continue;
 
-    const isHeading = /^h[1-6]$/.test(tag) || (tag === 'p' && isBoldHeading(el));
-
-    if (isHeading) {
+    if (/^h[1-6]$/.test(tag) || (tag === 'p' && isBoldHeading(el))) {
       const level: 1 | 2 = tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6' ? 2 : 1;
-      if (!titleSet) {
-        title = text;
-        titleSet = true;
-      }
-      pushSection();
-      currentSection = newSection(level, text);
+      if (!titleSet) { title = t; titleSet = true; }
+      push();
+      current = makeSection(level, t);
       continue;
     }
 
-    // List item or paragraph
-    const cb = asCheckbox(text);
+    const cb = asCheckbox(t);
     if (cb !== null) {
-      addCheckbox(cb);
+      ensure();
+      current!.content.push({ id: makeId('c'), kind: 'field', field: newField('checkbox', cb) });
       continue;
     }
 
-    // Explicit [field]/[textarea]/[checkbox] markers still work
-    const field = parseField(text);
-    if (field) {
-      ensureSection();
-      currentSection!.fields.push(field);
+    const marker = parseFieldMarker(t);
+    if (marker) {
+      ensure();
+      current!.content.push({ id: makeId('c'), kind: 'field', field: marker });
       continue;
     }
 
-    // Auto: an open-ended prompt NOT followed by a checkbox becomes a write-in box
-    if (isAnswerPrompt(text) && asCheckbox(nextText(bi)) === null) {
-      addTextarea(text);
+    if (isAnswerPrompt(t) && asCheckbox(nextText(bi)) === null) {
+      ensure();
+      current!.content.push({ id: makeId('c'), kind: 'field', field: newField('textarea', t) });
       continue;
     }
 
-    ensureSection();
-    if (tag === 'li') {
-      currentSection!.bullets.push(text);
-    } else {
-      currentSection!.bodyLines.push(text);
-    }
+    ensure();
+    if (tag === 'li') current!.content.push({ id: makeId('c'), kind: 'bullet', text: t });
+    else current!.content.push({ id: makeId('c'), kind: 'text', text: t });
   }
 
-  pushSection();
-  if (sections.length === 0) sections.push(newSection(1, 'Document'));
-
+  push();
+  if (sections.length === 0) sections.push(makeSection(1, 'Document'));
   return { title, author: '', sections };
 }
+
+// ---- plain text / markdown parser (.txt, .md, pasted) ------------------------
 
 export function parseWorkbook(rawText: string): DocumentModel {
   sectionCounter = 0;
   fieldCounter = 0;
 
-  // Normalize line endings
   const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-
   const sections: Section[] = [];
-  let currentSection: Section | null = null;
+  let current: Section | null = null;
   let title = 'Untitled Document';
   let titleSet = false;
 
-  function pushSection() {
-    if (currentSection) sections.push(currentSection);
-  }
+  const push = () => { if (current) sections.push(current); };
+  const ensure = () => { if (!current) current = makeSection(1, 'Document'); };
 
-  function newSection(level: 1 | 2, sectionTitle: string): Section {
-    sectionCounter++;
-    return {
-      id: makeId('section'),
-      level,
-      title: sectionTitle,
-      bodyLines: [],
-      bullets: [],
-      fields: [],
-    };
-  }
+  const meaningful = lines.map((l) => l.trim()).filter(Boolean);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) continue; // skip blank lines
-
-    // Normalize Word-style checkbox symbols to [checkbox] markers
+  for (let i = 0; i < meaningful.length; i++) {
+    const trimmed = meaningful[i];
     const normalized = trimmed
       .replace(/^[□☐]\s*/, '[checkbox] ')
       .replace(/^[■☑✓✔]\s*/, '[checkbox] ');
 
     if (normalized.startsWith('## ')) {
-      pushSection();
-      currentSection = newSection(2, normalized.slice(3).trim());
+      push();
+      current = makeSection(2, normalized.slice(3).trim());
     } else if (normalized.startsWith('# ')) {
       const heading = normalized.slice(2).trim();
-      if (!titleSet) {
-        title = heading;
-        titleSet = true;
-        pushSection();
-        currentSection = newSection(1, heading);
-      } else {
-        pushSection();
-        currentSection = newSection(1, heading);
-      }
+      if (!titleSet) { title = heading; titleSet = true; }
+      push();
+      current = makeSection(1, heading);
     } else if (normalized.startsWith('- ')) {
-      if (!currentSection) { currentSection = newSection(1, 'Document'); }
-      currentSection.bullets.push(normalized.slice(2).trim());
+      ensure();
+      current!.content.push({ id: makeId('c'), kind: 'bullet', text: normalized.slice(2).trim() });
     } else {
-      const field = parseField(normalized);
-      if (field) {
-        if (!currentSection) { currentSection = newSection(1, 'Document'); }
-        currentSection.fields.push(field);
+      const marker = parseFieldMarker(normalized);
+      if (marker) {
+        ensure();
+        current!.content.push({ id: makeId('c'), kind: 'field', field: marker });
+      } else if (isAnswerPrompt(normalized) && asCheckbox(meaningful[i + 1] ?? '') === null) {
+        ensure();
+        current!.content.push({ id: makeId('c'), kind: 'field', field: newField('textarea', normalized) });
       } else {
-        if (!currentSection) { currentSection = newSection(1, 'Document'); }
-        currentSection.bodyLines.push(normalized);
+        ensure();
+        current!.content.push({ id: makeId('c'), kind: 'text', text: normalized });
       }
     }
   }
 
-  pushSection();
-
-  if (sections.length === 0) {
-    sections.push(newSection(1, 'Document'));
-  }
-
+  push();
+  if (sections.length === 0) sections.push(makeSection(1, 'Document'));
   return { title, author: '', sections };
 }

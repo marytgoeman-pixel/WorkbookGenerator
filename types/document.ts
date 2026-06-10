@@ -23,18 +23,23 @@ export interface DocTable {
 export type HeadingStyle = 'accent' | 'brand' | 'plain';
 export type TextCase = 'none' | 'upper' | 'sentence' | 'title';
 
+// A section's content is an ordered list so document order is preserved
+// (e.g. prompt → checkboxes → answer box → next prompt …)
+export type ContentItem =
+  | { id: string; kind: 'text'; text: string }
+  | { id: string; kind: 'bullet'; text: string }
+  | { id: string; kind: 'field'; field: FormField }
+  | { id: string; kind: 'table'; table: DocTable };
+
 export interface Section {
   id: string;
   level: 1 | 2;
   title: string;
-  bodyLines: string[];
-  bullets: string[];
-  fields: FormField[];
+  content: ContentItem[];      // ordered content (text, bullets, fields, tables)
   headingStyle?: HeadingStyle; // how the section heading is drawn (default 'accent')
   headingCase?: TextCase;      // case transform for the heading (default 'none')
   callout?: boolean;           // render the body text inside a stylized brand box
   pageBreakBefore?: boolean;   // force this section to start on a new page
-  tables?: DocTable[];         // fillable tables/grids parsed from the doc
 }
 
 export type Spacing = 'compact' | 'normal' | 'relaxed';

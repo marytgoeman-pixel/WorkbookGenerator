@@ -1,4 +1,4 @@
-import { DocumentModel, Section, FormField, FieldType } from '@/types/document';
+import { DocumentModel, Section, FormField, FieldType, DocTable, TableCell } from '@/types/document';
 
 let sectionCounter = 0;
 let fieldCounter = 0;
@@ -59,6 +59,70 @@ function isBoldHeading(el: Element): boolean {
   return text.length <= 60 && wordCount <= 8 && !endsLikeSentence;
 }
 
+// A cell that is empty or just underscores/dots is a fill-in
+function isBlankCell(text: string): boolean {
+  return text === '' || /^[_.\s]{2,}$/.test(text);
+}
+
+// Detect a numeric rating range like "(1-10)" in a column header
+function rangeOptions(header: string): string[] | null {
+  const m = header.match(/\(?\s*(\d+)\s*[-–]\s*(\d+)\s*\)?/);
+  if (!m) return null;
+  const lo = parseInt(m[1], 10);
+  const hi = parseInt(m[2], 10);
+  if (isNaN(lo) || isNaN(hi) || hi <= lo || hi - lo > 50) return null;
+  const opts: string[] = [];
+  for (let v = lo; v <= hi; v++) opts.push(String(v));
+  return opts;
+}
+
+function cellText(td: Element): string {
+  return (td.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
+function parseTable(tableEl: Element): DocTable {
+  const headerCells = Array.from(tableEl.querySelectorAll('thead th, thead td'));
+  let headers = headerCells.map(cellText);
+
+  const bodyRows = Array.from(tableEl.querySelectorAll('tbody tr'));
+  let dataRows = bodyRows;
+
+  // No <thead>? Use the first row as the header.
+  if (headers.length === 0) {
+    const allRows = Array.from(tableEl.querySelectorAll('tr'));
+    if (allRows.length) {
+      headers = Array.from(allRows[0].children).map(cellText);
+      dataRows = allRows.slice(1);
+    }
+  }
+
+  const colOptions = headers.map(rangeOptions);
+
+  const rows: TableCell[][] = dataRows.map((tr) => {
+    const cells = Array.from(tr.children);
+    return cells.map((td, col): TableCell => {
+      const text = cellText(td);
+      if (isBlankCell(text)) {
+        fieldCounter++;
+        const opts = colOptions[col];
+        return {
+          text: '',
+          field: {
+            id: makeId('field'),
+            label: '',
+            type: opts ? 'dropdown' : 'text',
+            required: false,
+            ...(opts ? { options: opts } : {}),
+          },
+        };
+      }
+      return { text };
+    });
+  });
+
+  return { id: makeId('table'), headers, rows };
+}
+
 /**
  * Parse the HTML that mammoth produces from a Word document. Unlike raw-text
  * extraction, this preserves heading levels, lists, and bold "headings".
@@ -68,7 +132,7 @@ export function parseWorkbookHtml(html: string): DocumentModel {
   fieldCounter = 0;
 
   const docEl = new DOMParser().parseFromString(html, 'text/html');
-  const blocks = Array.from(docEl.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li'));
+  const blocks = Array.from(docEl.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, table'));
 
   const sections: Section[] = [];
   let currentSection: Section | null = null;
@@ -107,11 +171,11 @@ export function parseWorkbookHtml(html: string): DocumentModel {
     });
   }
 
-  // Text of the next meaningful block (skips empties and <p> inside <li>)
+  // Text of the next meaningful block (skips empties, table cells, and <p> inside <li>)
   function nextText(from: number): string {
     for (let j = from + 1; j < blocks.length; j++) {
       const e = blocks[j];
-      if (e.tagName === 'P' && e.closest('li')) continue;
+      if ((e.tagName === 'P' || e.tagName === 'LI') && e.closest('table, li')) continue;
       const t = (e.textContent || '').replace(/\s+/g, ' ').trim();
       if (t) return t;
     }
@@ -120,10 +184,19 @@ export function parseWorkbookHtml(html: string): DocumentModel {
 
   for (let bi = 0; bi < blocks.length; bi++) {
     const el = blocks[bi];
-    // Skip <p> that live inside <li> (handled by the li itself)
+    const tag = el.tagName.toLowerCase();
+
+    // Tables become fillable grids on the current section
+    if (tag === 'table') {
+      ensureSection();
+      (currentSection!.tables ||= []).push(parseTable(el));
+      continue;
+    }
+
+    // Skip <p>/<li> that live inside a table or list item (handled elsewhere)
+    if ((el.tagName === 'P' || el.tagName === 'LI') && el.closest('table')) continue;
     if (el.tagName === 'P' && el.closest('li')) continue;
 
-    const tag = el.tagName.toLowerCase();
     const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
     if (!text) continue;
 

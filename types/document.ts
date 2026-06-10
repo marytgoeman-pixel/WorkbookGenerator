@@ -1,10 +1,23 @@
-export type FieldType = 'text' | 'textarea' | 'checkbox';
+export type FieldType = 'text' | 'textarea' | 'checkbox' | 'dropdown';
 
 export interface FormField {
   id: string;
   label: string;
   type: FieldType;
   required: boolean;
+  options?: string[]; // for dropdown fields (e.g. ["1".."10"])
+}
+
+// A cell is either static text or a fillable field
+export interface TableCell {
+  text: string;
+  field?: FormField;
+}
+
+export interface DocTable {
+  id: string;
+  headers: string[];
+  rows: TableCell[][];
 }
 
 export type HeadingStyle = 'accent' | 'brand' | 'plain';
@@ -21,6 +34,7 @@ export interface Section {
   headingCase?: TextCase;      // case transform for the heading (default 'none')
   callout?: boolean;           // render the body text inside a stylized brand box
   pageBreakBefore?: boolean;   // force this section to start on a new page
+  tables?: DocTable[];         // fillable tables/grids parsed from the doc
 }
 
 export type Spacing = 'compact' | 'normal' | 'relaxed';

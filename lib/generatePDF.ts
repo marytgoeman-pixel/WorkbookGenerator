@@ -436,6 +436,55 @@ export async function generatePDF(
 
     if (section.bullets.length > 0) y -= tmpl.paragraphSpacing;
 
+    // Tables (fillable grids)
+    for (const table of section.tables ?? []) {
+      const cols = table.headers.length || (table.rows[0]?.length ?? 0);
+      if (cols === 0) continue;
+      const colW = mainColWidth / cols;
+      const rowH = 24;
+      const headerColor = branded ? hexToRgb(branding!.colors.subtitle) : primaryColor;
+
+      // Header row
+      ensureSpace(rowH * 2);
+      let ty = y;
+      page.drawRectangle({ x: tmpl.marginLeft, y: ty - rowH + 4, width: mainColWidth, height: rowH, color: headerColor, opacity: 0.12 });
+      table.headers.forEach((h, c) => {
+        const lines = wrapText(h, colW - 8, boldFont, 9);
+        page.drawText(lines[0] ?? '', { x: tmpl.marginLeft + c * colW + 4, y: ty - 12, size: 9, font: boldFont, color: headerColor });
+      });
+      ty -= rowH;
+
+      // Data rows
+      for (const row of table.rows) {
+        if (ty - rowH < tmpl.marginBottom) { newPage(); ty = y = tmpl.pageHeight - tmpl.marginTop; }
+        for (let c = 0; c < cols; c++) {
+          const cell = row[c];
+          const cx = tmpl.marginLeft + c * colW;
+          // cell border
+          page.drawRectangle({ x: cx, y: ty - rowH + 4, width: colW, height: rowH, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1), opacity: 1 });
+          if (!cell) continue;
+          if (cell.field) {
+            fieldIndex++;
+            const name = `${section.id}__${cell.field.id}`;
+            const fw = colW - 10, fh = 15, fx = cx + 5, fy = ty - rowH + 4 + (rowH - fh) / 2;
+            if (cell.field.type === 'dropdown' && cell.field.options) {
+              const dd = form.createDropdown(name);
+              dd.addOptions(cell.field.options);
+              dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
+            } else {
+              const tf = form.createTextField(name);
+              tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
+            }
+          } else if (cell.text) {
+            const lines = wrapText(cell.text, colW - 8, font, 9);
+            page.drawText(lines[0] ?? '', { x: cx + 4, y: ty - 12, size: 9, font, color: rgb(0.15, 0.15, 0.15) });
+          }
+        }
+        ty -= rowH;
+      }
+      y = ty - tmpl.paragraphSpacing;
+    }
+
     // Form fields
     for (const field of section.fields) {
       fieldIndex++;
@@ -460,6 +509,24 @@ export async function generatePDF(
           backgroundColor: rgb(1, 1, 1),
         });
         y -= 22;
+      } else if (field.type === 'dropdown') {
+        const label = sanitize(field.label).trim();
+        ensureSpace((label ? tmpl.bodySize + 4 : 0) + tmpl.fieldHeight + 8);
+        if (label) {
+          page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) });
+          y -= tmpl.bodySize + 4;
+        }
+        const dd = form.createDropdown(fieldName);
+        dd.addOptions(field.options ?? []);
+        dd.addToPage(page, {
+          x: tmpl.marginLeft,
+          y: y - tmpl.fieldHeight,
+          width: Math.min(160, mainColWidth),
+          height: tmpl.fieldHeight,
+          borderColor: branded ? accentColor : primaryColor,
+          backgroundColor: rgb(1, 1, 1),
+        });
+        y -= tmpl.fieldHeight + 10;
       } else {
         // Label (skipped when blank, so a field can be just a fill box)
         const label = sanitize(field.label).trim();

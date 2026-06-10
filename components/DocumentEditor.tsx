@@ -77,6 +77,11 @@ export default function DocumentEditor({ doc, onChange }: Props) {
     onChange({ ...doc, sections });
   }
 
+  function deleteTable(sectionId: string, tableId: string) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    updateSection(sectionId, { tables: (s.tables ?? []).filter((t) => t.id !== tableId) });
+  }
+
   function deleteSection(sectionId: string) {
     onChange({ ...doc, sections: doc.sections.filter((s) => s.id !== sectionId) });
   }
@@ -107,8 +112,8 @@ export default function DocumentEditor({ doc, onChange }: Props) {
     });
   }
 
-  const fieldTypeIcon: Record<FieldType, string> = { text: '—', textarea: '≡', checkbox: '☐' };
-  const fieldTypeLabel: Record<FieldType, string> = { text: 'Text field', textarea: 'Text area', checkbox: 'Checkbox' };
+  const fieldTypeIcon: Record<FieldType, string> = { text: '—', textarea: '≡', checkbox: '☐', dropdown: '▾' };
+  const fieldTypeLabel: Record<FieldType, string> = { text: 'Text field', textarea: 'Text area', checkbox: 'Checkbox', dropdown: 'Dropdown' };
 
   return (
     <div className="space-y-4">
@@ -298,6 +303,21 @@ export default function DocumentEditor({ doc, onChange }: Props) {
               <button onClick={() => addBullet(section.id)} className="text-xs px-2 py-0.5 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600 transition-colors">+ bullet</button>
             </div>
           </div>
+
+          {/* Tables (auto-detected fillable grids) */}
+          {(section.tables ?? []).map((t) => {
+            const fillCount = t.rows.reduce((n, r) => n + r.filter((c) => c.field).length, 0);
+            const dd = t.rows.some((r) => r.some((c) => c.field?.type === 'dropdown'));
+            return (
+              <div key={t.id} className="border-t bg-blue-50/40 px-4 py-2 flex items-center gap-2 text-xs text-gray-600">
+                <span title="Fillable table">▦</span>
+                <span className="flex-1">
+                  Table · {t.headers.length} cols × {t.rows.length} rows · {fillCount} fillable{dd ? ' (with 1–10 dropdowns)' : ''}
+                </span>
+                <button onClick={() => deleteTable(section.id, t.id)} className="text-red-400 hover:text-red-600" title="Remove table">✕</button>
+              </div>
+            );
+          })}
 
           {/* Fields list */}
           {section.fields.length > 0 && (

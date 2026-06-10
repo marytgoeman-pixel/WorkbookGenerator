@@ -6,6 +6,7 @@ import FileUpload from '@/components/FileUpload';
 import DocumentEditor from '@/components/DocumentEditor';
 import PDFPreview from '@/components/PDFPreview';
 import DownloadButton from '@/components/DownloadButton';
+import { APP_VERSION } from '@/lib/version';
 
 interface Props {
   branding: ClientBranding;
@@ -49,7 +50,10 @@ export default function WorkbookApp({ branding }: Props) {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Welcome {branding.displayName}</h1>
+            <h1 className="text-xl font-bold text-gray-900">
+              Welcome {branding.displayName}
+              <span className="ml-2 text-xs font-mono text-gray-400 align-middle">{APP_VERSION}</span>
+            </h1>
             <p className="text-xs text-gray-400 mt-0.5">
               Upload your Word doc → Review → Download your branded fillable PDF
             </p>

@@ -389,20 +389,20 @@ export async function generatePDF(
       } else if (field.type === 'dropdown') {
         const label = sanitize(field.label).trim();
         ensureSpace((label ? tmpl.bodySize + 4 : 0) + tmpl.fieldHeight + 8);
-        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize + 4; }
+        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize - 3; }
         const dd = form.createDropdown(fieldName);
         dd.addOptions(field.options ?? []);
         dd.addToPage(page, { x: tmpl.marginLeft, y: y - tmpl.fieldHeight, width: Math.min(160, mainColWidth), height: tmpl.fieldHeight, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
-        y -= tmpl.fieldHeight + 10;
+        y -= tmpl.fieldHeight + 18;
       } else {
         const label = sanitize(field.label).trim();
         const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
         ensureSpace((label ? tmpl.bodySize + 4 : 0) + fh + 8);
-        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize + 4; }
+        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize - 3; }
         const tf = form.createTextField(fieldName);
         if (field.type === 'textarea') tf.enableMultiline();
         tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: branded ? hexToRgb(branding.colors.grayBox) : rgb(0.98, 0.98, 0.98) });
-        y -= fh + 10;
+        y -= fh + 18;
       }
     };
 

@@ -3,7 +3,8 @@ import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { structureWithAI } from '@/lib/aiStructure';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+// Vercel Pro/Premium allows long functions; the AI generation runs ~30-40s.
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   // Require a logged-in client (also keeps the API key usage gated)

@@ -101,6 +101,14 @@ export interface ColorTheme {
   background: string;
 }
 
+// Where a section's heading was drawn — lets the preview map a click back to the editor.
+// page: 0-based page index; topFrac: 0 (page top) .. 1 (page bottom).
+export interface SectionAnchor {
+  sectionId: string;
+  page: number;
+  topFrac: number;
+}
+
 export interface AppState {
   document: DocumentModel | null;
   templateId: TemplateId;

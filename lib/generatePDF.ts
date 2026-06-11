@@ -173,7 +173,8 @@ export async function generatePDF(
   doc: DocumentModel,
   templateId: TemplateId,
   theme: ColorTheme,
-  branding?: ClientBranding
+  branding?: ClientBranding,
+  anchors?: import('@/types/document').SectionAnchor[]  // optional: collects per-section positions for click-to-edit
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const form = pdfDoc.getForm();
@@ -409,6 +410,11 @@ export async function generatePDF(
       y -= section.level === 1 ? 6 : 2;
     }
 
+    // Record where this section's heading lands (for click-to-edit in the preview)
+    const recordAnchor = () => {
+      anchors?.push({ sectionId: section.id, page: pdfDoc.getPageCount() - 1, topFrac: Math.min(1, Math.max(0, (tmpl.pageHeight - y) / tmpl.pageHeight)) });
+    };
+
     // Section heading
     if (branded) {
       // Headers/subheaders are NOT bulleted by default. 'accent' (opt-in) adds a square bullet;
@@ -432,6 +438,7 @@ export async function generatePDF(
       const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
       // Orphan control: keep the whole heading together with the start of its content
       ensureSpace(hLines.length * (size + 2) + (section.level === 1 ? 8 : 5) + leadEstimate());
+      recordAnchor();
       if (useMark) {
         page.drawImage(sellitMark!, { x: tmpl.marginLeft, y: y - 2, width: markW, height: markH });
       } else if (drawBullet) {
@@ -974,18 +981,22 @@ function drawAboutJoPage(
     page.drawText(cred, { x: lx + (logoW - cw) / 2, y: ly - 22, size: bodySize, font, color: ink });
   }
 
-  // Bio paragraphs (full width, below the photo/logo block)
-  let yy = photoBottom - 40;
-  for (const para of JO_BIO) {
-    for (const ln of wrapText(para, W - pad * 2, font, bodySize)) {
-      page.drawText(ln, { x: pad, y: yy, size: bodySize, font, color: ink });
-      yy -= lineH;
-    }
+  // Bio + accolade, vertically centered in the white space below the photo/logo block
+  const bioWrapped = JO_BIO.map((p) => wrapText(p, W - pad * 2, font, bodySize));
+  const bioH = bioWrapped.reduce((s, lns) => s + lns.length * lineH, 0) + paraGap * (JO_BIO.length - 1);
+  const accGap = 22, accH = 18;
+  const blockH = bioH + accGap + accH;
+  const regionTop = photoBottom - 28;
+  const regionBottom = tmpl.marginBottom + 30;
+  const extra = Math.max(0, (regionTop - regionBottom) - blockH);
+  let yy = regionTop - extra / 2;
+  for (const lns of bioWrapped) {
+    for (const ln of lns) { page.drawText(ln, { x: pad, y: yy, size: bodySize, font, color: ink }); yy -= lineH; }
     yy -= paraGap;
   }
 
   // Accolade (italic, brand blue, centered)
-  yy -= 8;
+  yy -= accGap - paraGap;
   const acc = sanitize('North Carolina Educator of the Year 2015');
   const aw = italicFont.widthOfTextAtSize(acc, 13);
   page.drawText(acc, { x: (W - aw) / 2, y: Math.max(tmpl.marginBottom + 18, yy), size: 13, font: italicFont, color: blue });
@@ -1003,14 +1014,15 @@ function drawLegalPage(page: PDFPage, tmpl: Template, font: PDFFontT, _boldFont:
   const pad = tmpl.marginLeft;
   const ink = rgb(0.15, 0.15, 0.15);
   const bodySize = 12, lineH = 16, paraGap = 14;
-  let yy = H - 200; // start in the upper-middle, like the source
-  for (const para of JO_LEGAL) {
-    for (const ln of wrapText(para, W - pad * 2, font, bodySize)) {
-      page.drawText(ln, { x: pad, y: yy, size: bodySize, font, color: ink });
-      yy -= lineH;
-    }
+  // Bottom-aligned: place the disclaimer block near the bottom of the page
+  const legalWrapped = JO_LEGAL.map((p) => wrapText(p, W - pad * 2, font, bodySize));
+  const totalH = legalWrapped.reduce((s, lns) => s + lns.length * lineH, 0) + paraGap * (JO_LEGAL.length - 1);
+  let yy = tmpl.marginBottom + totalH + 6;
+  for (const lns of legalWrapped) {
+    for (const ln of lns) { page.drawText(ln, { x: pad, y: yy, size: bodySize, font, color: ink }); yy -= lineH; }
     yy -= paraGap;
   }
+  void H;
 }
 
 // Draw the navy top bar and the branded footer (logo, tagline, social links, page number)

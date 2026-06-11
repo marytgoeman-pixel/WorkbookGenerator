@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { DocumentModel, TemplateId, ColorTheme, ClientBranding } from '@/types/document';
+import { DocumentModel, TemplateId, ColorTheme, ClientBranding, SectionAnchor } from '@/types/document';
 import { generatePDF } from '@/lib/generatePDF';
 
 interface Props {
@@ -8,10 +8,12 @@ interface Props {
   templateId: TemplateId;
   colorTheme: ColorTheme;
   branding?: ClientBranding;
+  onSelectSection?: (sectionId: string) => void; // click a spot in the preview → edit that section
 }
 
-export default function PDFPreview({ doc, templateId, colorTheme, branding }: Props) {
+export default function PDFPreview({ doc, templateId, colorTheme, branding, onSelectSection }: Props) {
   const [pageImages, setPageImages] = useState<string[]>([]);
+  const [anchors, setAnchors] = useState<SectionAnchor[]>([]);
   // Native-PDF fallback (used if pdf.js can't render — e.g. older Safari): a blob URL in an <iframe>
   const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,8 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding }: Pr
         if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null; }
       };
       try {
-        const bytes = await generatePDF(doc, templateId, colorTheme, branding);
+        const collected: SectionAnchor[] = [];
+        const bytes = await generatePDF(doc, templateId, colorTheme, branding, collected);
 
         // Always prepare a native-PDF blob URL as a robust fallback for any browser
         // whose pdf.js canvas path fails (notably older Safari on macOS).
@@ -71,12 +74,14 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding }: Pr
             images.push(canvas.toDataURL('image/png'));
           }
           setPageImages(images);
+          setAnchors(collected);
           setFallbackUrl(null);
           revokeBlob(); // canvas path worked; the blob isn't needed
         } catch (renderErr) {
           // pdf.js failed (e.g. unsupported on this browser) — show the native PDF viewer instead
           console.warn('pdf.js preview failed; falling back to native PDF viewer:', renderErr);
           setPageImages([]);
+          setAnchors([]);
           setFallbackUrl(blobUrl);
         }
       } catch (e) {
@@ -94,6 +99,22 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding }: Pr
 
   // Revoke any outstanding blob URL on unmount
   useEffect(() => () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); }, []);
+
+  // Map a click on page `pageIdx` (at vertical fraction `frac`) to the section whose
+  // heading is at or above that point — i.e. the part of the workbook shown there.
+  function handlePageClick(e: React.MouseEvent<HTMLDivElement>, pageIdx: number) {
+    if (!onSelectSection || anchors.length === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = (e.clientY - rect.top) / rect.height;
+    let chosen: SectionAnchor | null = null;
+    for (const a of anchors) {
+      if (a.page < pageIdx || (a.page === pageIdx && a.topFrac <= frac)) chosen = a;
+      else if (a.page > pageIdx) break;
+    }
+    if (chosen) onSelectSection(chosen.sectionId);
+  }
+
+  const clickable = !!onSelectSection && anchors.length > 0;
 
   if (!doc) {
     return (
@@ -122,15 +143,25 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding }: Pr
         <iframe src={fallbackUrl} title="PDF preview" className="w-full h-full border-0" />
       ) : (
         <div className="h-full overflow-y-auto">
+          {clickable && (
+            <div className="sticky top-0 z-10 bg-blue-50/95 backdrop-blur-sm text-blue-700 text-[11px] text-center py-1.5 border-b border-blue-100">
+              💡 Click anywhere in the preview to jump to that part in the editor
+            </div>
+          )}
           <div className="flex flex-col items-center gap-4 p-4">
             {pageImages.map((src, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <div
                 key={i}
-                src={src}
-                alt={`Page ${i + 1}`}
-                className="w-full max-w-2xl shadow-md rounded bg-white"
-              />
+                className={`relative w-full max-w-2xl group ${clickable ? 'cursor-pointer' : ''}`}
+                onClick={(e) => handlePageClick(e, i)}
+                title={clickable ? 'Click to edit this part of the workbook' : undefined}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`Page ${i + 1}`} className="w-full shadow-md rounded bg-white block" />
+                {clickable && (
+                  <div className="absolute inset-0 rounded ring-2 ring-transparent group-hover:ring-blue-400/50 transition-all pointer-events-none" />
+                )}
+              </div>
             ))}
           </div>
         </div>

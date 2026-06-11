@@ -24,6 +24,14 @@ export default function WorkbookApp({ branding }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [doc, setDoc] = useState<DocumentModel | null>(null);
+  // Which section to scroll to in the editor (set by clicking the preview). `n` bumps each
+  // click so re-clicking the same section re-triggers the scroll.
+  const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
+
+  function selectSection(id: string) {
+    setStep(2);
+    setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+  }
 
   // Jo's template + colors are fixed by her brand
   const templateId = branding.templateId;
@@ -132,7 +140,7 @@ export default function WorkbookApp({ branding }: Props) {
               </div>
               {step === 2 && (
                 <div className="p-5 space-y-4">
-                  <DocumentEditor doc={doc} onChange={setDoc} branding={branding} />
+                  <DocumentEditor doc={doc} onChange={setDoc} branding={branding} focus={focus} />
                   <button
                     onClick={() => setStep(3)}
                     className="w-full py-2.5 text-white rounded-xl font-medium transition-opacity hover:opacity-90"
@@ -160,7 +168,7 @@ export default function WorkbookApp({ branding }: Props) {
 
         {/* Right panel: Preview */}
         <div className="flex-1 min-h-0 min-w-0">
-          <PDFPreview doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} />
+          <PDFPreview doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} onSelectSection={selectSection} />
         </div>
       </div>
     </div>

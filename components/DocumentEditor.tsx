@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding,
 } from '@/types/document';
@@ -9,6 +9,7 @@ interface Props {
   doc: DocumentModel;
   onChange: (doc: DocumentModel) => void;
   branding?: ClientBranding;
+  focus?: { id: string; n: number } | null; // scroll to + highlight this section (from preview clicks)
 }
 
 function uid(prefix: string) {
@@ -18,8 +19,23 @@ function uid(prefix: string) {
 const fieldTypeIcon: Record<FieldType, string> = { text: '—', textarea: '≡', checkbox: '☐', dropdown: '▾' };
 const fieldTypeLabel: Record<FieldType, string> = { text: 'Text field', textarea: 'Text area', checkbox: 'Checkbox', dropdown: 'Dropdown' };
 
-export default function DocumentEditor({ doc, onChange, branding }: Props) {
+export default function DocumentEditor({ doc, onChange, branding, focus }: Props) {
   const isJo = branding?.id === 'jomangum';
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  // When the preview is clicked, scroll the matching section into view and flash a highlight.
+  useEffect(() => {
+    if (!focus) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`wb-sec-${focus.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightId(focus.id);
+        setTimeout(() => setHighlightId((cur) => (cur === focus.id ? null : cur)), 1800);
+      }
+    }, 60);
+    return () => clearTimeout(t);
+  }, [focus]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingAuthor, setEditingAuthor] = useState(false);
@@ -272,7 +288,8 @@ export default function DocumentEditor({ doc, onChange, branding }: Props) {
 
       {/* Sections */}
       {doc.sections.map((section, idx) => (
-        <div key={section.id} className="border rounded-xl overflow-hidden">
+        <div key={section.id} id={`wb-sec-${section.id}`}
+          className={`border rounded-xl overflow-hidden transition-all ${highlightId === section.id ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
           {/* Header row */}
           <div className="bg-white px-4 py-3 flex items-center gap-2">
             <div className="flex flex-col gap-0.5">
@@ -394,15 +411,17 @@ export default function DocumentEditor({ doc, onChange, branding }: Props) {
                     <span className="text-gray-400 text-xs w-4">{fieldTypeIcon[item.field.type]}</span>
                     <input className="flex-1 text-xs border-b border-dashed border-gray-300 bg-transparent focus:outline-none focus:border-blue-400 py-0.5"
                       value={item.field.label} placeholder={`${fieldTypeLabel[item.field.type]} label…`} onChange={(e) => updateFieldLabel(section.id, item.id, e.target.value)} />
-                    <span className="text-[10px] text-gray-400">{fieldTypeLabel[item.field.type]}{item.field.options ? ` (${item.field.options[0]}–${item.field.options[item.field.options.length - 1]})` : ''}</span>
+                    {item.field.options && (
+                      <span className="text-[10px] text-gray-400">({item.field.options[0]}–{item.field.options[item.field.options.length - 1]})</span>
+                    )}
                     {(item.field.type === 'text' || item.field.type === 'textarea') && (
-                      <span className="flex items-center gap-0.5 text-gray-400" title="Make THIS answer box taller or shorter">
-                        <span className="text-[10px]">↕</span>
-                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.max(0.5, Math.round((((item.kind === 'field' && item.field.heightScale) || 1) - 0.25) * 100) / 100) })}
-                          className="w-4 h-4 leading-none rounded border border-gray-200 hover:border-blue-400 hover:text-blue-600 text-[11px]">−</button>
-                        <span className="text-[10px] tabular-nums w-8 text-center">{(item.field.heightScale ?? 1).toFixed(2)}×</span>
-                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.min(5, Math.round((((item.kind === 'field' && item.field.heightScale) || 1) + 0.25) * 100) / 100) })}
-                          className="w-4 h-4 leading-none rounded border border-gray-200 hover:border-blue-400 hover:text-blue-600 text-[11px]">+</button>
+                      <span className="flex items-center gap-0.5 text-orange-500 font-semibold" title="Make THIS answer box taller or shorter">
+                        <span className="text-xs">↕</span>
+                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.max(0.5, Math.round(((item.field.heightScale ?? 1) - 0.25) * 100) / 100) })}
+                          className="w-4 h-4 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-500 text-[12px]">−</button>
+                        <span className="text-[11px] tabular-nums w-8 text-center text-orange-600">{(item.field.heightScale ?? 1).toFixed(2)}×</span>
+                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.min(5, Math.round(((item.field.heightScale ?? 1) + 0.25) * 100) / 100) })}
+                          className="w-4 h-4 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-500 text-[12px]">+</button>
                       </span>
                     )}
                   </>

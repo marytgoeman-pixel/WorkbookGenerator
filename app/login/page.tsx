@@ -9,7 +9,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [bgReady, setBgReady] = useState(false); // becomes true if /login-bg.jpg loads
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,16 +36,12 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 overflow-hidden bg-gradient-to-br from-[#1B5E7C] via-[#16384b] to-[#0d1b26]">
-      {/* Optional photo background — appears automatically if public/login-bg.jpg exists.
-          Drop the plant image there to feature it; the brand scrim keeps text readable. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/login-bg.jpg"
-        alt=""
+      {/* Photo background via CSS (no onLoad race) — the botanical login-bg.jpg.
+          If the file is missing, this layer is simply transparent and the gradient shows. */}
+      <div
         aria-hidden="true"
-        onLoad={() => setBgReady(true)}
-        onError={() => setBgReady(false)}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bgReady ? 'opacity-100' : 'opacity-0'}`}
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/login-bg.jpg')" }}
       />
       {/* Brand scrim — tints the botanical pattern teal/navy (never white) while keeping the card legible */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#1B5E7C]/55 via-[#1d4458]/64 to-[#0d1b26]/80" />

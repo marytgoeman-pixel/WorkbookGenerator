@@ -430,18 +430,20 @@ export async function generatePDF(
       const sq = Math.round(size * 0.55);
       // Sell It draws its icon mark beside every page (H1) title instead of a bullet.
       const useMark = sellit && section.level === 1 && !!sellitMark;
-      const markH = size + 9;
+      const markH = size + 12;
       const markW = useMark ? markH * (sellitMark!.width / sellitMark!.height) : 0;
       const drawBullet = !useMark && style === 'accent';
-      const textX = useMark ? tmpl.marginLeft + markW + 10 : drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
+      // With the mark, the heading text aligns LEFT with the body text and the mark hangs in the margin.
+      const textX = drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
+      const markX = Math.max(6, tmpl.marginLeft - markW - 8);
       // Wrap long headings to the content margin instead of overflowing
       const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
       // Orphan control: keep the whole heading together with the start of its content
       ensureSpace(hLines.length * (size + 2) + (section.level === 1 ? 8 : 5) + leadEstimate());
       recordAnchor();
       if (useMark) {
-        // Vertically center the mark on the heading text (text center ≈ baseline + 0.36·size)
-        page.drawImage(sellitMark!, { x: tmpl.marginLeft, y: y + size * 0.36 - markH / 2, width: markW, height: markH });
+        // Mark hangs in the left margin, vertically centered on the heading text
+        page.drawImage(sellitMark!, { x: markX, y: y + size * 0.36 - markH / 2, width: markW, height: markH });
       } else if (drawBullet) {
         page.drawRectangle({ x: tmpl.marginLeft, y: y + 1, width: sq, height: sq, color: accentColor });
       }
@@ -598,8 +600,14 @@ export async function generatePDF(
         page.drawRectangle({ x: tmpl.marginLeft, y: y - headerH + 4, width: mainColWidth, height: headerH, color: headerColor, opacity: solidHeader ? 1 : 0.12 });
         const htColor = solidHeader ? rgb(1, 1, 1) : headerColor;
         headerWrapped.forEach((lines, c) => {
-          let cy = y - vpad - TFS + 5;
-          for (const ln of lines) { page.drawText(ln, { x: tmpl.marginLeft + c * colW + 4, y: cy, size: TFS, font: boldFont, color: htColor }); cy -= cellLineH; }
+          // Center each header title horizontally in its column and vertically in the row
+          const blockH = lines.length * cellLineH;
+          let cy = y + 4 - (headerH - blockH) / 2 - TFS + 1;
+          for (const ln of lines) {
+            const w = boldFont.widthOfTextAtSize(ln, TFS);
+            page.drawText(ln, { x: tmpl.marginLeft + c * colW + (colW - w) / 2, y: cy, size: TFS, font: boldFont, color: htColor });
+            cy -= cellLineH;
+          }
         });
         y -= headerH;
       };
@@ -801,25 +809,25 @@ async function drawSellItCover(
   // Eyebrow (editable) + logo (right) + rule
   page.drawText(sanitize(eyebrowText.toUpperCase()), { x: pad, y: ty, size: 9, font: boldFont, color: ink });
   if (logo) {
-    const lh = 20, lw = lh * (logo.width / logo.height);
-    page.drawImage(logo, { x: W - pad - lw, y: ty + 3 - lh / 2, width: lw, height: lh });
+    const lh = 30, lw = lh * (logo.width / logo.height);
+    page.drawImage(logo, { x: W - pad - lw, y: ty + 4 - lh / 2, width: lw, height: lh });
   }
   ty -= 11;
   page.drawLine({ start: { x: pad, y: ty }, end: { x: W - pad, y: ty }, thickness: 1, color: ink });
   ty -= 50;
 
-  // Title (blue) with the icon mark to the left, and the "Workbook" label inline (ink)
+  // Title (blue) aligned at the left margin; the icon mark hangs in the margin to its left.
+  // The "Workbook" label renders inline (ink) after the title.
   let tSize = 38;
   const title = applyCase(doc.title || 'Untitled', 'none');
   const wbLabel = (doc.cover?.workbookLabel ?? 'Workbook').trim();
   const ratio = mark ? mark.width / mark.height : 0;
-  const titleMaxW = (ts: number) => W - pad - (pad + (mark ? ts * ratio + 14 : 0));
-  let titleLines = wrapText(title, titleMaxW(tSize), boldFont, tSize);
-  while (titleLines.length > 3 && tSize > 24) { tSize -= 3; titleLines = wrapText(title, titleMaxW(tSize), boldFont, tSize); }
-  const markH = tSize * 0.95;
+  let titleLines = wrapText(title, innerW, boldFont, tSize);
+  while (titleLines.length > 3 && tSize > 24) { tSize -= 3; titleLines = wrapText(title, innerW, boldFont, tSize); }
+  const markH = tSize * 1.08; // a bit bigger
   const markW = mark ? markH * ratio : 0;
-  const tx = pad + (mark ? markW + 14 : 0);
-  if (mark) page.drawImage(mark, { x: pad, y: ty + tSize * 0.36 - markH / 2, width: markW, height: markH });
+  const tx = pad; // title aligns left with the rest of the text
+  if (mark) page.drawImage(mark, { x: Math.max(6, pad - markW - 8), y: ty + tSize * 0.36 - markH / 2, width: markW, height: markH });
   const titleLineH = tSize + 6;
   for (let i = 0; i < titleLines.length; i++) {
     const ln = titleLines[i];
@@ -857,6 +865,12 @@ async function drawSellItCover(
       const scale = Math.max(innerW / img.width, imgTop / img.height); // cover-fit → fills + bleeds off bottom
       const dw = img.width * scale, dh = img.height * scale;
       page.drawImage(img, { x: pad - (dw - innerW) / 2, y: imgTop - dh, width: dw, height: dh });
+      // Sell It blue fade rising over the image: opaque blue at the bottom edge → clear toward the top
+      const strips = 60;
+      for (let s = 0; s < strips; s++) {
+        const op = 0.9 * Math.pow(1 - s / strips, 1.5);
+        page.drawRectangle({ x: 0, y: (s / strips) * imgTop, width: W, height: imgTop / strips + 0.6, color: blue, opacity: op });
+      }
     }
   }
 }

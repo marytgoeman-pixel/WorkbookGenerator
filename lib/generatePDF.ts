@@ -503,11 +503,24 @@ export async function generatePDF(
         else if (item.kind === 'table') renderTable(item.table);
       }
     } else {
+      // Track whether the previous block was a "box" (textarea/dropdown/table) so a
+      // following text line (e.g. the next numbered question) gets clear separation.
+      let lastWasBox = false;
       for (const item of section.content) {
-        if (item.kind === 'text') renderText(item.text);
-        else if (item.kind === 'bullet') renderBullet(item.text);
-        else if (item.kind === 'field') renderField(item.field);
-        else if (item.kind === 'table') renderTable(item.table);
+        if (item.kind === 'text') {
+          if (lastWasBox) y -= 12 * sp;
+          renderText(item.text);
+          lastWasBox = false;
+        } else if (item.kind === 'bullet') {
+          renderBullet(item.text);
+          lastWasBox = false;
+        } else if (item.kind === 'field') {
+          renderField(item.field);
+          lastWasBox = item.field.type === 'textarea' || item.field.type === 'dropdown' || item.field.type === 'text';
+        } else if (item.kind === 'table') {
+          renderTable(item.table);
+          lastWasBox = true;
+        }
       }
     }
 

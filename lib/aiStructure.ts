@@ -198,3 +198,63 @@ export async function structureWithAI(html: string): Promise<DocumentModel> {
   const ai = JSON.parse(textBlock.text) as AiDoc;
   return mapToDocument(ai);
 }
+
+// Convert our DocumentModel back into the AI's flat shape, so the model can read
+// the current workbook and revise it.
+function docToAi(doc: DocumentModel): AiDoc {
+  return {
+    title: doc.title,
+    sections: doc.sections.map((s) => ({
+      title: s.title,
+      level: s.level,
+      callout: !!s.callout,
+      items: s.content.map((it): AiItem => {
+        if (it.kind === 'field') {
+          return { kind: 'field', text: it.field.label, fieldType: it.field.type, options: it.field.options ?? [], tableHeaders: [], tableRows: [] };
+        }
+        if (it.kind === 'table') {
+          return {
+            kind: 'table', text: '', fieldType: '', options: [],
+            tableHeaders: it.table.headers,
+            tableRows: it.table.rows.map((r) => ({
+              cells: r.map((c) => c.field
+                ? { text: '', fieldType: c.field.type, options: c.field.options ?? [] }
+                : { text: c.text, fieldType: '' as const, options: [] }),
+            })),
+          };
+        }
+        return { kind: it.kind, text: it.text, fieldType: '', options: [], tableHeaders: [], tableRows: [] };
+      }),
+    })),
+  };
+}
+
+const REFINE_SYSTEM = `You are editing an EXISTING fillable workbook (given as JSON in the same schema you output).
+Apply the user's instruction and return the COMPLETE revised workbook as JSON matching the schema.
+
+Rules:
+- Keep everything the user did not ask to change. Preserve wording, order, fields, and tables unless the instruction implies changing them.
+- You can add, remove, reorder, or restyle sections and items, and add fillable fields, checkboxes, dropdowns, or tables.
+- Headings are never bulleted. Illustrative examples stay as read-only text. Only add fields where the learner is asked to write, rate, or check.
+- For grid/calendar-style requests, use a "table" item: e.g. a monthly calendar = a table whose headers are the weekdays and whose cells are fillable "text" fields (or static day numbers). A tracker = a table with the right columns and fillable cells.
+- Output ONLY the JSON for the full workbook.`;
+
+export async function refineWithAI(doc: DocumentModel, instruction: string): Promise<DocumentModel> {
+  const client = new Anthropic();
+  const current = JSON.stringify(docToAi(doc));
+
+  const stream = client.messages.stream({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 16000,
+    system: REFINE_SYSTEM,
+    output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+    messages: [{ role: 'user', content: `Current workbook JSON:\n\n${current}\n\nInstruction:\n${instruction}` }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const response = await stream.finalMessage();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const textBlock = (response.content as any[]).find((b) => b.type === 'text');
+  if (!textBlock) throw new Error('No revised output returned');
+  return mapToDocument(JSON.parse(textBlock.text) as AiDoc);
+}

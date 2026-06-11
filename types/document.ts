@@ -51,7 +51,8 @@ export interface CoverSettings {
   enabled: boolean;
   imageId?: string;                          // references a COVER_IMAGES id in lib/covers.ts
   subtitle?: string;                         // optional line shown under the title on the cover
-  imageAlign?: 'left' | 'center' | 'right';  // horizontal focus when the photo is wider than the page
+  imageAlign?: 'left' | 'center' | 'right';   // horizontal focus when the photo is wider than the page
+  imageAlignV?: 'top' | 'center' | 'bottom';  // vertical focus when the photo is taller than the page
 }
 
 export interface DocumentModel {

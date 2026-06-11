@@ -24,46 +24,6 @@ export default function WorkbookApp({ branding }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [doc, setDoc] = useState<DocumentModel | null>(null);
-  const [refineText, setRefineText] = useState('');
-  const [refining, setRefining] = useState(false);
-  const [refineError, setRefineError] = useState('');
-  const [refineOk, setRefineOk] = useState(false);
-
-  async function refine() {
-    if (!doc || !refineText.trim() || refining) return;
-    setRefining(true);
-    setRefineError('');
-    setRefineOk(false);
-    try {
-      const res = await fetch('/api/refine', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document: doc, instruction: refineText.trim() }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        setRefineError(
-          res.status === 404
-            ? 'The AI refine endpoint is not on this deployment yet — push the latest code and redeploy.'
-            : d.error || `Refine failed (${res.status}).`
-        );
-        return;
-      }
-      const d = await res.json();
-      if (d.document) {
-        setDoc(d.document);
-        setRefineText('');
-        setRefineOk(true);
-        setTimeout(() => setRefineOk(false), 6000);
-      } else {
-        setRefineError('The AI returned no changes. Try rephrasing the instruction.');
-      }
-    } catch {
-      setRefineError('Could not reach the AI service (the endpoint may not be deployed yet).');
-    } finally {
-      setRefining(false);
-    }
-  }
 
   // Jo's template + colors are fixed by her brand
   const templateId = branding.templateId;
@@ -172,42 +132,6 @@ export default function WorkbookApp({ branding }: Props) {
               </div>
               {step === 2 && (
                 <div className="p-5 space-y-4">
-                  {/* Refine with AI — reprompt to add to or restructure the workbook */}
-                  <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 space-y-2">
-                    <div className="text-xs font-semibold text-blue-800">✨ Refine with AI</div>
-                    <p className="text-[11px] text-blue-700/80 leading-snug">
-                      Tell the AI what to change or add — e.g. “Turn the monthly touches into a fillable calendar table,”
-                      or “Add a goals section with 3 write-in lines.”
-                    </p>
-                    <textarea
-                      className="w-full h-16 text-xs border rounded-lg p-2 resize-y focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
-                      placeholder="Describe a change or addition…"
-                      value={refineText}
-                      disabled={refining}
-                      onChange={(e) => setRefineText(e.target.value)}
-                    />
-                    <button
-                      onClick={refine}
-                      disabled={refining || !refineText.trim()}
-                      className="w-full py-2 rounded-lg text-white text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-                      style={{ backgroundColor: branding.colors.subtitle }}
-                    >
-                      {refining ? (
-                        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Revising… (up to a minute)</>
-                      ) : 'Apply with AI'}
-                    </button>
-                    {refineError && (
-                      <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
-                        ⚠️ {refineError}
-                      </p>
-                    )}
-                    {refineOk && (
-                      <p className="text-xs text-green-800 bg-green-50 border border-green-300 rounded-lg px-2 py-1.5 font-medium">
-                        ✓ Applied — check the preview on the right.
-                      </p>
-                    )}
-                  </div>
-
                   <DocumentEditor doc={doc} onChange={setDoc} />
                   <button
                     onClick={() => setStep(3)}

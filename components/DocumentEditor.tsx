@@ -181,20 +181,35 @@ export default function DocumentEditor({ doc, onChange }: Props) {
               })}
             </div>
             {cover.imageId && (
-              <div>
-                <label className="block text-[11px] font-medium text-gray-500 mb-1">Image focus (if the photo is wider than the page)</label>
-                <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-                  {(['left', 'center', 'right'] as const).map((a) => {
-                    const active = (cover.imageAlign ?? 'center') === a;
-                    return (
-                      <button key={a} type="button" onClick={() => setCover({ imageAlign: a })}
-                        className={`px-3 py-1.5 text-xs capitalize transition-colors ${
-                          active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                        } ${a !== 'left' ? 'border-l border-gray-200' : ''}`}>
-                        {a === 'left' ? '⬅ Left' : a === 'right' ? 'Right ➡' : '⬌ Center'}
-                      </button>
-                    );
-                  })}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-medium text-gray-500">Image focus (which part stays in frame)</label>
+                <div className="flex flex-wrap gap-3">
+                  <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                    {(['left', 'center', 'right'] as const).map((a) => {
+                      const active = (cover.imageAlign ?? 'center') === a;
+                      return (
+                        <button key={a} type="button" onClick={() => setCover({ imageAlign: a })}
+                          className={`px-3 py-1.5 text-xs transition-colors ${
+                            active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                          } ${a !== 'left' ? 'border-l border-gray-200' : ''}`}>
+                          {a === 'left' ? '⬅ Left' : a === 'right' ? 'Right ➡' : '⬌ Center'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                    {(['top', 'center', 'bottom'] as const).map((a) => {
+                      const active = (cover.imageAlignV ?? 'center') === a;
+                      return (
+                        <button key={a} type="button" onClick={() => setCover({ imageAlignV: a })}
+                          className={`px-3 py-1.5 text-xs transition-colors ${
+                            active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                          } ${a !== 'top' ? 'border-l border-gray-200' : ''}`}>
+                          {a === 'top' ? '⬆ Top' : a === 'bottom' ? '⬇ Bottom' : '⬍ Center'}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}

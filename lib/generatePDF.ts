@@ -679,8 +679,11 @@ async function drawCoverPage(
     const scale = Math.max(W / img.width, H / img.height);
     const dw = img.width * scale, dh = img.height * scale;
     const align = doc.cover?.imageAlign ?? 'center';
+    const alignV = doc.cover?.imageAlignV ?? 'center';
     const dx = align === 'left' ? 0 : align === 'right' ? W - dw : (W - dw) / 2;
-    page.drawImage(img, { x: dx, y: (H - dh) / 2, width: dw, height: dh });
+    // PDF y-origin is bottom-left: top → show the image's top, bottom → its bottom
+    const dy = alignV === 'top' ? H - dh : alignV === 'bottom' ? 0 : (H - dh) / 2;
+    page.drawImage(img, { x: dx, y: dy, width: dw, height: dh });
   } else {
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
   }
@@ -733,10 +736,10 @@ async function drawCoverPage(
 
   // Logo bottom-right within the band, if available
   if (logo) {
-    const targetH = 32;
+    const targetH = 54;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
-    page.drawImage(logo, { x: W - pad - w, y: 24, width: w, height: targetH });
+    page.drawImage(logo, { x: W - pad - w, y: 22, width: w, height: targetH });
   }
 }
 

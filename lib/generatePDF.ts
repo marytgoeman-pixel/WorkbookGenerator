@@ -113,19 +113,25 @@ async function tryEmbedImage(pdfDoc: PDFDocument, url: string): Promise<PDFImage
 }
 
 function wrapText(text: string, maxWidth: number, font: { widthOfTextAtSize: (t: string, s: number) => number }, size: number): string[] {
-  const words = sanitize(text).split(' ');
+  // Respect hard line breaks (\n) FIRST — split on newlines before sanitizing,
+  // since sanitize() drops control chars. Then word-wrap each segment to maxWidth.
+  // This lets a title/heading/text item like "Line one\nLine two" render on two lines.
+  const segments = text.replace(/\r\n?/g, '\n').split('\n');
   const lines: string[] = [];
-  let current = '';
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (font.widthOfTextAtSize(test, size) <= maxWidth) {
-      current = test;
-    } else {
-      if (current) lines.push(current);
-      current = word;
+  for (const seg of segments) {
+    const words = sanitize(seg).split(' ');
+    let current = '';
+    for (const word of words) {
+      const test = current ? `${current} ${word}` : word;
+      if (font.widthOfTextAtSize(test, size) <= maxWidth) {
+        current = test;
+      } else {
+        if (current) lines.push(current);
+        current = word;
+      }
     }
+    lines.push(current); // push even when empty so a blank line from "\n\n" is preserved
   }
-  if (current) lines.push(current);
   return lines.length ? lines : [''];
 }
 
@@ -239,7 +245,9 @@ export async function generatePDF(
   // Title block — case controlled by doc.titleCase (defaults to UPPER in branded mode).
   // Long titles wrap across lines (and shrink a step if very long) so they never overflow.
   const titleCase = doc.titleCase ?? (branded ? 'upper' : 'none');
-  const rawTitle = applyCase(sanitize(doc.title || 'Untitled'), titleCase);
+  // NOTE: don't sanitize here — wrapText() needs the raw text (with any \n) and
+  // sanitizes each line itself. Pre-sanitizing would strip hard line breaks.
+  const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
   let titleSize = tmpl.titleSize;
   let titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
   if (titleLines.length > 2) {
@@ -296,7 +304,8 @@ export async function generatePDF(
       // default H1 = brand title color, H2 = brand subtitle color, both bold and unbulleted.
       const style = section.headingStyle ?? (section.level === 1 ? 'title' : 'brand');
       const size = section.level === 1 ? tmpl.headingSize : tmpl.subheadingSize;
-      const headingText = applyCase(sanitize(section.title), section.headingCase);
+      // raw (not pre-sanitized) so wrapText() can honor hard line breaks in the heading
+      const headingText = applyCase(section.title, section.headingCase);
       const headingColor =
         style === 'brand' ? hexToRgb(branding!.colors.subtitle)
         : style === 'plain' ? rgb(0.15, 0.15, 0.15)

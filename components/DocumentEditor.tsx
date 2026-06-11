@@ -145,10 +145,11 @@ export default function DocumentEditor({ doc, onChange }: Props) {
               {section.level === 1 ? 'H1' : 'H2'}
             </span>
             {editingId === section.id ? (
-              <input autoFocus className="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              <textarea autoFocus rows={Math.max(1, section.title.split('\n').length)}
+                className="flex-1 border rounded px-2 py-1 text-sm leading-snug resize-y focus:outline-none focus:ring-2 focus:ring-blue-400"
                 value={section.title} onChange={(e) => updateSection(section.id, { title: e.target.value })} onBlur={() => setEditingId(null)} />
             ) : (
-              <button className="flex-1 text-left text-sm font-medium text-gray-800 hover:text-blue-600 truncate" onClick={() => setEditingId(section.id)}>
+              <button className="flex-1 text-left text-sm font-medium text-gray-800 hover:text-blue-600 whitespace-pre-line" onClick={() => setEditingId(section.id)}>
                 {section.title} ✏️
               </button>
             )}
@@ -158,6 +159,12 @@ export default function DocumentEditor({ doc, onChange }: Props) {
             </button>
             <button onClick={() => deleteSection(section.id)} className="text-gray-300 hover:text-red-600 text-sm" title="Delete section">🗑</button>
           </div>
+
+          {editingId === section.id && (
+            <div className="bg-blue-50 px-4 py-1 text-[10px] text-blue-700 border-t border-blue-100">
+              💡 Press <b>Enter</b> for a line break in the heading. Click away when done.
+            </div>
+          )}
 
           {/* Style controls */}
           <div className="border-t bg-gray-50 px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
@@ -215,8 +222,9 @@ export default function DocumentEditor({ doc, onChange }: Props) {
                 {item.kind === 'text' && (
                   <>
                     <span className="text-gray-300 text-xs w-4" title="Text">¶</span>
-                    <input className="flex-1 text-xs border-b border-dashed border-gray-200 bg-transparent focus:outline-none focus:border-blue-400 py-0.5"
-                      value={item.text} placeholder="Text…" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
+                    <textarea rows={Math.max(1, item.text.split('\n').length)}
+                      className="flex-1 text-xs border border-dashed border-gray-200 rounded bg-transparent focus:outline-none focus:border-blue-400 px-1 py-0.5 resize-y leading-snug"
+                      value={item.text} placeholder="Text… (Enter = line break)" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
                     <button onClick={() => textToField(section.id, item.id, 'textarea')} className="text-[10px] px-1 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600" title="Make a write-in box">→box</button>
                     <button onClick={() => textToField(section.id, item.id, 'checkbox')} className="text-[10px] px-1 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600" title="Make a checkbox">→check</button>
                   </>

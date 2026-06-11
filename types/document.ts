@@ -5,7 +5,8 @@ export interface FormField {
   label: string;
   type: FieldType;
   required: boolean;
-  options?: string[]; // for dropdown fields (e.g. ["1".."10"])
+  options?: string[];    // for dropdown fields (e.g. ["1".."10"])
+  heightScale?: number;  // per-box height multiplier (default 1) for text/textarea answer boxes
 }
 
 // A cell is either static text or a fillable field
@@ -64,6 +65,8 @@ export interface DocumentModel {
   titleCase?: TextCase;        // case transform for the document title
   bodySpacing?: Spacing;       // extra vertical space between paragraphs/lines
   cover?: CoverSettings;       // optional branded cover page
+  aboutPage?: boolean;         // append an "About Jo" page at the end (Jo only)
+  legalPage?: boolean;         // append a legal/disclaimer page at the end (Jo only)
 }
 
 export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum' | 'sellit';

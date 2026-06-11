@@ -533,8 +533,8 @@ export async function generatePDF(
       const IFS = 12;          // interactive font size for fillable text (12pt minimum)
       const labLH = IFS + 4;   // label line height (so long prompts wrap, not overflow)
       const labelColor = rgb(0.2, 0.2, 0.2);
-      // Per-section "Box size" slider scales the height of text/textarea answer boxes
-      const fieldScale = section.fieldScale ?? 1;
+      // Per-box "size" control scales the height of this text/textarea answer box
+      const fieldScale = field.heightScale ?? 1;
 
       if (field.type === 'checkbox') {
         // Wrap the label to the right of the checkbox; box sits on the first line.
@@ -690,10 +690,24 @@ export async function generatePDF(
     y -= tmpl.sectionSpacing * sp;
   }
 
+  // --- Optional appended pages (Jo only): About Jo, then a plain Legal page ---
+  let legalPageIndex = -1;
+  if (jo && doc.aboutPage) {
+    newPage();
+    const photo = await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'jopicture.png'));
+    drawAboutJoPage(page, tmpl, branding!, photo, brandLogo, font, boldFont, italicFont);
+  }
+  if (jo && doc.legalPage) {
+    newPage();
+    legalPageIndex = pdfDoc.getPageCount() - 1;
+    drawLegalPage(page, tmpl, font, boldFont);
+  }
+
   // --- Page chrome (header bar + footer) on every page ---
   const pageCount = pdfDoc.getPageCount();
   for (let i = 0; i < pageCount; i++) {
-    if (hasCover && i === 0) continue; // the cover has its own full-bleed design
+    if (hasCover && i === 0) continue;     // the cover has its own full-bleed design
+    if (i === legalPageIndex) continue;    // the legal page is a plain disclaimer (no chrome)
     const p = pdfDoc.getPage(i);
 
     if (sellit) {
@@ -915,6 +929,87 @@ async function drawCoverPage(
     const scale = targetH / logo.height;
     const w = logo.width * scale;
     page.drawImage(logo, { x: W - pad - w, y: 22, width: w, height: targetH });
+  }
+}
+
+const JO_BIO: string[] = [
+  'Jo Mangum is a REALTOR® with more than 30 years of experience as an agent, coach, leader, and teacher. After a successful career as a full-time agent, she discovered her true passion—helping others achieve success—and transitioned into coaching and education.',
+  'At Realogy/Anywhere, Jo designed and launched programs to strengthen real estate careers across multiple brands. She led strategic productivity initiatives, drove recruiting efforts, and built international consulting divisions for ERA Global and Century 21 Global.',
+  'As Vice President of Global REAL Coaching, Jo created and launched a division dedicated to leadership development, coaching skills, and personalized coaching programs. Her initiatives supported Coldwell Banker, Century 21, Sotheby’s International Realty, ERA, Better Homes & Gardens Realty, and Corcoran Realty worldwide.',
+  'Jo’s influence has touched hundreds of thousands of agents and leaders through her coaching strategies, international programs, and continuing education courses. Her work continues to shape the growth and resilience of real estate professionals across the globe.',
+];
+
+// Optional "About Jo" page: photo (left) + logo & credentials (right), bio, accolade.
+function drawAboutJoPage(
+  page: PDFPage,
+  tmpl: Template,
+  branding: ClientBranding,
+  photo: PDFImage | null,
+  logo: PDFImage | null,
+  font: PDFFontT,
+  boldFont: PDFFontT,
+  italicFont: PDFFontT
+) {
+  const W = tmpl.pageWidth, H = tmpl.pageHeight;
+  const pad = tmpl.marginLeft;
+  const blue = hexToRgb(branding.colors.header);
+  const ink = rgb(0.13, 0.13, 0.13);
+  const bodySize = 12, lineH = 16, paraGap = 10;
+
+  // Photo (left)
+  const photoW = 165;
+  const photoTop = H - tmpl.marginTop - 2;
+  const photoH = photo ? photoW * (photo.height / photo.width) : 0;
+  if (photo) page.drawImage(photo, { x: pad + 46, y: photoTop - photoH, width: photoW, height: photoH });
+  const photoBottom = photo ? photoTop - photoH : photoTop - 200;
+
+  // Logo + credentials (right of photo, upper area)
+  if (logo) {
+    const logoW = 188, logoH = logoW * (logo.height / logo.width);
+    const lx = pad + 46 + photoW + 56;
+    const ly = photoTop - 44 - logoH;
+    page.drawImage(logo, { x: lx, y: ly, width: logoW, height: logoH });
+    const cred = sanitize('CRS, GRI, PCC, REALTOR®');
+    const cw = font.widthOfTextAtSize(cred, bodySize);
+    page.drawText(cred, { x: lx + (logoW - cw) / 2, y: ly - 22, size: bodySize, font, color: ink });
+  }
+
+  // Bio paragraphs (full width, below the photo/logo block)
+  let yy = photoBottom - 40;
+  for (const para of JO_BIO) {
+    for (const ln of wrapText(para, W - pad * 2, font, bodySize)) {
+      page.drawText(ln, { x: pad, y: yy, size: bodySize, font, color: ink });
+      yy -= lineH;
+    }
+    yy -= paraGap;
+  }
+
+  // Accolade (italic, brand blue, centered)
+  yy -= 8;
+  const acc = sanitize('North Carolina Educator of the Year 2015');
+  const aw = italicFont.widthOfTextAtSize(acc, 13);
+  page.drawText(acc, { x: (W - aw) / 2, y: Math.max(tmpl.marginBottom + 18, yy), size: 13, font: italicFont, color: blue });
+}
+
+const JO_LEGAL: string[] = [
+  'The information contained in this program is provided for educational and information purposes only and may not be suitable for your situation or location. This content is not a substitute for consulting with a licensed professional in your state of residence and nothing herein should be construed as legal advice. Please note that market conditions, local laws and regulation may differ based on your state of residence and can have a substantial effect on your business.  JAMM, Inc. makes no representations, warrantied (implied or otherwise) or guarantees that any of the advice contained herein will result in an increase in business, profits, or client volume. Nothing contained in this website or any JAMM, Inc. materials shall be construed as such a promise or guarantee.  JAMM, Inc. shall not be liable for any loss of profit or any other personal/commercial damages.',
+  'Nothing contained in this program may be reproduced, stored, or transmitted in any form, or by any means except as permitted under Section 107 or 108 of the United States Copyright Act, without the prior written permission of JAMM, Inc.',
+];
+
+// Optional plain Legal/disclaimer page (no header bar or footer).
+function drawLegalPage(page: PDFPage, tmpl: Template, font: PDFFontT, _boldFont: PDFFontT) {
+  void _boldFont;
+  const W = tmpl.pageWidth, H = tmpl.pageHeight;
+  const pad = tmpl.marginLeft;
+  const ink = rgb(0.15, 0.15, 0.15);
+  const bodySize = 12, lineH = 16, paraGap = 14;
+  let yy = H - 200; // start in the upper-middle, like the source
+  for (const para of JO_LEGAL) {
+    for (const ln of wrapText(para, W - pad * 2, font, bodySize)) {
+      page.drawText(ln, { x: pad, y: yy, size: bodySize, font, color: ink });
+      yy -= lineH;
+    }
+    yy -= paraGap;
   }
 }
 

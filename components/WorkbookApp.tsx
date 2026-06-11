@@ -132,7 +132,7 @@ export default function WorkbookApp({ branding }: Props) {
               </div>
               {step === 2 && (
                 <div className="p-5 space-y-4">
-                  <DocumentEditor doc={doc} onChange={setDoc} />
+                  <DocumentEditor doc={doc} onChange={setDoc} branding={branding} />
                   <button
                     onClick={() => setStep(3)}
                     className="w-full py-2.5 text-white rounded-xl font-medium transition-opacity hover:opacity-90"

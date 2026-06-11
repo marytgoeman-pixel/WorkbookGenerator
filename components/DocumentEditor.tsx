@@ -1,13 +1,14 @@
 'use client';
 import { useState } from 'react';
 import {
-  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings,
+  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding,
 } from '@/types/document';
 import { COVER_IMAGES } from '@/lib/covers';
 
 interface Props {
   doc: DocumentModel;
   onChange: (doc: DocumentModel) => void;
+  branding?: ClientBranding;
 }
 
 function uid(prefix: string) {
@@ -17,7 +18,8 @@ function uid(prefix: string) {
 const fieldTypeIcon: Record<FieldType, string> = { text: '—', textarea: '≡', checkbox: '☐', dropdown: '▾' };
 const fieldTypeLabel: Record<FieldType, string> = { text: 'Text field', textarea: 'Text area', checkbox: 'Checkbox', dropdown: 'Dropdown' };
 
-export default function DocumentEditor({ doc, onChange }: Props) {
+export default function DocumentEditor({ doc, onChange, branding }: Props) {
+  const isJo = branding?.id === 'jomangum';
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingAuthor, setEditingAuthor] = useState(false);
@@ -49,6 +51,13 @@ export default function DocumentEditor({ doc, onChange }: Props) {
     const s = doc.sections.find((x) => x.id === sectionId)!;
     setContent(sectionId, s.content.map((it) =>
       it.id === itemId && it.kind === 'field' ? { ...it, field: { ...it.field, label } } : it
+    ));
+  }
+
+  function updateFieldProp(sectionId: string, itemId: string, patch: Partial<FormField>) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    setContent(sectionId, s.content.map((it) =>
+      it.id === itemId && it.kind === 'field' ? { ...it, field: { ...it.field, ...patch } } : it
     ));
   }
 
@@ -232,6 +241,35 @@ export default function DocumentEditor({ doc, onChange }: Props) {
         )}
       </div>
 
+      {/* End pages (Jo only): About + Legal, appended at the end */}
+      {isJo && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-2.5 bg-gradient-to-r from-slate-50 to-white text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <span className="text-base">📑</span> End pages
+          </div>
+          <div className="px-4 py-2 border-t border-gray-100 divide-y divide-gray-100">
+            <label className="flex items-center justify-between py-2 cursor-pointer">
+              <span className="text-sm text-gray-700">Add an <b>About Jo</b> page</span>
+              <span className="relative inline-flex items-center">
+                <input type="checkbox" className="peer sr-only" checked={!!doc.aboutPage}
+                  onChange={(e) => onChange({ ...doc, aboutPage: e.target.checked })} />
+                <span className="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-blue-500 transition-colors" />
+                <span className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+              </span>
+            </label>
+            <label className="flex items-center justify-between py-2 cursor-pointer">
+              <span className="text-sm text-gray-700">Add a <b>Legal</b> page</span>
+              <span className="relative inline-flex items-center">
+                <input type="checkbox" className="peer sr-only" checked={!!doc.legalPage}
+                  onChange={(e) => onChange({ ...doc, legalPage: e.target.checked })} />
+                <span className="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-blue-500 transition-colors" />
+                <span className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* Sections */}
       {doc.sections.map((section, idx) => (
         <div key={section.id} className="border rounded-xl overflow-hidden">
@@ -320,12 +358,6 @@ export default function DocumentEditor({ doc, onChange }: Props) {
                   onChange={(e) => updateSection(section.id, { lineSpacing: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
                 <span className="shrink-0 w-8 text-right tabular-nums">{(section.lineSpacing ?? 1).toFixed(2)}×</span>
               </label>
-              <label className="flex items-center gap-2 text-gray-500" title="Make the write-in answer boxes in this section taller (bigger) or shorter">
-                <span className="shrink-0 w-14 font-medium text-[11px]">Box size</span>
-                <input type="range" min="0.5" max="3" step="0.1" value={section.fieldScale ?? 1}
-                  onChange={(e) => updateSection(section.id, { fieldScale: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
-                <span className="shrink-0 w-8 text-right tabular-nums">{(section.fieldScale ?? 1).toFixed(1)}×</span>
-              </label>
             </div>
           )}
 
@@ -363,6 +395,16 @@ export default function DocumentEditor({ doc, onChange }: Props) {
                     <input className="flex-1 text-xs border-b border-dashed border-gray-300 bg-transparent focus:outline-none focus:border-blue-400 py-0.5"
                       value={item.field.label} placeholder={`${fieldTypeLabel[item.field.type]} label…`} onChange={(e) => updateFieldLabel(section.id, item.id, e.target.value)} />
                     <span className="text-[10px] text-gray-400">{fieldTypeLabel[item.field.type]}{item.field.options ? ` (${item.field.options[0]}–${item.field.options[item.field.options.length - 1]})` : ''}</span>
+                    {(item.field.type === 'text' || item.field.type === 'textarea') && (
+                      <span className="flex items-center gap-0.5 text-gray-400" title="Make THIS answer box taller or shorter">
+                        <span className="text-[10px]">↕</span>
+                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.max(0.5, Math.round((((item.kind === 'field' && item.field.heightScale) || 1) - 0.25) * 100) / 100) })}
+                          className="w-4 h-4 leading-none rounded border border-gray-200 hover:border-blue-400 hover:text-blue-600 text-[11px]">−</button>
+                        <span className="text-[10px] tabular-nums w-8 text-center">{(item.field.heightScale ?? 1).toFixed(2)}×</span>
+                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.min(5, Math.round((((item.kind === 'field' && item.field.heightScale) || 1) + 0.25) * 100) / 100) })}
+                          className="w-4 h-4 leading-none rounded border border-gray-200 hover:border-blue-400 hover:text-blue-600 text-[11px]">+</button>
+                      </span>
+                    )}
                   </>
                 )}
 

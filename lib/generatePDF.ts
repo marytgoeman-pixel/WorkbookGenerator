@@ -430,17 +430,18 @@ export async function generatePDF(
       const sq = Math.round(size * 0.55);
       // Sell It draws its icon mark beside every page (H1) title instead of a bullet.
       const useMark = sellit && section.level === 1 && !!sellitMark;
-      const markH = size + 4;
+      const markH = size + 9;
       const markW = useMark ? markH * (sellitMark!.width / sellitMark!.height) : 0;
       const drawBullet = !useMark && style === 'accent';
-      const textX = useMark ? tmpl.marginLeft + markW + 9 : drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
+      const textX = useMark ? tmpl.marginLeft + markW + 10 : drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
       // Wrap long headings to the content margin instead of overflowing
       const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
       // Orphan control: keep the whole heading together with the start of its content
       ensureSpace(hLines.length * (size + 2) + (section.level === 1 ? 8 : 5) + leadEstimate());
       recordAnchor();
       if (useMark) {
-        page.drawImage(sellitMark!, { x: tmpl.marginLeft, y: y - 2, width: markW, height: markH });
+        // Vertically center the mark on the heading text (text center ≈ baseline + 0.36·size)
+        page.drawImage(sellitMark!, { x: tmpl.marginLeft, y: y + size * 0.36 - markH / 2, width: markW, height: markH });
       } else if (drawBullet) {
         page.drawRectangle({ x: tmpl.marginLeft, y: y + 1, width: sq, height: sq, color: accentColor });
       }
@@ -718,7 +719,7 @@ export async function generatePDF(
     const p = pdfDoc.getPage(i);
 
     if (sellit) {
-      drawSellItChrome(p, tmpl, branding!, brandLogo, font, boldFont, i + 1);
+      drawSellItChrome(p, tmpl, branding!, brandLogo, font, boldFont, i + 1, doc.cover?.header?.trim() || branding!.tagline);
     } else if (branded) {
       drawBrandedChrome(pdfDoc, p, tmpl, branding!, brandLogo, socialIcons, font, italicFont, boldFont, i + 1);
     } else {
@@ -743,7 +744,7 @@ export async function generatePDF(
   return pdfDoc.save();
 }
 
-// Sell It interior chrome: eyebrow tagline (left) + logo (right) header, page-number footer.
+// Sell It interior chrome: editable eyebrow (left) + logo (right) header, page-number footer.
 function drawSellItChrome(
   page: PDFPage,
   tmpl: Template,
@@ -751,7 +752,8 @@ function drawSellItChrome(
   logo: PDFImage | null,
   font: PDFFontT,
   boldFont: PDFFontT,
-  pageNum: number
+  pageNum: number,
+  eyebrowText: string
 ) {
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
   const gray = rgb(0.5, 0.54, 0.58);
@@ -759,13 +761,13 @@ function drawSellItChrome(
 
   // Eyebrow tagline (left), lightly letter-spaced
   const eyebrow = sanitize(branding.tagline.toUpperCase()).split('').join(' '.replace(/.*/, ' '));
-  page.drawText(sanitize(branding.tagline.toUpperCase()), { x: tmpl.marginLeft, y: topY, size: 8, font: boldFont, color: gray });
+  page.drawText(sanitize(eyebrowText.toUpperCase()), { x: tmpl.marginLeft, y: topY, size: 8.5, font: boldFont, color: gray });
 
-  // Logo (right)
+  // Logo (right) — larger, vertically centered on the header row
   if (logo) {
-    const h = 15;
+    const h = 22;
     const w = h * (logo.width / logo.height);
-    page.drawImage(logo, { x: W - tmpl.marginRight - w, y: topY - 4, width: w, height: h });
+    page.drawImage(logo, { x: W - tmpl.marginRight - w, y: topY + 3 - h / 2, width: w, height: h });
   }
   void eyebrow;
 
@@ -787,60 +789,74 @@ async function drawSellItCover(
   logo: PDFImage | null,
   mark: PDFImage | null
 ) {
-  void logo;
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
   const blue = hexToRgb(branding.colors.header);
   const ink = hexToRgb(branding.colors.title);
   const gray = rgb(0.5, 0.54, 0.58);
   const pad = tmpl.marginLeft;
   const innerW = W - pad * 2;
+  const eyebrowText = doc.cover?.header?.trim() || branding.tagline;
 
   let ty = H - 64;
-  // Eyebrow + rule
-  page.drawText(sanitize(branding.tagline.toUpperCase()), { x: pad, y: ty, size: 9, font: boldFont, color: ink });
-  ty -= 9;
+  // Eyebrow (editable) + logo (right) + rule
+  page.drawText(sanitize(eyebrowText.toUpperCase()), { x: pad, y: ty, size: 9, font: boldFont, color: ink });
+  if (logo) {
+    const lh = 20, lw = lh * (logo.width / logo.height);
+    page.drawImage(logo, { x: W - pad - lw, y: ty + 3 - lh / 2, width: lw, height: lh });
+  }
+  ty -= 11;
   page.drawLine({ start: { x: pad, y: ty }, end: { x: W - pad, y: ty }, thickness: 1, color: ink });
-  ty -= 46;
+  ty -= 50;
 
-  // Title (blue) with the icon mark to its left
-  let tSize = 36;
-  const markH = tSize;
-  const markW = mark ? markH * (mark.width / mark.height) : 0;
-  const tx = mark ? pad + markW + 14 : pad;
-  const titleMaxW = W - pad - tx;
-  let titleLines = wrapText(applyCase(doc.title || 'Untitled', 'none'), titleMaxW, boldFont, tSize);
-  while (titleLines.length > 3 && tSize > 24) { tSize = tSize - 3; titleLines = wrapText(applyCase(doc.title || 'Untitled', 'none'), W - pad - (mark ? pad + tSize * (mark.width / mark.height) + 14 : pad), boldFont, tSize); }
-  if (mark) page.drawImage(mark, { x: pad, y: ty - (tSize - tSize) - 4, width: tSize * (mark.width / mark.height), height: tSize });
-  const tx2 = mark ? pad + tSize * (mark.width / mark.height) + 14 : pad;
-  for (const ln of titleLines) {
-    page.drawText(ln, { x: tx2, y: ty, size: tSize, font: boldFont, color: blue });
-    ty -= tSize + 4;
+  // Title (blue) with the icon mark to the left, and the "Workbook" label inline (ink)
+  let tSize = 38;
+  const title = applyCase(doc.title || 'Untitled', 'none');
+  const wbLabel = (doc.cover?.workbookLabel ?? 'Workbook').trim();
+  const ratio = mark ? mark.width / mark.height : 0;
+  const titleMaxW = (ts: number) => W - pad - (pad + (mark ? ts * ratio + 14 : 0));
+  let titleLines = wrapText(title, titleMaxW(tSize), boldFont, tSize);
+  while (titleLines.length > 3 && tSize > 24) { tSize -= 3; titleLines = wrapText(title, titleMaxW(tSize), boldFont, tSize); }
+  const markH = tSize * 0.95;
+  const markW = mark ? markH * ratio : 0;
+  const tx = pad + (mark ? markW + 14 : 0);
+  if (mark) page.drawImage(mark, { x: pad, y: ty + tSize * 0.36 - markH / 2, width: markW, height: markH });
+  const titleLineH = tSize + 6;
+  for (let i = 0; i < titleLines.length; i++) {
+    const ln = titleLines[i];
+    page.drawText(ln, { x: tx, y: ty, size: tSize, font: boldFont, color: blue });
+    if (i === titleLines.length - 1 && wbLabel) {
+      const lnW = boldFont.widthOfTextAtSize(ln, tSize);
+      const lblW = boldFont.widthOfTextAtSize(' ' + wbLabel, tSize);
+      if (tx + lnW + lblW <= W - pad) {
+        page.drawText(' ' + wbLabel, { x: tx + lnW, y: ty, size: tSize, font: boldFont, color: ink });
+      } else {
+        ty -= titleLineH;
+        page.drawText(wbLabel, { x: tx, y: ty, size: tSize, font: boldFont, color: ink });
+      }
+    }
+    ty -= titleLineH;
   }
-  ty -= 18;
+  ty -= 16;
 
-  // WORKBOOK
-  page.drawText('WORKBOOK', { x: pad, y: ty, size: 26, font: boldFont, color: ink });
-  ty -= 30;
-
-  // Cover subtitle (e.g. "Session 1 — ...") in blue
-  const sub = doc.cover?.subtitle?.trim();
-  if (sub) {
-    for (const ln of wrapText(sub, innerW, boldFont, 13)) { page.drawText(ln, { x: pad, y: ty, size: 13, font: boldFont, color: blue }); ty -= 18; }
+  // Session line (blue) + descriptor (gray) — both editable, optional
+  const session = doc.cover?.subtitle?.trim();
+  if (session) {
+    for (const ln of wrapText(session, innerW, boldFont, 14)) { page.drawText(ln, { x: pad, y: ty, size: 14, font: boldFont, color: blue }); ty -= 20; }
   }
-  // Author line (gray) if present
-  if (doc.author?.trim()) { page.drawText(sanitize(doc.author.trim()), { x: pad, y: ty, size: 12, font, color: gray }); ty -= 18; }
+  const descriptor = doc.cover?.descriptor?.trim();
+  if (descriptor) {
+    for (const ln of wrapText(descriptor, innerW, font, 13)) { page.drawText(ln, { x: pad, y: ty, size: 13, font, color: gray }); ty -= 18; }
+  }
 
-  // Optional image contained in the remaining lower area
+  // Cover image — fills the lower area at content width and bleeds off the bottom of the page
   const chosen = coverById(doc.cover?.imageId);
   const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
   if (img) {
-    const top = ty - 12;
-    const bottom = tmpl.marginBottom + 6;
-    const boxH = top - bottom;
-    if (boxH > 60) {
-      const scale = Math.min(innerW / img.width, boxH / img.height); // contain — never overflow
+    const imgTop = ty - 18;
+    if (imgTop > 130) {
+      const scale = Math.max(innerW / img.width, imgTop / img.height); // cover-fit → fills + bleeds off bottom
       const dw = img.width * scale, dh = img.height * scale;
-      page.drawImage(img, { x: pad, y: top - dh, width: dw, height: dh });
+      page.drawImage(img, { x: pad - (dw - innerW) / 2, y: imgTop - dh, width: dw, height: dh });
     }
   }
 }

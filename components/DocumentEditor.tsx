@@ -21,6 +21,7 @@ const fieldTypeLabel: Record<FieldType, string> = { text: 'Text field', textarea
 
 export default function DocumentEditor({ doc, onChange, branding, focus }: Props) {
   const isJo = branding?.id === 'jomangum';
+  const isSellit = branding?.id === 'sellit';
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
   // When the preview is clicked, scroll the matching section into view and flash a highlight.
@@ -166,6 +167,16 @@ export default function DocumentEditor({ doc, onChange, branding, focus }: Props
             <option value="compact">Compact</option><option value="normal">Normal</option><option value="relaxed">Relaxed</option>
           </select>
         </Row>
+        {isSellit && (
+          <Row label="Top header">
+            <input
+              className="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="THE GROWTH ACCELERATOR"
+              value={cover.header ?? ''}
+              onChange={(e) => setCover({ header: e.target.value })}
+            />
+          </Row>
+        )}
       </div>
 
       {/* Cover page */}
@@ -244,15 +255,37 @@ export default function DocumentEditor({ doc, onChange, branding, focus }: Props
                 </label>
               </div>
             )}
+            {isSellit && (
+              <div>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">Word after the title (inline)</label>
+                <input
+                  className="w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Workbook"
+                  value={cover.workbookLabel ?? ''}
+                  onChange={(e) => setCover({ workbookLabel: e.target.value })}
+                />
+              </div>
+            )}
             <div>
-              <label className="block text-[11px] font-medium text-gray-500 mb-1">Cover subtitle (optional)</label>
+              <label className="block text-[11px] font-medium text-gray-500 mb-1">{isSellit ? 'Session line (blue)' : 'Cover subtitle (optional)'}</label>
               <input
                 className="w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="e.g. A workbook for real estate professionals"
+                placeholder={isSellit ? 'e.g. Session 1 - June 11, 1PM ET' : 'e.g. A workbook for real estate professionals'}
                 value={cover.subtitle ?? ''}
                 onChange={(e) => setCover({ subtitle: e.target.value })}
               />
             </div>
+            {isSellit && (
+              <div>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">Description line (gray, optional)</label>
+                <input
+                  className="w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="e.g. Turning conversations into appointments"
+                  value={cover.descriptor ?? ''}
+                  onChange={(e) => setCover({ descriptor: e.target.value })}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

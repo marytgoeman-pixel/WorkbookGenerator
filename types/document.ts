@@ -52,10 +52,13 @@ export type Spacing = 'compact' | 'normal' | 'relaxed';
 export interface CoverSettings {
   enabled: boolean;
   imageId?: string;                          // references a COVER_IMAGES id in lib/covers.ts
-  subtitle?: string;                         // optional line shown under the title on the cover
+  subtitle?: string;                         // session line (blue) — e.g. "Session 1 - June 11, 1PM ET"
   imageAlign?: 'left' | 'center' | 'right';   // horizontal focus when the photo is wider than the page
   imageAlignV?: 'top' | 'center' | 'bottom';  // vertical focus when the photo is taller than the page
   imageZoom?: number;                          // scale multiplier on the cover-fit image (1 = fill; <1 zooms out, >1 zooms in)
+  header?: string;                           // Sell It top header / eyebrow text (default = brand tagline)
+  workbookLabel?: string;                    // Sell It: word shown inline after the title (default "Workbook")
+  descriptor?: string;                       // Sell It: gray descriptor line under the session line
 }
 
 export interface DocumentModel {

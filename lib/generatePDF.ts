@@ -528,33 +528,36 @@ export async function generatePDF(
 
     const renderField = (field: FormField) => {
       const fieldName = `${section.id}__${field.id}`;
-      const IFS = 10; // interactive font size (Arial/Helvetica 10) for all fillable text
+      const IFS = 10;          // interactive font size for fillable text
+      const labLH = IFS + 3;   // label line height (so long prompts wrap, not overflow)
+      const labelColor = rgb(0.2, 0.2, 0.2);
+
       if (field.type === 'checkbox') {
-        ensureSpace(20);
-        page.drawText(sanitize(field.label), { x: tmpl.marginLeft + 20, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) });
+        // Wrap the label to the right of the checkbox; box sits on the first line.
+        const lines = wrapText(field.label, mainColWidth - 20, font, IFS);
+        ensureSpace(Math.max(20, lines.length * labLH));
         const cb = form.createCheckBox(fieldName);
         cb.addToPage(page, { x: tmpl.marginLeft, y: y - 2, width: 14, height: 14, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
-        y -= 22;
-      } else if (field.type === 'dropdown') {
-        const label = sanitize(field.label).trim();
-        if (label) y -= 10 * sp; // separate the prompt from the item above
-        ensureSpace((label ? IFS + 4 : 0) + tmpl.fieldHeight + 8);
-        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
-        const dd = form.createDropdown(fieldName);
-        dd.addOptions(field.options ?? []);
-        dd.addToPage(page, { x: tmpl.marginLeft, y: y - tmpl.fieldHeight, width: Math.min(160, mainColWidth), height: tmpl.fieldHeight, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
-        dd.setFontSize(IFS);
-        y -= tmpl.fieldHeight + 18 * sp;
+        for (const ln of lines) { page.drawText(ln, { x: tmpl.marginLeft + 20, y, size: IFS, font, color: labelColor }); y -= labLH; }
+        y -= Math.max(0, 22 - labLH);
       } else {
-        const label = sanitize(field.label).trim();
+        const hasLabel = !!field.label.trim();
         const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
-        if (label) y -= 10 * sp; // separate the prompt from the item above
-        ensureSpace((label ? IFS + 4 : 0) + fh + 8);
-        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
-        const tf = form.createTextField(fieldName);
-        if (field.type === 'textarea') tf.enableMultiline();
-        tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
-        tf.setFontSize(IFS);
+        if (hasLabel) y -= 10 * sp; // separate the prompt from the item above
+        const lines = hasLabel ? wrapText(field.label, mainColWidth, font, IFS) : [];
+        ensureSpace(lines.length * labLH + fh + 10);
+        for (const ln of lines) { page.drawText(ln, { x: tmpl.marginLeft, y, size: IFS, font, color: labelColor }); y -= labLH; }
+        if (field.type === 'dropdown') {
+          const dd = form.createDropdown(fieldName);
+          dd.addOptions(field.options ?? []);
+          dd.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: Math.min(160, mainColWidth), height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
+          dd.setFontSize(IFS);
+        } else {
+          const tf = form.createTextField(fieldName);
+          if (field.type === 'textarea') tf.enableMultiline();
+          tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
+          tf.setFontSize(IFS);
+        }
         y -= fh + 18 * sp;
       }
     };

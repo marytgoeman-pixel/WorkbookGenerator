@@ -27,11 +27,13 @@ export default function WorkbookApp({ branding }: Props) {
   const [refineText, setRefineText] = useState('');
   const [refining, setRefining] = useState(false);
   const [refineError, setRefineError] = useState('');
+  const [refineOk, setRefineOk] = useState(false);
 
   async function refine() {
     if (!doc || !refineText.trim() || refining) return;
     setRefining(true);
     setRefineError('');
+    setRefineOk(false);
     try {
       const res = await fetch('/api/refine', {
         method: 'POST',
@@ -40,13 +42,24 @@ export default function WorkbookApp({ branding }: Props) {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setRefineError(d.error || `Refine failed (${res.status}).`);
+        setRefineError(
+          res.status === 404
+            ? 'The AI refine endpoint is not on this deployment yet — push the latest code and redeploy.'
+            : d.error || `Refine failed (${res.status}).`
+        );
         return;
       }
       const d = await res.json();
-      if (d.document) { setDoc(d.document); setRefineText(''); }
+      if (d.document) {
+        setDoc(d.document);
+        setRefineText('');
+        setRefineOk(true);
+        setTimeout(() => setRefineOk(false), 6000);
+      } else {
+        setRefineError('The AI returned no changes. Try rephrasing the instruction.');
+      }
     } catch {
-      setRefineError('Could not reach the AI service.');
+      setRefineError('Could not reach the AI service (the endpoint may not be deployed yet).');
     } finally {
       setRefining(false);
     }
@@ -183,7 +196,16 @@ export default function WorkbookApp({ branding }: Props) {
                         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Revising… (up to a minute)</>
                       ) : 'Apply with AI'}
                     </button>
-                    {refineError && <p className="text-[11px] text-red-600">{refineError}</p>}
+                    {refineError && (
+                      <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
+                        ⚠️ {refineError}
+                      </p>
+                    )}
+                    {refineOk && (
+                      <p className="text-xs text-green-800 bg-green-50 border border-green-300 rounded-lg px-2 py-1.5 font-medium">
+                        ✓ Applied — check the preview on the right.
+                      </p>
+                    )}
                   </div>
 
                   <DocumentEditor doc={doc} onChange={setDoc} />

@@ -181,6 +181,10 @@ export async function generatePDF(
 
   // Pre-embed brand logo (may be null until the client uploads it)
   const brandLogo = branded ? await tryEmbedImage(pdfDoc, branding!.logoUrl) : null;
+  // White logo variant for the dark cover band (falls back to the normal logo)
+  const whiteLogo = branded
+    ? (await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'logowhite.png'))) ?? brandLogo
+    : null;
 
   // Pre-embed social icon PNGs from the same folder as the logo (e.g. /clients/jo/linkedin.png)
   const socialIcons: Record<string, PDFImage | null> = {};
@@ -266,7 +270,7 @@ export async function generatePDF(
   // Optional branded cover page (page 1). Real content then starts on a fresh page.
   let hasCover = false;
   if (branded && doc.cover?.enabled) {
-    await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, brandLogo);
+    await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, whiteLogo);
     hasCover = true;
     newPage();
   }
@@ -668,12 +672,15 @@ async function drawCoverPage(
   const innerW = W - pad * 2;
 
   // Background image, cover-fit to the full page. Falls back to a solid brand fill.
+  // imageAlign chooses which part of a too-wide photo stays in frame.
   const chosen = coverById(doc.cover?.imageId);
   const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
   if (img) {
     const scale = Math.max(W / img.width, H / img.height);
     const dw = img.width * scale, dh = img.height * scale;
-    page.drawImage(img, { x: (W - dw) / 2, y: (H - dh) / 2, width: dw, height: dh });
+    const align = doc.cover?.imageAlign ?? 'center';
+    const dx = align === 'left' ? 0 : align === 'right' ? W - dw : (W - dw) / 2;
+    page.drawImage(img, { x: dx, y: (H - dh) / 2, width: dw, height: dh });
   } else {
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
   }
@@ -691,13 +698,16 @@ async function drawCoverPage(
   while (titleLines.length > 3 && tSize > 22) { tSize -= 2; titleLines = wrapText(rawTitle, innerW, boldFont, tSize); }
   const titleLH = tSize + 6;
 
+  const orange = hexToRgb(branding.colors.title);
   const sub = doc.cover?.subtitle?.trim();
   const tagline = sanitize(branding.tagline);
-  const byLine = sanitize(`A workbook by ${doc.author?.trim() || branding.displayName}`);
+  // Just the author's name (no "A workbook by" prefix). Falls back to the brand name if blank.
+  const authorName = sanitize(doc.author?.trim() || branding.displayName);
 
-  const topPad = 30, botPad = 28, ruleGap = 18, byGap = 18, tagGap = 16;
+  const topPad = 30, botPad = 28, titleGap = 16, byGap = 16, tagGap = 16;
   const eyebrowH = sub ? 22 : 0;
-  const contentH = eyebrowH + titleLines.length * titleLH + ruleGap + byGap + tagGap;
+  const authorSize = 14;
+  const contentH = eyebrowH + titleLines.length * titleLH + titleGap + authorSize + byGap + tagGap;
   const bandH = Math.min(H * 0.5, Math.max(H * 0.34, contentH + topPad + botPad));
 
   page.drawRectangle({ x: 0, y: 0, width: W, height: bandH, color: navy, opacity: img ? 0.9 : 1 });
@@ -713,11 +723,12 @@ async function drawCoverPage(
     page.drawText(ln, { x: pad, y: ty, size: tSize, font: boldFont, color: rgb(1, 1, 1) });
     ty -= titleLH;
   }
-  ty -= 2;
-  page.drawRectangle({ x: pad, y: ty, width: 64, height: 3, color: gold });
-  ty -= byGap;
-  page.drawText(byLine, { x: pad, y: ty, size: 12, font, color: rgb(1, 1, 1) });
-  ty -= tagGap;
+  ty -= titleGap;
+  // Author name on an orange highlighter bar (no "A workbook by" prefix)
+  const aW = boldFont.widthOfTextAtSize(authorName, authorSize);
+  page.drawRectangle({ x: pad - 4, y: ty - 4, width: aW + 8, height: authorSize + 5, color: orange });
+  page.drawText(authorName, { x: pad, y: ty, size: authorSize, font: boldFont, color: rgb(1, 1, 1) });
+  ty -= byGap + 2;
   page.drawText(tagline, { x: pad, y: ty, size: 9, font: italicFont, color: rgb(0.85, 0.9, 0.94) });
 
   // Logo bottom-right within the band, if available

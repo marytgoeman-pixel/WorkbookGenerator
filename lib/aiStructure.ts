@@ -17,10 +17,16 @@ interface AiCell {
 interface AiItem {
   kind: 'text' | 'bullet' | 'field' | 'table';
   text: string;          // text/bullet content, or the field's label
+  color: string;         // text/bullet color: '' (default), a hex like '#E04927', or a name
   fieldType: '' | FieldType; // only when kind === 'field'
   options: string[];     // only for dropdown fields
   tableHeaders: string[];          // only when kind === 'table'
   tableRows: { cells: AiCell[] }[]; // only when kind === 'table'
+}
+
+// Remove any stray HTML tags the model might emit inside text
+function stripHtml(s: string): string {
+  return (s || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
 }
 interface AiSection {
   title: string;
@@ -55,6 +61,7 @@ const SCHEMA = {
               properties: {
                 kind: { type: 'string', enum: ['text', 'bullet', 'field', 'table'] },
                 text: { type: 'string' },
+                color: { type: 'string' },
                 fieldType: { type: 'string', enum: ['', 'text', 'textarea', 'checkbox', 'dropdown'] },
                 options: { type: 'array', items: { type: 'string' } },
                 tableHeaders: { type: 'array', items: { type: 'string' } },
@@ -82,7 +89,7 @@ const SCHEMA = {
                   },
                 },
               },
-              required: ['kind', 'text', 'fieldType', 'options', 'tableHeaders', 'tableRows'],
+              required: ['kind', 'text', 'color', 'fieldType', 'options', 'tableHeaders', 'tableRows'],
             },
           },
         },
@@ -121,7 +128,8 @@ Rules:
 - IMPORTANT: illustrative examples are read-only "text" items, NOT fields. Lines that show sample messages or comparisons (e.g. 'Pressure: "..."', 'Presence: "..."', anything in quotes given as an example to read) must be "text", never a textarea or input. Only create a field where the learner is explicitly asked to write, rate, or check something.
 - Do not put a field between two example lines. Only add an answer box after a genuine question/prompt directed at the learner.
 - If a section asks the learner to total or score their answers (e.g. "Your Score"), keep the scoring guidance as text, and add ONE short single-line "text" field labeled "Your Score:" so they can record the number.
-- Do not invent content. Keep the learner's wording. Make it clean and well-grouped so the user only needs minor edits.
+- Do not invent content. Keep the learner's wording and original capitalization. Make it clean and well-grouped so the user only needs minor edits.
+- COLORING TEXT: to color a text or bullet line, set its "color" to a hex like "#E04927" or a common name ("red", "green", "blue", "orange"). For everything else leave color "". NEVER put HTML tags (e.g. <span>) or markdown in "text" — text is plain words only.
 - Output ONLY the JSON.`;
 
 function toFieldType(t: string): FieldType {
@@ -166,10 +174,11 @@ function mapToDocument(ai: AiDoc): DocumentModel {
         const table: DocTable = { id: uid('table'), headers, rows };
         return { id: uid('c'), kind: 'table', table };
       }
-      if (it.kind === 'bullet') return { id: uid('c'), kind: 'bullet', text: it.text || '' };
-      return { id: uid('c'), kind: 'text', text: it.text || '' };
+      const color = (it.color || '').trim();
+      if (it.kind === 'bullet') return { id: uid('c'), kind: 'bullet', text: stripHtml(it.text), ...(color ? { color } : {}) };
+      return { id: uid('c'), kind: 'text', text: stripHtml(it.text), ...(color ? { color } : {}) };
     });
-    return { id: uid('section'), level: s.level === 2 ? 2 : 1, title: s.title || 'Section', content, callout: !!s.callout };
+    return { id: uid('section'), level: s.level === 2 ? 2 : 1, title: stripHtml(s.title) || 'Section', content, callout: !!s.callout };
   });
 
   if (sections.length === 0) sections.push({ id: uid('section'), level: 1, title: 'Document', content: [] });
@@ -210,11 +219,11 @@ function docToAi(doc: DocumentModel): AiDoc {
       callout: !!s.callout,
       items: s.content.map((it): AiItem => {
         if (it.kind === 'field') {
-          return { kind: 'field', text: it.field.label, fieldType: it.field.type, options: it.field.options ?? [], tableHeaders: [], tableRows: [] };
+          return { kind: 'field', text: it.field.label, color: '', fieldType: it.field.type, options: it.field.options ?? [], tableHeaders: [], tableRows: [] };
         }
         if (it.kind === 'table') {
           return {
-            kind: 'table', text: '', fieldType: '', options: [],
+            kind: 'table', text: '', color: '', fieldType: '', options: [],
             tableHeaders: it.table.headers,
             tableRows: it.table.rows.map((r) => ({
               cells: r.map((c) => c.field
@@ -223,7 +232,7 @@ function docToAi(doc: DocumentModel): AiDoc {
             })),
           };
         }
-        return { kind: it.kind, text: it.text, fieldType: '', options: [], tableHeaders: [], tableRows: [] };
+        return { kind: it.kind, text: stripHtml(it.text), color: it.color ?? '', fieldType: '', options: [], tableHeaders: [], tableRows: [] };
       }),
     })),
   };
@@ -237,6 +246,7 @@ Rules:
 - You can add, remove, reorder, or restyle sections and items, and add fillable fields, checkboxes, dropdowns, or tables.
 - Headings are never bulleted. Illustrative examples stay as read-only text. Only add fields where the learner is asked to write, rate, or check.
 - For grid/calendar-style requests, use a "table" item: e.g. a monthly calendar = a table whose headers are the weekdays and whose cells are fillable "text" fields (or static day numbers). A tracker = a table with the right columns and fillable cells.
+- COLORING TEXT: to color a line, set its "color" to a hex ("#E04927") or a name ("red","green","blue","orange"); leave "" otherwise. NEVER put HTML tags or markdown in "text". Preserve the original capitalization — do not uppercase words just to color them.
 - Output ONLY the JSON for the full workbook.`;
 
 export async function refineWithAI(doc: DocumentModel, instruction: string): Promise<DocumentModel> {

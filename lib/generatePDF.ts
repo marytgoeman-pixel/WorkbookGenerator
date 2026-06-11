@@ -57,6 +57,21 @@ function hexToRgb(hex: string): RGB {
   return rgb(r, g, b);
 }
 
+const NAMED_COLORS: Record<string, string> = {
+  red: '#D32F2F', green: '#2E7D32', blue: '#1565C0', orange: '#E04927',
+  purple: '#6A1B9A', teal: '#00796B', gray: '#555555', grey: '#555555',
+  black: '#111111', gold: '#C9A227', navy: '#16293A',
+};
+
+// Resolve a user/AI color (hex or name) to RGB; returns null if blank/invalid → use default
+function resolveColor(color: string | undefined): RGB | null {
+  if (!color) return null;
+  const c = color.trim().toLowerCase();
+  if (/^#?[0-9a-f]{6}$/.test(c)) return hexToRgb(c.startsWith('#') ? c : '#' + c);
+  if (NAMED_COLORS[c]) return hexToRgb(NAMED_COLORS[c]);
+  return null;
+}
+
 function getTemplate(id: TemplateId): Template {
   if (id === 'modern') return modernTemplate;
   if (id === 'workbook') return workbookTemplate;
@@ -360,16 +375,18 @@ export async function generatePDF(
     const lineH = tmpl.lineHeight * ls;
 
     // ---- ordered content rendering (preserves document order) ----
-    const renderText = (txt: string) => {
+    const renderText = (txt: string, color?: string) => {
+      const col = resolveColor(color) ?? rgb(0.1, 0.1, 0.1);
       for (const wline of wrapText(txt, mainColWidth, font, tmpl.bodySize)) {
         ensureSpace(lineH);
-        page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
+        page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: col });
         y -= lineH;
       }
       y -= tmpl.paragraphSpacing * sp;
     };
 
-    const renderBullet = (txt: string) => {
+    const renderBullet = (txt: string, color?: string) => {
+      const col = resolveColor(color) ?? rgb(0.1, 0.1, 0.1);
       const wrapped = wrapText(txt, mainColWidth - tmpl.bulletIndent - 6, font, tmpl.bodySize);
       ensureSpace(tmpl.lineHeight);
       if (branded) {
@@ -377,11 +394,11 @@ export async function generatePDF(
       } else {
         page.drawText('•', { x: tmpl.marginLeft + tmpl.bulletIndent, y, size: tmpl.bodySize, font: boldFont, color: secondaryColor });
       }
-      page.drawText(wrapped[0], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
+      page.drawText(wrapped[0], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: col });
       y -= tmpl.lineHeight;
       for (let i = 1; i < wrapped.length; i++) {
         ensureSpace(tmpl.lineHeight);
-        page.drawText(wrapped[i], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
+        page.drawText(wrapped[i], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: col });
         y -= tmpl.lineHeight;
       }
     };
@@ -498,7 +515,7 @@ export async function generatePDF(
       const texts = section.content.filter((i) => i.kind === 'text').map((i) => i.text);
       if (texts.length) renderCalloutBox(texts);
       for (const item of section.content) {
-        if (item.kind === 'bullet') renderBullet(item.text);
+        if (item.kind === 'bullet') renderBullet(item.text, item.color);
         else if (item.kind === 'field') renderField(item.field);
         else if (item.kind === 'table') renderTable(item.table);
       }
@@ -509,10 +526,10 @@ export async function generatePDF(
       for (const item of section.content) {
         if (item.kind === 'text') {
           if (lastWasBox) y -= 12 * sp;
-          renderText(item.text);
+          renderText(item.text, item.color);
           lastWasBox = false;
         } else if (item.kind === 'bullet') {
-          renderBullet(item.text);
+          renderBullet(item.text, item.color);
           lastWasBox = false;
         } else if (item.kind === 'field') {
           renderField(item.field);

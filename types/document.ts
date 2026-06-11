@@ -26,8 +26,8 @@ export type TextCase = 'none' | 'upper' | 'sentence' | 'title';
 // A section's content is an ordered list so document order is preserved
 // (e.g. prompt → checkboxes → answer box → next prompt …)
 export type ContentItem =
-  | { id: string; kind: 'text'; text: string }
-  | { id: string; kind: 'bullet'; text: string }
+  | { id: string; kind: 'text'; text: string; color?: string }   // color: hex (#E04927) or name
+  | { id: string; kind: 'bullet'; text: string; color?: string }
   | { id: string; kind: 'field'; field: FormField }
   | { id: string; kind: 'table'; table: DocTable };
 

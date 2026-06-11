@@ -40,6 +40,7 @@ export interface Section {
   headingCase?: TextCase;      // case transform for the heading (default 'none')
   callout?: boolean;           // render the body text inside a stylized brand box
   pageBreakBefore?: boolean;   // force this section to start on a new page
+  spacing?: number;            // per-section spacing multiplier (default 1) to nudge content up/down
 }
 
 export type Spacing = 'compact' | 'normal' | 'relaxed';

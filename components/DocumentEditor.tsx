@@ -181,6 +181,16 @@ export default function DocumentEditor({ doc, onChange }: Props) {
             <label className="flex items-center gap-1 text-gray-500 cursor-pointer">
               <input type="checkbox" checked={!!section.pageBreakBefore} onChange={(e) => updateSection(section.id, { pageBreakBefore: e.target.checked })} /> New page
             </label>
+            <label className="flex items-center gap-1.5 text-gray-500 w-full" title="Drag to tighten or loosen this section's spacing — useful to pull content back from the next page">
+              <span className="shrink-0">Spacing</span>
+              <input
+                type="range" min="0.3" max="2" step="0.1"
+                value={section.spacing ?? 1}
+                onChange={(e) => updateSection(section.id, { spacing: parseFloat(e.target.value) })}
+                className="flex-1 accent-blue-500"
+              />
+              <span className="shrink-0 w-7 text-right tabular-nums">{(section.spacing ?? 1).toFixed(1)}×</span>
+            </label>
           </div>
 
           {/* Ordered content */}

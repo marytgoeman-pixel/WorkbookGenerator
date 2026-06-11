@@ -231,10 +231,12 @@ export async function generatePDF(
     titleSize = Math.max(16, tmpl.titleSize - 4);
     titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
   }
+  // The main title uses the brand blue (header color) when branded
+  const titleColor = branded ? hexToRgb(branding!.colors.header) : primaryColor;
   const titleLineH = titleSize + 4;
   ensureSpace(titleLines.length * titleLineH + 12);
   for (const tline of titleLines) {
-    page.drawText(tline, { x: tmpl.marginLeft, y, size: titleSize, font: boldFont, color: primaryColor });
+    page.drawText(tline, { x: tmpl.marginLeft, y, size: titleSize, font: boldFont, color: titleColor });
     y -= titleLineH;
   }
 
@@ -290,14 +292,13 @@ export async function generatePDF(
       if (drawBullet) {
         page.drawRectangle({ x: tmpl.marginLeft, y: y + 1, width: sq, height: sq, color: accentColor });
       }
-      page.drawText(headingText, {
-        x: textX,
-        y,
-        size,
-        font: boldFont,
-        color: headingColor,
-      });
-      y -= size + (section.level === 1 ? 10 : 7);
+      // Wrap long headings to the content margin instead of overflowing
+      const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
+      for (const hl of hLines) {
+        page.drawText(hl, { x: textX, y, size, font: boldFont, color: headingColor });
+        y -= size + 2;
+      }
+      y -= (section.level === 1 ? 8 : 5);
     } else if (section.level === 1) {
       {
         if (tmpl.headerBarHeight > 0) {
@@ -351,6 +352,10 @@ export async function generatePDF(
       y -= tmpl.subheadingSize + 6;
     }
 
+    // Per-section spacing multiplier — the editor's drag bar adjusts this to pull
+    // content up (smaller) or push it down (larger) to control page breaks.
+    const sp = section.spacing ?? 1;
+
     // ---- ordered content rendering (preserves document order) ----
     const renderText = (txt: string) => {
       for (const wline of wrapText(txt, mainColWidth, font, tmpl.bodySize)) {
@@ -358,7 +363,7 @@ export async function generatePDF(
         page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
         y -= tmpl.lineHeight;
       }
-      y -= tmpl.paragraphSpacing;
+      y -= tmpl.paragraphSpacing * sp;
     };
 
     const renderBullet = (txt: string) => {
@@ -380,29 +385,32 @@ export async function generatePDF(
 
     const renderField = (field: FormField) => {
       const fieldName = `${section.id}__${field.id}`;
+      const IFS = 10; // interactive font size (Arial/Helvetica 10) for all fillable text
       if (field.type === 'checkbox') {
         ensureSpace(20);
-        page.drawText(sanitize(field.label), { x: tmpl.marginLeft + 20, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) });
+        page.drawText(sanitize(field.label), { x: tmpl.marginLeft + 20, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) });
         const cb = form.createCheckBox(fieldName);
         cb.addToPage(page, { x: tmpl.marginLeft, y: y - 2, width: 14, height: 14, borderColor: primaryColor, backgroundColor: rgb(1, 1, 1) });
         y -= 22;
       } else if (field.type === 'dropdown') {
         const label = sanitize(field.label).trim();
-        ensureSpace((label ? tmpl.bodySize + 4 : 0) + tmpl.fieldHeight + 8);
-        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize - 3; }
+        ensureSpace((label ? IFS + 4 : 0) + tmpl.fieldHeight + 8);
+        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
         const dd = form.createDropdown(fieldName);
         dd.addOptions(field.options ?? []);
         dd.addToPage(page, { x: tmpl.marginLeft, y: y - tmpl.fieldHeight, width: Math.min(160, mainColWidth), height: tmpl.fieldHeight, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
-        y -= tmpl.fieldHeight + 18;
+        dd.setFontSize(IFS);
+        y -= tmpl.fieldHeight + 18 * sp;
       } else {
         const label = sanitize(field.label).trim();
         const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
-        ensureSpace((label ? tmpl.bodySize + 4 : 0) + fh + 8);
-        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.2, 0.2, 0.2) }); y -= tmpl.bodySize - 3; }
+        ensureSpace((label ? IFS + 4 : 0) + fh + 8);
+        if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
         const tf = form.createTextField(fieldName);
         if (field.type === 'textarea') tf.enableMultiline();
         tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: branded ? hexToRgb(branding.colors.grayBox) : rgb(0.98, 0.98, 0.98) });
-        y -= fh + 18;
+        tf.setFontSize(IFS);
+        y -= fh + 18 * sp;
       }
     };
 
@@ -495,7 +503,7 @@ export async function generatePDF(
       }
     }
 
-    y -= tmpl.sectionSpacing;
+    y -= tmpl.sectionSpacing * sp;
   }
 
   // --- Page chrome (header bar + footer) on every page ---

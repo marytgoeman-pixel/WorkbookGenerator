@@ -352,16 +352,19 @@ export async function generatePDF(
       y -= tmpl.subheadingSize + 6;
     }
 
-    // Per-section spacing multiplier — the editor's drag bar adjusts this to pull
-    // content up (smaller) or push it down (larger) to control page breaks.
+    // Per-section multipliers, both driven by sliders in the editor:
+    //  sp = gaps between blocks (pull content up/down to control page breaks)
+    //  ls = line height within text/callouts (tighten or loosen lines)
     const sp = section.spacing ?? 1;
+    const ls = section.lineSpacing ?? 1;
+    const lineH = tmpl.lineHeight * ls;
 
     // ---- ordered content rendering (preserves document order) ----
     const renderText = (txt: string) => {
       for (const wline of wrapText(txt, mainColWidth, font, tmpl.bodySize)) {
-        ensureSpace(tmpl.lineHeight);
+        ensureSpace(lineH);
         page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: rgb(0.1, 0.1, 0.1) });
-        y -= tmpl.lineHeight;
+        y -= lineH;
       }
       y -= tmpl.paragraphSpacing * sp;
     };
@@ -394,6 +397,7 @@ export async function generatePDF(
         y -= 22;
       } else if (field.type === 'dropdown') {
         const label = sanitize(field.label).trim();
+        if (label) y -= 10 * sp; // separate the prompt from the item above
         ensureSpace((label ? IFS + 4 : 0) + tmpl.fieldHeight + 8);
         if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
         const dd = form.createDropdown(fieldName);
@@ -404,6 +408,7 @@ export async function generatePDF(
       } else {
         const label = sanitize(field.label).trim();
         const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
+        if (label) y -= 10 * sp; // separate the prompt from the item above
         ensureSpace((label ? IFS + 4 : 0) + fh + 8);
         if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
         const tf = form.createTextField(fieldName);
@@ -473,16 +478,19 @@ export async function generatePDF(
       const calloutBg = hexToRgb(branding!.colors.calloutBg);
       const pad = 12;
       const innerW = mainColWidth - pad * 2;
-      const allWrapped = [];
-      for (const line of lines) { allWrapped.push(...wrapText(line, innerW, font, tmpl.bodySize)); allWrapped.push(''); }
-      if (allWrapped[allWrapped.length - 1] === '') allWrapped.pop();
-      const boxH = allWrapped.length * tmpl.lineHeight + pad * 2;
+      const cLineH = tmpl.lineHeight * ls;          // line spacing controls how tight lines are
+      const paraGap = cLineH * 0.5;                 // modest gap between paragraphs (was a full blank line)
+      const paras = lines.map((l) => wrapText(l, innerW, font, tmpl.bodySize)).filter((p) => p.join('').trim());
+      const boxH = paras.reduce((h, p) => h + p.length * cLineH, 0) + Math.max(0, paras.length - 1) * paraGap + pad * 2;
       ensureSpace(boxH + 8);
       const boxTop = y + tmpl.bodySize;
       page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: calloutBg });
       page.drawRectangle({ x: tmpl.marginLeft + 5, y: boxTop - boxH + 5, width: mainColWidth - 10, height: boxH - 10, borderColor: hexToRgb(branding!.colors.calloutBorder), borderWidth: 1, borderDashArray: [3, 3], color: calloutBg });
       let cy = boxTop - pad - tmpl.bodySize + 2;
-      for (const wline of allWrapped) { if (wline) page.drawText(wline, { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) }); cy -= tmpl.lineHeight; }
+      paras.forEach((p, i) => {
+        for (const wline of p) { page.drawText(wline, { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) }); cy -= cLineH; }
+        if (i < paras.length - 1) cy -= paraGap;
+      });
       y = boxTop - boxH - tmpl.paragraphSpacing;
     };
 
@@ -570,10 +578,11 @@ function drawBrandedChrome(
 
   // Logo (left). If not yet uploaded, fall back to styled text.
   if (logo) {
-    const targetH = 44;
+    const targetH = 42;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
-    page.drawImage(logo, { x: tmpl.marginLeft, y: centerY - targetH / 2 + 2, width: w, height: targetH });
+    // Raised off the page bottom so it isn't crammed against the edge
+    page.drawImage(logo, { x: tmpl.marginLeft, y: centerY - targetH / 2 + 12, width: w, height: targetH });
   } else {
     page.drawText('Jo', { x: tmpl.marginLeft, y: centerY, size: 16, font: boldFont, color: hexToRgb(branding.colors.title) });
     page.drawText('Mangum', { x: tmpl.marginLeft + 18, y: centerY, size: 14, font: italicFont, color: headerColor });

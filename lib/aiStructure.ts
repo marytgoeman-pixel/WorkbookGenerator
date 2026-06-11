@@ -120,6 +120,7 @@ Rules:
 - Convert "□"/checkbox glyphs to checkbox fields. Convert numbered choice questions to a text prompt followed by their checkbox options.
 - IMPORTANT: illustrative examples are read-only "text" items, NOT fields. Lines that show sample messages or comparisons (e.g. 'Pressure: "..."', 'Presence: "..."', anything in quotes given as an example to read) must be "text", never a textarea or input. Only create a field where the learner is explicitly asked to write, rate, or check something.
 - Do not put a field between two example lines. Only add an answer box after a genuine question/prompt directed at the learner.
+- If a section asks the learner to total or score their answers (e.g. "Your Score"), keep the scoring guidance as text, and add ONE short single-line "text" field labeled "Your Score:" so they can record the number.
 - Do not invent content. Keep the learner's wording. Make it clean and well-grouped so the user only needs minor edits.
 - Output ONLY the JSON.`;
 

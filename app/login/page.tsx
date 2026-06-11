@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { APP_VERSION } from '@/lib/version';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -60,7 +61,10 @@ export default function LoginPage() {
             alt="The Learning Creative"
             className="mx-auto mb-3 w-full max-w-[220px] h-auto"
           />
-          <h1 className="text-lg font-bold text-gray-900">Workbook PDF Generator</h1>
+          <h1 className="text-lg font-bold text-gray-900">
+            Workbook PDF Generator
+            <span className="ml-2 text-xs font-mono text-gray-400 align-middle">{APP_VERSION}</span>
+          </h1>
           <p className="text-sm text-gray-400 mt-1">Sign in to your branded workspace</p>
         </div>
 

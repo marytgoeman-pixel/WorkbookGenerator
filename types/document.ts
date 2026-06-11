@@ -42,6 +42,7 @@ export interface Section {
   pageBreakBefore?: boolean;   // force this section to start on a new page
   spacing?: number;            // per-section spacing multiplier (default 1) for gaps between blocks
   lineSpacing?: number;        // per-section line-height multiplier (default 1) to tighten/loosen lines
+  fieldScale?: number;         // per-section input-box height multiplier (default 1) — bigger/smaller answer boxes
 }
 
 export type Spacing = 'compact' | 'normal' | 'relaxed';

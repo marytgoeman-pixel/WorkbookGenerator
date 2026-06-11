@@ -12,8 +12,8 @@ export const sellitTemplate = {
   titleSize: 24,
   headingSize: 21,      // big interior page titles (ink, Aeonik)
   subheadingSize: 12,   // blue uppercase section labels
-  bodySize: 10.5,
-  lineHeight: 15,
+  bodySize: 12,
+  lineHeight: 16,
   sectionSpacing: 16,
   paragraphSpacing: 6,
   fieldHeight: 24,

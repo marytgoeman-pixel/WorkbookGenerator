@@ -320,6 +320,12 @@ export default function DocumentEditor({ doc, onChange }: Props) {
                   onChange={(e) => updateSection(section.id, { lineSpacing: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
                 <span className="shrink-0 w-8 text-right tabular-nums">{(section.lineSpacing ?? 1).toFixed(2)}×</span>
               </label>
+              <label className="flex items-center gap-2 text-gray-500" title="Make the write-in answer boxes in this section taller (bigger) or shorter">
+                <span className="shrink-0 w-14 font-medium text-[11px]">Box size</span>
+                <input type="range" min="0.5" max="3" step="0.1" value={section.fieldScale ?? 1}
+                  onChange={(e) => updateSection(section.id, { fieldScale: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
+                <span className="shrink-0 w-8 text-right tabular-nums">{(section.fieldScale ?? 1).toFixed(1)}×</span>
+              </label>
             </div>
           )}
 

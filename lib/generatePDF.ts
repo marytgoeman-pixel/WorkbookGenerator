@@ -501,7 +501,8 @@ export async function generatePDF(
 
     // ---- ordered content rendering (preserves document order) ----
     const renderText = (txt: string, color?: string) => {
-      const col = resolveColor(color) ?? rgb(0.1, 0.1, 0.1);
+      // "Pressure"/"Presence" lines render in the default color (coloring removed per request)
+      const col = /pressure|presence/i.test(txt) ? rgb(0.1, 0.1, 0.1) : (resolveColor(color) ?? rgb(0.1, 0.1, 0.1));
       // widow/orphan control keeps >=2 lines of a paragraph together across pages
       placeLines(wrapText(txt, mainColWidth, font, tmpl.bodySize), lineH,
         (wline) => page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: col }));
@@ -509,7 +510,8 @@ export async function generatePDF(
     };
 
     const renderBullet = (txt: string, color?: string) => {
-      const col = resolveColor(color) ?? rgb(0.1, 0.1, 0.1);
+      // "Pressure"/"Presence" lines render in the default color (coloring removed per request)
+      const col = /pressure|presence/i.test(txt) ? rgb(0.1, 0.1, 0.1) : (resolveColor(color) ?? rgb(0.1, 0.1, 0.1));
       const wrapped = wrapText(txt, mainColWidth - tmpl.bulletIndent - 6, font, tmpl.bodySize);
       ensureSpace(tmpl.lineHeight);
       if (branded) {
@@ -528,21 +530,25 @@ export async function generatePDF(
 
     const renderField = (field: FormField) => {
       const fieldName = `${section.id}__${field.id}`;
-      const IFS = 10;          // interactive font size for fillable text
-      const labLH = IFS + 3;   // label line height (so long prompts wrap, not overflow)
+      const IFS = 12;          // interactive font size for fillable text (12pt minimum)
+      const labLH = IFS + 4;   // label line height (so long prompts wrap, not overflow)
       const labelColor = rgb(0.2, 0.2, 0.2);
+      // Per-section "Box size" slider scales the height of text/textarea answer boxes
+      const fieldScale = section.fieldScale ?? 1;
 
       if (field.type === 'checkbox') {
         // Wrap the label to the right of the checkbox; box sits on the first line.
-        const lines = wrapText(field.label, mainColWidth - 20, font, IFS);
+        const lines = wrapText(field.label, mainColWidth - 22, font, IFS);
         ensureSpace(Math.max(20, lines.length * labLH));
         const cb = form.createCheckBox(fieldName);
-        cb.addToPage(page, { x: tmpl.marginLeft, y: y - 2, width: 14, height: 14, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
-        for (const ln of lines) { page.drawText(ln, { x: tmpl.marginLeft + 20, y, size: IFS, font, color: labelColor }); y -= labLH; }
-        y -= Math.max(0, 22 - labLH);
+        cb.addToPage(page, { x: tmpl.marginLeft, y: y - 3, width: 15, height: 15, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
+        for (const ln of lines) { page.drawText(ln, { x: tmpl.marginLeft + 22, y, size: IFS, font, color: labelColor }); y -= labLH; }
+        y -= Math.max(0, 24 - labLH);
       } else {
         const hasLabel = !!field.label.trim();
-        const fh = field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight;
+        const fh = field.type === 'dropdown'
+          ? tmpl.fieldHeight
+          : (field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight) * fieldScale;
         if (hasLabel) y -= 10 * sp; // separate the prompt from the item above
         const lines = hasLabel ? wrapText(field.label, mainColWidth, font, IFS) : [];
         ensureSpace(lines.length * labLH + fh + 10);
@@ -566,58 +572,69 @@ export async function generatePDF(
       const cols = table.headers.length || (table.rows[0]?.length ?? 0);
       if (cols === 0) return;
       const colW = mainColWidth / cols;
-      const rowH = 24;
+      const TFS = 12;          // table font size — kept at the 12pt minimum
+      const cellLineH = 15;    // line height for wrapped cell text
+      const vpad = 8;          // vertical padding inside a cell
+      const minRowH = 30;
       const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
+      const solidHeader = sellit; // Sell It: solid blue header + white text; others: light tint
 
-      // Sell It: solid blue header bar with white text. Others: light tint with brand-color text.
-      const solidHeader = sellit;
+      const wrapCell = (text: string, f: typeof font) => wrapText(text, colW - 8, f, TFS);
+
+      // Header height grows to fit wrapped header labels
+      const headerWrapped = table.headers.map((h) => wrapCell(h, boldFont));
+      const headerLines = Math.max(1, ...headerWrapped.map((l) => l.length));
+      const headerH = Math.max(minRowH, headerLines * cellLineH + vpad);
+
       const drawHeader = () => {
-        page.drawRectangle({ x: tmpl.marginLeft, y: y - rowH + 4, width: mainColWidth, height: rowH, color: headerColor, opacity: solidHeader ? 1 : 0.12 });
+        page.drawRectangle({ x: tmpl.marginLeft, y: y - headerH + 4, width: mainColWidth, height: headerH, color: headerColor, opacity: solidHeader ? 1 : 0.12 });
         const htColor = solidHeader ? rgb(1, 1, 1) : headerColor;
-        table.headers.forEach((h: string, c: number) => {
-          const lines = wrapText(h, colW - 8, boldFont, 9);
-          page.drawText(lines[0] ?? '', { x: tmpl.marginLeft + c * colW + 4, y: y - 12, size: 9, font: boldFont, color: htColor });
+        headerWrapped.forEach((lines, c) => {
+          let cy = y - vpad - TFS + 5;
+          for (const ln of lines) { page.drawText(ln, { x: tmpl.marginLeft + c * colW + 4, y: cy, size: TFS, font: boldFont, color: htColor }); cy -= cellLineH; }
         });
-        y -= rowH;
+        y -= headerH;
       };
 
-      // Keep the table together: if it doesn't fit here but fits on a fresh page, start fresh
-      const tableHeight = (table.rows.length + 1) * rowH;
-      const usable = tmpl.pageHeight - tmpl.marginTop - tmpl.marginBottom;
-      if (y - tableHeight < tmpl.marginBottom && tableHeight <= usable) {
-        newPage();
-      }
+      // Pre-wrap static text cells and compute each row's height
+      const rowWrapped = table.rows.map((row) => row.map((cell) => (cell && cell.text && !cell.field) ? wrapCell(cell.text, font) : ['']));
+      const rowHeights = rowWrapped.map((cells) => Math.max(minRowH, Math.max(1, ...cells.map((l) => l.length)) * cellLineH + vpad));
 
-      let ty = (drawHeader(), y);
-      for (const row of table.rows) {
-        if (ty - rowH < tmpl.marginBottom) {
-          newPage();
-          drawHeader();          // repeat the header on the continued page
-          ty = y;
-        }
+      // Keep the table together if it fits on a fresh page
+      const total = headerH + rowHeights.reduce((a, b) => a + b, 0);
+      const usable = tmpl.pageHeight - tmpl.marginTop - tmpl.marginBottom;
+      if (y - total < tmpl.marginBottom && total <= usable) newPage();
+
+      drawHeader();
+      table.rows.forEach((row, ri) => {
+        const rh = rowHeights[ri];
+        if (y - rh < tmpl.marginBottom) { newPage(); drawHeader(); }
+        const rowTop = y;
         for (let c = 0; c < cols; c++) {
           const cell = row[c];
           const cx = tmpl.marginLeft + c * colW;
-          page.drawRectangle({ x: cx, y: ty - rowH + 4, width: colW, height: rowH, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1) });
+          page.drawRectangle({ x: cx, y: rowTop - rh + 4, width: colW, height: rh, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1) });
           if (!cell) continue;
           if (cell.field) {
             const name = `${section.id}__${cell.field.id}`;
-            const fw = colW - 10, fh = 15, fx = cx + 5, fy = ty - rowH + 4 + (rowH - fh) / 2;
+            const fh = Math.min(rh - 8, 20), fw = colW - 10, fx = cx + 5, fy = rowTop - rh + 4 + (rh - fh) / 2;
             if (cell.field.type === 'dropdown' && cell.field.options) {
               const dd = form.createDropdown(name); dd.addOptions(cell.field.options);
               dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
+              dd.setFontSize(TFS);
             } else {
               const tf = form.createTextField(name);
               tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
+              tf.setFontSize(TFS);
             }
           } else if (cell.text) {
-            const lines = wrapText(cell.text, colW - 8, font, 9);
-            page.drawText(lines[0] ?? '', { x: cx + 4, y: ty - 12, size: 9, font, color: rgb(0.15, 0.15, 0.15) });
+            let cy = rowTop - vpad - TFS + 5;
+            for (const ln of rowWrapped[ri][c]) { page.drawText(ln, { x: cx + 4, y: cy, size: TFS, font, color: rgb(0.15, 0.15, 0.15) }); cy -= cellLineH; }
           }
         }
-        ty -= rowH;
-      }
-      y = ty - tmpl.paragraphSpacing;
+        y -= rh;
+      });
+      y -= tmpl.paragraphSpacing;
     };
 
     const renderCalloutBox = (lines: string[]) => {

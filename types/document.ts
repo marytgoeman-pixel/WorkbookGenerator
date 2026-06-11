@@ -65,7 +65,7 @@ export interface DocumentModel {
   cover?: CoverSettings;       // optional branded cover page
 }
 
-export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum';
+export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum' | 'sellit';
 
 export interface SocialLink {
   type: 'website' | 'linkedin' | 'youtube' | 'instagram' | 'facebook';

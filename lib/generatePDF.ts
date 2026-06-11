@@ -4,7 +4,9 @@ import { classicTemplate } from './templates/classic';
 import { modernTemplate } from './templates/modern';
 import { workbookTemplate } from './templates/workbook';
 import { jomangumTemplate } from './templates/jomangum';
+import { sellitTemplate } from './templates/sellit';
 import { coverById } from './covers';
+import fontkit from '@pdf-lib/fontkit';
 
 type Template = {
   id: string; name: string; description: string;
@@ -77,7 +79,19 @@ function getTemplate(id: TemplateId): Template {
   if (id === 'modern') return modernTemplate;
   if (id === 'workbook') return workbookTemplate;
   if (id === 'jomangum') return jomangumTemplate;
+  if (id === 'sellit') return sellitTemplate;
   return classicTemplate;
+}
+
+// Fetch raw font bytes (for embedding custom OTF/WOFF). Returns null if unavailable.
+async function tryFetchBytes(url: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
 // Add a clickable URI link annotation over a rectangle
@@ -163,11 +177,27 @@ export async function generatePDF(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const form = pdfDoc.getForm();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const italicFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+  let font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  let boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  let italicFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
 
-  const branded = templateId === 'jomangum' && !!branding;
+  const jo = templateId === 'jomangum' && !!branding;
+  const sellit = templateId === 'sellit' && !!branding;
+  const branded = jo || sellit;
+
+  // Sell It uses its own typefaces: Aeonik (bold) for headings, Inter for body.
+  if (sellit) {
+    pdfDoc.registerFontkit(fontkit);
+    const base = branding!.logoUrl.replace(/[^/]*$/, '');
+    const [aeonik, inter] = await Promise.all([
+      tryFetchBytes(`${base}AeonikPro-Bold.otf`),
+      tryFetchBytes(`${base}Inter-Regular.woff`),
+    ]);
+    try {
+      if (aeonik) boldFont = await pdfDoc.embedFont(aeonik, { subset: true });
+      if (inter) { font = await pdfDoc.embedFont(inter, { subset: true }); italicFont = font; }
+    } catch { /* fall back to Helvetica on any embed error */ }
+  }
 
   // Copy the template so we can apply document-level spacing without mutating the shared constant
   const tmpl = { ...getTemplate(templateId) };
@@ -178,13 +208,18 @@ export async function generatePDF(
   const secondaryColor = hexToRgb(branded ? branding!.colors.subtitle : theme.secondary);
   const accentColor = hexToRgb(branded ? branding!.colors.accent : theme.secondary);
   const bgColor = hexToRgb(theme.background);
+  // Fillable-field background: branded clients tint it (Sell It = periwinkle, Jo = light gray)
+  const fieldBg = branded ? hexToRgb(branding!.colors.grayBox) : rgb(0.98, 0.98, 0.98);
 
   // Pre-embed brand logo (may be null until the client uploads it)
   const brandLogo = branded ? await tryEmbedImage(pdfDoc, branding!.logoUrl) : null;
   // White logo variant for the dark cover band (falls back to the normal logo)
+  const whiteName = sellit ? 'sellitlogowhite.png' : 'logowhite.png';
   const whiteLogo = branded
-    ? (await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'logowhite.png'))) ?? brandLogo
+    ? (await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, whiteName))) ?? brandLogo
     : null;
+  // Sell It's icon mark (the converging-arrows symbol) in brand blue, drawn beside page titles
+  const sellitMark = sellit ? await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'sellitmark-blue.png')) : null;
 
   // Pre-embed social icon PNGs from the same folder as the logo (e.g. /clients/jo/linkedin.png)
   const socialIcons: Record<string, PDFImage | null> = {};
@@ -270,7 +305,11 @@ export async function generatePDF(
   // Optional branded cover page (page 1). Real content then starts on a fresh page.
   let hasCover = false;
   if (branded && doc.cover?.enabled) {
-    await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, whiteLogo);
+    if (sellit) {
+      await drawSellItCover(pdfDoc, page, tmpl, doc, branding!, boldFont, font, brandLogo, sellitMark);
+    } else {
+      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, whiteLogo);
+    }
     hasCover = true;
     newPage();
   }
@@ -383,13 +422,19 @@ export async function generatePDF(
         : style === 'plain' ? rgb(0.15, 0.15, 0.15)
         : primaryColor; // 'title' and 'accent' both use the primary brand color
       const sq = Math.round(size * 0.55);
-      const drawBullet = style === 'accent';
-      const textX = drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
+      // Sell It draws its icon mark beside every page (H1) title instead of a bullet.
+      const useMark = sellit && section.level === 1 && !!sellitMark;
+      const markH = size + 4;
+      const markW = useMark ? markH * (sellitMark!.width / sellitMark!.height) : 0;
+      const drawBullet = !useMark && style === 'accent';
+      const textX = useMark ? tmpl.marginLeft + markW + 9 : drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
       // Wrap long headings to the content margin instead of overflowing
       const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
       // Orphan control: keep the whole heading together with the start of its content
       ensureSpace(hLines.length * (size + 2) + (section.level === 1 ? 8 : 5) + leadEstimate());
-      if (drawBullet) {
+      if (useMark) {
+        page.drawImage(sellitMark!, { x: tmpl.marginLeft, y: y - 2, width: markW, height: markH });
+      } else if (drawBullet) {
         page.drawRectangle({ x: tmpl.marginLeft, y: y + 1, width: sq, height: sq, color: accentColor });
       }
       for (const hl of hLines) {
@@ -488,7 +533,7 @@ export async function generatePDF(
         ensureSpace(20);
         page.drawText(sanitize(field.label), { x: tmpl.marginLeft + 20, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) });
         const cb = form.createCheckBox(fieldName);
-        cb.addToPage(page, { x: tmpl.marginLeft, y: y - 2, width: 14, height: 14, borderColor: primaryColor, backgroundColor: rgb(1, 1, 1) });
+        cb.addToPage(page, { x: tmpl.marginLeft, y: y - 2, width: 14, height: 14, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
         y -= 22;
       } else if (field.type === 'dropdown') {
         const label = sanitize(field.label).trim();
@@ -497,7 +542,7 @@ export async function generatePDF(
         if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
         const dd = form.createDropdown(fieldName);
         dd.addOptions(field.options ?? []);
-        dd.addToPage(page, { x: tmpl.marginLeft, y: y - tmpl.fieldHeight, width: Math.min(160, mainColWidth), height: tmpl.fieldHeight, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
+        dd.addToPage(page, { x: tmpl.marginLeft, y: y - tmpl.fieldHeight, width: Math.min(160, mainColWidth), height: tmpl.fieldHeight, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
         dd.setFontSize(IFS);
         y -= tmpl.fieldHeight + 18 * sp;
       } else {
@@ -508,7 +553,7 @@ export async function generatePDF(
         if (label) { page.drawText(label, { x: tmpl.marginLeft, y, size: IFS, font, color: rgb(0.2, 0.2, 0.2) }); y -= IFS - 2; }
         const tf = form.createTextField(fieldName);
         if (field.type === 'textarea') tf.enableMultiline();
-        tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: branded ? hexToRgb(branding.colors.grayBox) : rgb(0.98, 0.98, 0.98) });
+        tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
         tf.setFontSize(IFS);
         y -= fh + 18 * sp;
       }
@@ -521,11 +566,14 @@ export async function generatePDF(
       const rowH = 24;
       const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
 
+      // Sell It: solid blue header bar with white text. Others: light tint with brand-color text.
+      const solidHeader = sellit;
       const drawHeader = () => {
-        page.drawRectangle({ x: tmpl.marginLeft, y: y - rowH + 4, width: mainColWidth, height: rowH, color: headerColor, opacity: 0.12 });
+        page.drawRectangle({ x: tmpl.marginLeft, y: y - rowH + 4, width: mainColWidth, height: rowH, color: headerColor, opacity: solidHeader ? 1 : 0.12 });
+        const htColor = solidHeader ? rgb(1, 1, 1) : headerColor;
         table.headers.forEach((h: string, c: number) => {
           const lines = wrapText(h, colW - 8, boldFont, 9);
-          page.drawText(lines[0] ?? '', { x: tmpl.marginLeft + c * colW + 4, y: y - 12, size: 9, font: boldFont, color: headerColor });
+          page.drawText(lines[0] ?? '', { x: tmpl.marginLeft + c * colW + 4, y: y - 12, size: 9, font: boldFont, color: htColor });
         });
         y -= rowH;
       };
@@ -554,10 +602,10 @@ export async function generatePDF(
             const fw = colW - 10, fh = 15, fx = cx + 5, fy = ty - rowH + 4 + (rowH - fh) / 2;
             if (cell.field.type === 'dropdown' && cell.field.options) {
               const dd = form.createDropdown(name); dd.addOptions(cell.field.options);
-              dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
+              dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
             } else {
               const tf = form.createTextField(name);
-              tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: rgb(1, 1, 1) });
+              tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
             }
           } else if (cell.text) {
             const lines = wrapText(cell.text, colW - 8, font, 9);
@@ -628,7 +676,9 @@ export async function generatePDF(
     if (hasCover && i === 0) continue; // the cover has its own full-bleed design
     const p = pdfDoc.getPage(i);
 
-    if (branded) {
+    if (sellit) {
+      drawSellItChrome(p, tmpl, branding!, brandLogo, font, boldFont, i + 1);
+    } else if (branded) {
       drawBrandedChrome(pdfDoc, p, tmpl, branding!, brandLogo, socialIcons, font, italicFont, boldFont, i + 1);
     } else {
       // Generic footer: title left, page number right
@@ -650,6 +700,108 @@ export async function generatePDF(
   }
 
   return pdfDoc.save();
+}
+
+// Sell It interior chrome: eyebrow tagline (left) + logo (right) header, page-number footer.
+function drawSellItChrome(
+  page: PDFPage,
+  tmpl: Template,
+  branding: ClientBranding,
+  logo: PDFImage | null,
+  font: PDFFontT,
+  boldFont: PDFFontT,
+  pageNum: number
+) {
+  const W = tmpl.pageWidth, H = tmpl.pageHeight;
+  const gray = rgb(0.5, 0.54, 0.58);
+  const topY = H - 48;
+
+  // Eyebrow tagline (left), lightly letter-spaced
+  const eyebrow = sanitize(branding.tagline.toUpperCase()).split('').join(' '.replace(/.*/, ' '));
+  page.drawText(sanitize(branding.tagline.toUpperCase()), { x: tmpl.marginLeft, y: topY, size: 8, font: boldFont, color: gray });
+
+  // Logo (right)
+  if (logo) {
+    const h = 15;
+    const w = h * (logo.width / logo.height);
+    page.drawImage(logo, { x: W - tmpl.marginRight - w, y: topY - 4, width: w, height: h });
+  }
+  void eyebrow;
+
+  // Footer page number (right)
+  const pn = `${pageNum}`;
+  page.drawText(pn, { x: W - tmpl.marginRight - font.widthOfTextAtSize(pn, 9), y: tmpl.marginBottom / 2, size: 9, font, color: gray });
+}
+
+// Sell It cover: eyebrow + rule, big blue title with the icon mark, WORKBOOK, subtitle,
+// and (optionally) the chosen image contained in the lower area. White background.
+async function drawSellItCover(
+  pdfDoc: PDFDocument,
+  page: PDFPage,
+  tmpl: Template,
+  doc: DocumentModel,
+  branding: ClientBranding,
+  boldFont: PDFFontT,
+  font: PDFFontT,
+  logo: PDFImage | null,
+  mark: PDFImage | null
+) {
+  void logo;
+  const W = tmpl.pageWidth, H = tmpl.pageHeight;
+  const blue = hexToRgb(branding.colors.header);
+  const ink = hexToRgb(branding.colors.title);
+  const gray = rgb(0.5, 0.54, 0.58);
+  const pad = tmpl.marginLeft;
+  const innerW = W - pad * 2;
+
+  let ty = H - 64;
+  // Eyebrow + rule
+  page.drawText(sanitize(branding.tagline.toUpperCase()), { x: pad, y: ty, size: 9, font: boldFont, color: ink });
+  ty -= 9;
+  page.drawLine({ start: { x: pad, y: ty }, end: { x: W - pad, y: ty }, thickness: 1, color: ink });
+  ty -= 46;
+
+  // Title (blue) with the icon mark to its left
+  let tSize = 36;
+  const markH = tSize;
+  const markW = mark ? markH * (mark.width / mark.height) : 0;
+  const tx = mark ? pad + markW + 14 : pad;
+  const titleMaxW = W - pad - tx;
+  let titleLines = wrapText(applyCase(doc.title || 'Untitled', 'none'), titleMaxW, boldFont, tSize);
+  while (titleLines.length > 3 && tSize > 24) { tSize = tSize - 3; titleLines = wrapText(applyCase(doc.title || 'Untitled', 'none'), W - pad - (mark ? pad + tSize * (mark.width / mark.height) + 14 : pad), boldFont, tSize); }
+  if (mark) page.drawImage(mark, { x: pad, y: ty - (tSize - tSize) - 4, width: tSize * (mark.width / mark.height), height: tSize });
+  const tx2 = mark ? pad + tSize * (mark.width / mark.height) + 14 : pad;
+  for (const ln of titleLines) {
+    page.drawText(ln, { x: tx2, y: ty, size: tSize, font: boldFont, color: blue });
+    ty -= tSize + 4;
+  }
+  ty -= 18;
+
+  // WORKBOOK
+  page.drawText('WORKBOOK', { x: pad, y: ty, size: 26, font: boldFont, color: ink });
+  ty -= 30;
+
+  // Cover subtitle (e.g. "Session 1 — ...") in blue
+  const sub = doc.cover?.subtitle?.trim();
+  if (sub) {
+    for (const ln of wrapText(sub, innerW, boldFont, 13)) { page.drawText(ln, { x: pad, y: ty, size: 13, font: boldFont, color: blue }); ty -= 18; }
+  }
+  // Author line (gray) if present
+  if (doc.author?.trim()) { page.drawText(sanitize(doc.author.trim()), { x: pad, y: ty, size: 12, font, color: gray }); ty -= 18; }
+
+  // Optional image contained in the remaining lower area
+  const chosen = coverById(doc.cover?.imageId);
+  const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
+  if (img) {
+    const top = ty - 12;
+    const bottom = tmpl.marginBottom + 6;
+    const boxH = top - bottom;
+    if (boxH > 60) {
+      const scale = Math.min(innerW / img.width, boxH / img.height); // contain — never overflow
+      const dw = img.width * scale, dh = img.height * scale;
+      page.drawImage(img, { x: pad, y: top - dh, width: dw, height: dh });
+    }
+  }
 }
 
 // Draw a branded cover page: full-bleed photo (the client's chosen image) with a

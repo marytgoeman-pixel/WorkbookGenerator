@@ -38,6 +38,29 @@ export const CLIENTS: ClientAccount[] = [
     },
   },
   {
+    // Second client: Sell It (The Growth Accelerator).
+    // Default password: SellIt2025!  (change by replacing the hash)
+    username: 'sellit',
+    passwordHash: '$2b$10$QUFb/mc9aIABisNpFYgMHu95RHGn7/0zdjNvB7E5aVNNhFPwUVTaa',
+    branding: {
+      id: 'sellit',
+      displayName: 'Sell It',
+      templateId: 'sellit',
+      tagline: 'THE GROWTH ACCELERATOR',
+      logoUrl: '/clients/sellit/sellitlogocolor.png',
+      social: [],
+      colors: {
+        header: '#3F69FF',     // Sell It Blue — cover title, table headers, callout band
+        title: '#0A263A',      // Ink — big interior page titles
+        subtitle: '#3F69FF',   // Sell It Blue — section labels / prompts
+        accent: '#3F69FF',     // Sell It Blue — bullets, field borders
+        calloutBg: '#3F69FF',
+        calloutBorder: '#3F69FF',
+        grayBox: '#E6EBFF',    // light periwinkle — fillable field background
+      },
+    },
+  },
+  {
     // Admin account — sees the analytics dashboard, not a workbook workspace.
     // Default password: JoAdmin2025!  (change by replacing the hash)
     username: 'admin',

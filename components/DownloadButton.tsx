@@ -25,6 +25,12 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding }
       a.download = `${doc.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'workbook'}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      // Record the download for the admin dashboard (best-effort, never blocks)
+      fetch('/api/track-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: doc.title }),
+      }).catch(() => {});
     } finally {
       setLoading(false);
     }

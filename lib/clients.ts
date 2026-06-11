@@ -5,6 +5,7 @@ import { ClientBranding } from '@/types/document';
 export interface ClientAccount {
   username: string;
   passwordHash: string; // bcrypt hash
+  isAdmin?: boolean;    // admin sees the analytics dashboard, not a workbook workspace
   branding: ClientBranding;
 }
 
@@ -36,6 +37,17 @@ export const CLIENTS: ClientAccount[] = [
       },
     },
   },
+  {
+    // Admin account — sees the analytics dashboard, not a workbook workspace.
+    // Default password: JoAdmin2025!  (change by replacing the hash)
+    username: 'admin',
+    passwordHash: '$2b$10$QNlfEg3s08OARDBTspocDu3.3uatMe8HYTxxzuNUTZ.tWur2icz1W',
+    isAdmin: true,
+    branding: {
+      id: 'admin', displayName: 'Admin', templateId: 'classic', tagline: '', logoUrl: '', social: [],
+      colors: { header: '#1B5E7C', title: '#E04927', subtitle: '#1B5E7C', accent: '#F8BC24', calloutBg: '#1B5E7C', calloutBorder: '#F8BC24', grayBox: '#F0F0F0' },
+    },
+  },
 ];
 
 export function findClientByUsername(username: string): ClientAccount | undefined {
@@ -44,4 +56,13 @@ export function findClientByUsername(username: string): ClientAccount | undefine
 
 export function getBrandingById(id: string): ClientBranding | undefined {
   return CLIENTS.find((c) => c.branding.id === id)?.branding;
+}
+
+// Non-admin client ids, used by the analytics dashboard
+export function clientIds(): string[] {
+  return CLIENTS.filter((c) => !c.isAdmin).map((c) => c.branding.id);
+}
+
+export function displayNameForId(id: string): string {
+  return CLIENTS.find((c) => c.branding.id === id)?.branding.displayName ?? id;
 }

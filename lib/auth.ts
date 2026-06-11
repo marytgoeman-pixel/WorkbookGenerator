@@ -11,6 +11,7 @@ export interface SessionPayload {
   username: string;
   clientId: string;
   displayName: string;
+  isAdmin?: boolean;
 }
 
 export async function createSession(payload: SessionPayload): Promise<string> {
@@ -29,6 +30,7 @@ export async function verifySession(token: string | undefined): Promise<SessionP
       username: payload.username as string,
       clientId: payload.clientId as string,
       displayName: payload.displayName as string,
+      isAdmin: payload.isAdmin as boolean | undefined,
     };
   } catch {
     return null;

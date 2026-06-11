@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { findClientByUsername } from '@/lib/clients';
 import { createSession, SESSION_COOKIE } from '@/lib/auth';
+import { recordLogin } from '@/lib/analytics';
 
 export const runtime = 'nodejs';
 
@@ -25,9 +26,12 @@ export async function POST(req: NextRequest) {
     username: client.username,
     clientId: client.branding.id,
     displayName: client.branding.displayName,
+    isAdmin: client.isAdmin,
   });
 
-  const res = NextResponse.json({ ok: true, displayName: client.branding.displayName });
+  if (!client.isAdmin) await recordLogin(client.branding.id);
+
+  const res = NextResponse.json({ ok: true, displayName: client.branding.displayName, isAdmin: !!client.isAdmin });
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

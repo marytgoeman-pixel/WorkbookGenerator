@@ -8,6 +8,7 @@ export default async function Home() {
   const cookieStore = await cookies();
   const session = await verifySession(cookieStore.get(SESSION_COOKIE)?.value);
   if (!session) redirect('/login');
+  if (session.isAdmin) redirect('/admin');
 
   const branding = getBrandingById(session.clientId);
   if (!branding) redirect('/login');

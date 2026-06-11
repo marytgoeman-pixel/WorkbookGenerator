@@ -211,6 +211,12 @@ export default function DocumentEditor({ doc, onChange }: Props) {
                     })}
                   </div>
                 </div>
+                <label className="flex items-center gap-2 text-gray-500" title="Zoom the cover photo in (crop tighter) or out (show more)">
+                  <span className="shrink-0 w-12 text-[11px] font-medium">Zoom</span>
+                  <input type="range" min="0.5" max="3" step="0.1" value={cover.imageZoom ?? 1}
+                    onChange={(e) => setCover({ imageZoom: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
+                  <span className="shrink-0 w-9 text-right tabular-nums text-[11px]">{(cover.imageZoom ?? 1).toFixed(1)}×</span>
+                </label>
               </div>
             )}
             <div>

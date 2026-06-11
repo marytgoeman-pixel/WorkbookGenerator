@@ -53,6 +53,7 @@ export interface CoverSettings {
   subtitle?: string;                         // optional line shown under the title on the cover
   imageAlign?: 'left' | 'center' | 'right';   // horizontal focus when the photo is wider than the page
   imageAlignV?: 'top' | 'center' | 'bottom';  // vertical focus when the photo is taller than the page
+  imageZoom?: number;                          // scale multiplier on the cover-fit image (1 = fill; <1 zooms out, >1 zooms in)
 }
 
 export interface DocumentModel {

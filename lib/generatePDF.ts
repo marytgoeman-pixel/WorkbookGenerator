@@ -671,12 +671,17 @@ async function drawCoverPage(
   const pad = tmpl.marginLeft;
   const innerW = W - pad * 2;
 
-  // Background image, cover-fit to the full page. Falls back to a solid brand fill.
-  // imageAlign chooses which part of a too-wide photo stays in frame.
+  // Brand base so any area the photo doesn't cover (when zoomed out) reads as navy.
+  page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
+
+  // Background image. Base scale fills the page (cover-fit); imageZoom scales from
+  // there (>1 zooms in/crops, <1 zooms out and lets the navy base show around it).
+  // imageAlign / imageAlignV choose which part stays in frame.
   const chosen = coverById(doc.cover?.imageId);
   const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
   if (img) {
-    const scale = Math.max(W / img.width, H / img.height);
+    const zoom = Math.max(0.4, Math.min(3, doc.cover?.imageZoom ?? 1));
+    const scale = Math.max(W / img.width, H / img.height) * zoom;
     const dw = img.width * scale, dh = img.height * scale;
     const align = doc.cover?.imageAlign ?? 'center';
     const alignV = doc.cover?.imageAlignV ?? 'center';
@@ -684,8 +689,6 @@ async function drawCoverPage(
     // PDF y-origin is bottom-left: top → show the image's top, bottom → its bottom
     const dy = alignV === 'top' ? H - dh : alignV === 'bottom' ? 0 : (H - dh) / 2;
     page.drawImage(img, { x: dx, y: dy, width: dw, height: dh });
-  } else {
-    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
   }
 
   // Top brand bar + gold accent stripe

@@ -4,6 +4,7 @@ import { classicTemplate } from './templates/classic';
 import { modernTemplate } from './templates/modern';
 import { workbookTemplate } from './templates/workbook';
 import { jomangumTemplate } from './templates/jomangum';
+import { coverById } from './covers';
 
 type Template = {
   id: string; name: string; description: string;
@@ -120,17 +121,36 @@ function wrapText(text: string, maxWidth: number, font: { widthOfTextAtSize: (t:
   const lines: string[] = [];
   for (const seg of segments) {
     const words = sanitize(seg).split(' ');
+    const segLines: string[] = [];
     let current = '';
     for (const word of words) {
       const test = current ? `${current} ${word}` : word;
       if (font.widthOfTextAtSize(test, size) <= maxWidth) {
         current = test;
       } else {
-        if (current) lines.push(current);
+        if (current) segLines.push(current);
         current = word;
       }
     }
-    lines.push(current); // push even when empty so a blank line from "\n\n" is preserved
+    segLines.push(current); // push even when empty so a blank line from "\n\n" is preserved
+    // Runt control: avoid a lonely single-word last line by pulling the previous
+    // word down onto it (only if it still fits). Applied per segment so explicit
+    // line breaks keep their own balance.
+    if (segLines.length >= 2) {
+      const last = segLines[segLines.length - 1];
+      if (last && !last.includes(' ')) {
+        const prevWords = segLines[segLines.length - 2].split(' ');
+        if (prevWords.length >= 2) {
+          const moved = prevWords[prevWords.length - 1];
+          if (font.widthOfTextAtSize(`${moved} ${last}`, size) <= maxWidth) {
+            prevWords.pop();
+            segLines[segLines.length - 2] = prevWords.join(' ');
+            segLines[segLines.length - 1] = `${moved} ${last}`;
+          }
+        }
+      }
+    }
+    for (const l of segLines) lines.push(l);
   }
   return lines.length ? lines : [''];
 }
@@ -220,7 +240,36 @@ export async function generatePDF(
     if (y - needed < tmpl.marginBottom) newPage();
   }
 
+  // Place wrapped lines with widow/orphan control: never strand fewer than 2 lines
+  // of a paragraph alone at the top or bottom of a page. `draw` renders one line at
+  // the current y; we advance y after each.
+  function placeLines(lines: string[], lh: number, draw: (line: string) => void) {
+    let idx = 0;
+    while (idx < lines.length) {
+      let fit = Math.floor((y - tmpl.marginBottom) / lh);
+      if (fit <= 0) { newPage(); fit = Math.floor((y - tmpl.marginBottom) / lh); }
+      const remaining = lines.length - idx;
+      if (remaining <= fit) {
+        for (; idx < lines.length; idx++) { draw(lines[idx]); y -= lh; }
+      } else {
+        let take = fit;
+        if (remaining - take < 2) take = remaining - 2; // widow: keep >=2 lines for next page
+        if (take < 2) { newPage(); continue; }          // orphan: keep >=2 lines together here
+        for (let k = 0; k < take; k++, idx++) { draw(lines[idx]); y -= lh; }
+        newPage();
+      }
+    }
+  }
+
   fillBackground();
+
+  // Optional branded cover page (page 1). Real content then starts on a fresh page.
+  let hasCover = false;
+  if (branded && doc.cover?.enabled) {
+    await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, brandLogo);
+    hasCover = true;
+    newPage();
+  }
 
   // Notes column for first page
   if (tmpl.twoColumn) {
@@ -292,11 +341,30 @@ export async function generatePDF(
     if (section.pageBreakBefore && y < tmpl.pageHeight - tmpl.marginTop - 1) {
       newPage();
     }
+    // Per-section multipliers (driven by editor sliders): sp = gaps between blocks,
+    // ls = line height within text/callouts. Computed up-front so the heading's
+    // orphan control can estimate the first content block's height.
+    const sp = section.spacing ?? 1;
+    const ls = section.lineSpacing ?? 1;
+    const lineH = tmpl.lineHeight * ls;
+
+    // Estimate the first content block's height so a heading is never stranded at the
+    // bottom of a page without at least the start of its content (orphan control).
+    const leadEstimate = (): number => {
+      const first = section.content[0];
+      if (!first) return 0;
+      if (first.kind === 'text' || first.kind === 'bullet')
+        return Math.min(2, wrapText(first.text, mainColWidth, font, tmpl.bodySize).length) * lineH;
+      if (first.kind === 'field')
+        return (first.field.type === 'checkbox' ? 22 : first.field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight) + 16;
+      if (first.kind === 'table') return 48;
+      return lineH;
+    };
+
     // A small, consistent gap before a heading (level-2 sits closer to its parent)
     if (branded && y < tmpl.pageHeight - tmpl.marginTop - 2) {
       y -= section.level === 1 ? 6 : 2;
     }
-    ensureSpace(tmpl.headingSize + tmpl.sectionSpacing);
 
     // Section heading
     if (branded) {
@@ -313,11 +381,13 @@ export async function generatePDF(
       const sq = Math.round(size * 0.55);
       const drawBullet = style === 'accent';
       const textX = drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
+      // Wrap long headings to the content margin instead of overflowing
+      const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
+      // Orphan control: keep the whole heading together with the start of its content
+      ensureSpace(hLines.length * (size + 2) + (section.level === 1 ? 8 : 5) + leadEstimate());
       if (drawBullet) {
         page.drawRectangle({ x: tmpl.marginLeft, y: y + 1, width: sq, height: sq, color: accentColor });
       }
-      // Wrap long headings to the content margin instead of overflowing
-      const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
       for (const hl of hLines) {
         page.drawText(hl, { x: textX, y, size, font: boldFont, color: headingColor });
         y -= size + 2;
@@ -325,6 +395,7 @@ export async function generatePDF(
       y -= (section.level === 1 ? 8 : 5);
     } else if (section.level === 1) {
       {
+        ensureSpace(tmpl.headingSize + tmpl.sectionSpacing);
         if (tmpl.headerBarHeight > 0) {
           // Modern template: colored bar behind heading
           ensureSpace(tmpl.headingSize + tmpl.headerBarHeight + 8);
@@ -366,6 +437,7 @@ export async function generatePDF(
         }
       }
     } else {
+      ensureSpace(tmpl.subheadingSize + tmpl.sectionSpacing);
       page.drawText(applyCase(sanitize(section.title), section.headingCase), {
         x: tmpl.marginLeft,
         y,
@@ -376,21 +448,14 @@ export async function generatePDF(
       y -= tmpl.subheadingSize + 6;
     }
 
-    // Per-section multipliers, both driven by sliders in the editor:
-    //  sp = gaps between blocks (pull content up/down to control page breaks)
-    //  ls = line height within text/callouts (tighten or loosen lines)
-    const sp = section.spacing ?? 1;
-    const ls = section.lineSpacing ?? 1;
-    const lineH = tmpl.lineHeight * ls;
+    // (sp / ls / lineH were computed above the heading for orphan control)
 
     // ---- ordered content rendering (preserves document order) ----
     const renderText = (txt: string, color?: string) => {
       const col = resolveColor(color) ?? rgb(0.1, 0.1, 0.1);
-      for (const wline of wrapText(txt, mainColWidth, font, tmpl.bodySize)) {
-        ensureSpace(lineH);
-        page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: col });
-        y -= lineH;
-      }
+      // widow/orphan control keeps >=2 lines of a paragraph together across pages
+      placeLines(wrapText(txt, mainColWidth, font, tmpl.bodySize), lineH,
+        (wline) => page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: col }));
       y -= tmpl.paragraphSpacing * sp;
     };
 
@@ -556,6 +621,7 @@ export async function generatePDF(
   // --- Page chrome (header bar + footer) on every page ---
   const pageCount = pdfDoc.getPageCount();
   for (let i = 0; i < pageCount; i++) {
+    if (hasCover && i === 0) continue; // the cover has its own full-bleed design
     const p = pdfDoc.getPage(i);
 
     if (branded) {
@@ -580,6 +646,87 @@ export async function generatePDF(
   }
 
   return pdfDoc.save();
+}
+
+// Draw a branded cover page: full-bleed photo (the client's chosen image) with a
+// brand-colored band carrying the workbook title, author, and tagline.
+async function drawCoverPage(
+  pdfDoc: PDFDocument,
+  page: PDFPage,
+  tmpl: Template,
+  doc: DocumentModel,
+  branding: ClientBranding,
+  boldFont: PDFFontT,
+  font: PDFFontT,
+  italicFont: PDFFontT,
+  logo: PDFImage | null
+) {
+  const W = tmpl.pageWidth, H = tmpl.pageHeight;
+  const navy = hexToRgb(branding.colors.header);
+  const gold = hexToRgb(branding.colors.accent);
+  const pad = tmpl.marginLeft;
+  const innerW = W - pad * 2;
+
+  // Background image, cover-fit to the full page. Falls back to a solid brand fill.
+  const chosen = coverById(doc.cover?.imageId);
+  const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
+  if (img) {
+    const scale = Math.max(W / img.width, H / img.height);
+    const dw = img.width * scale, dh = img.height * scale;
+    page.drawImage(img, { x: (W - dw) / 2, y: (H - dh) / 2, width: dw, height: dh });
+  } else {
+    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
+  }
+
+  // Top brand bar + gold accent stripe
+  const topBar = 16;
+  page.drawRectangle({ x: 0, y: H - topBar, width: W, height: topBar, color: navy });
+  page.drawRectangle({ x: 0, y: H - topBar - 3, width: W, height: 3, color: gold });
+
+  // --- Title band along the bottom ---
+  const titleCase = doc.titleCase ?? 'upper';
+  let tSize = 32;
+  const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
+  let titleLines = wrapText(rawTitle, innerW, boldFont, tSize);
+  while (titleLines.length > 3 && tSize > 22) { tSize -= 2; titleLines = wrapText(rawTitle, innerW, boldFont, tSize); }
+  const titleLH = tSize + 6;
+
+  const sub = doc.cover?.subtitle?.trim();
+  const tagline = sanitize(branding.tagline);
+  const byLine = sanitize(`A workbook by ${doc.author?.trim() || branding.displayName}`);
+
+  const topPad = 30, botPad = 28, ruleGap = 18, byGap = 18, tagGap = 16;
+  const eyebrowH = sub ? 22 : 0;
+  const contentH = eyebrowH + titleLines.length * titleLH + ruleGap + byGap + tagGap;
+  const bandH = Math.min(H * 0.5, Math.max(H * 0.34, contentH + topPad + botPad));
+
+  page.drawRectangle({ x: 0, y: 0, width: W, height: bandH, color: navy, opacity: img ? 0.9 : 1 });
+  page.drawRectangle({ x: 0, y: bandH - 4, width: W, height: 4, color: gold });
+
+  let ty = bandH - topPad;
+  if (sub) {
+    page.drawText(sanitize(sub.toUpperCase()), { x: pad, y: ty - 11, size: 11, font: boldFont, color: gold });
+    ty -= eyebrowH;
+  }
+  ty -= tSize; // move to first title baseline
+  for (const ln of titleLines) {
+    page.drawText(ln, { x: pad, y: ty, size: tSize, font: boldFont, color: rgb(1, 1, 1) });
+    ty -= titleLH;
+  }
+  ty -= 2;
+  page.drawRectangle({ x: pad, y: ty, width: 64, height: 3, color: gold });
+  ty -= byGap;
+  page.drawText(byLine, { x: pad, y: ty, size: 12, font, color: rgb(1, 1, 1) });
+  ty -= tagGap;
+  page.drawText(tagline, { x: pad, y: ty, size: 9, font: italicFont, color: rgb(0.85, 0.9, 0.94) });
+
+  // Logo bottom-right within the band, if available
+  if (logo) {
+    const targetH = 32;
+    const scale = targetH / logo.height;
+    const w = logo.width * scale;
+    page.drawImage(logo, { x: W - pad - w, y: 24, width: w, height: targetH });
+  }
 }
 
 // Draw the navy top bar and the branded footer (logo, tagline, social links, page number)

@@ -129,6 +129,11 @@ Rules:
 - Do not put a field between two example lines. Only add an answer box after a genuine question/prompt directed at the learner.
 - If a section asks the learner to total or score their answers (e.g. "Your Score"), keep the scoring guidance as text, and add ONE short single-line "text" field labeled "Your Score:" so they can record the number.
 - Do not invent content. Keep the learner's wording and original capitalization. Make it clean and well-grouped so the user only needs minor edits.
+- EDITORIAL POLISH — avoid widows, orphans, and runts (these are typographic faults the layout tries to prevent, so help it):
+  - A "widow" is a lone last line of a paragraph; an "orphan" is a heading or first line stranded by itself; a "runt" is a final line that is just one short word.
+  - Write each "text" item as one or more COMPLETE sentences. Never leave a stray one- or two-word fragment as its own item.
+  - Never create a heading that has no content beneath it — every heading must be immediately followed by its related text/fields.
+  - Keep a prompt and its answer field adjacent and in order so they never get separated.
 - COLORING TEXT: to color a text or bullet line, set its "color" to a hex like "#E04927" or a common name ("red", "green", "blue", "orange"). For everything else leave color "". NEVER put HTML tags (e.g. <span>) or markdown in "text" — text is plain words only.
 - Output ONLY the JSON.`;
 
@@ -245,6 +250,8 @@ Rules:
 - Keep everything the user did not ask to change. Preserve wording, order, fields, and tables unless the instruction implies changing them.
 - You can add, remove, reorder, or restyle sections and items, and add fillable fields, checkboxes, dropdowns, or tables.
 - Headings are never bulleted. Illustrative examples stay as read-only text. Only add fields where the learner is asked to write, rate, or check.
+- EDIT IN PLACE — do NOT duplicate. When asked to split, shorten, or move text onto its own line, modify the EXISTING item's text; never copy the same text into new items. (If the user wants a hard line break inside one heading or paragraph, put a literal newline "\\n" inside that item's text rather than creating a duplicate item.)
+- EDITORIAL POLISH: avoid widows/orphans/runts — write complete sentences (no stray one- or two-word lines), never leave a heading with no content under it, and keep each prompt next to its answer field.
 - For grid/calendar-style requests, use a "table" item: e.g. a monthly calendar = a table whose headers are the weekdays and whose cells are fillable "text" fields (or static day numbers). A tracker = a table with the right columns and fillable cells.
 - COLORING TEXT: to color a line, set its "color" to a hex ("#E04927") or a name ("red","green","blue","orange"); leave "" otherwise. NEVER put HTML tags or markdown in "text". Preserve the original capitalization — do not uppercase words just to color them.
 - Output ONLY the JSON for the full workbook.`;

@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
 import {
-  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem,
+  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings,
 } from '@/types/document';
+import { COVER_IMAGES } from '@/lib/covers';
 
 interface Props {
   doc: DocumentModel;
@@ -20,6 +21,16 @@ export default function DocumentEditor({ doc, onChange }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingAuthor, setEditingAuthor] = useState(false);
+  const [openStyles, setOpenStyles] = useState<Record<string, boolean>>({});
+
+  function toggleStyle(id: string) {
+    setOpenStyles((m) => ({ ...m, [id]: !m[id] }));
+  }
+
+  const cover: CoverSettings = doc.cover ?? { enabled: false };
+  function setCover(patch: Partial<CoverSettings>) {
+    onChange({ ...doc, cover: { ...cover, ...patch } });
+  }
 
   function updateSection(id: string, patch: Partial<Section>) {
     onChange({ ...doc, sections: doc.sections.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
@@ -132,6 +143,56 @@ export default function DocumentEditor({ doc, onChange }: Props) {
         </Row>
       </div>
 
+      {/* Cover page */}
+      <div className="rounded-xl border border-gray-200 overflow-hidden">
+        <label className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-50 to-white cursor-pointer">
+          <span className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <span className="text-base">🖼️</span> Cover page
+          </span>
+          <span className="relative inline-flex items-center">
+            <input type="checkbox" className="peer sr-only" checked={cover.enabled}
+              onChange={(e) => setCover({ enabled: e.target.checked })} />
+            <span className="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-blue-500 transition-colors" />
+            <span className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+          </span>
+        </label>
+
+        {cover.enabled && (
+          <div className="px-4 py-3 space-y-3 border-t border-gray-100">
+            <p className="text-[11px] text-gray-500">Pick a background image for the cover. The title, author, and tagline sit in a branded band over it.</p>
+            <div className="grid grid-cols-5 gap-2">
+              {COVER_IMAGES.map((img) => {
+                const selected = cover.imageId === img.id;
+                return (
+                  <button key={img.id} type="button" title={img.label}
+                    onClick={() => setCover({ imageId: selected ? undefined : img.id })}
+                    className={`relative aspect-[3/2] rounded-lg overflow-hidden border-2 transition-all ${
+                      selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-transparent hover:border-gray-300'
+                    }`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.thumb} alt={img.label} className="w-full h-full object-cover" />
+                    {selected && (
+                      <span className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                        <span className="bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">✓</span>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 mb-1">Cover subtitle (optional)</label>
+              <input
+                className="w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="e.g. A workbook for real estate professionals"
+                value={cover.subtitle ?? ''}
+                onChange={(e) => setCover({ subtitle: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Sections */}
       {doc.sections.map((section, idx) => (
         <div key={section.id} className="border rounded-xl overflow-hidden">
@@ -157,6 +218,15 @@ export default function DocumentEditor({ doc, onChange }: Props) {
               className="text-[10px] text-gray-400 hover:text-blue-600 border border-gray-200 rounded px-1" title="Toggle H1/H2">
               {section.level === 1 ? '→H2' : '→H1'}
             </button>
+            <button onClick={() => toggleStyle(section.id)}
+              className={`flex items-center gap-1 text-[11px] rounded-full px-2 py-1 border transition-colors ${
+                openStyles[section.id]
+                  ? 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600'
+              }`} title="Style options for this block">
+              <span>Style</span>
+              <span className={`transition-transform ${openStyles[section.id] ? 'rotate-180' : ''}`}>▾</span>
+            </button>
             <button onClick={() => deleteSection(section.id)} className="text-gray-300 hover:text-red-600 text-sm" title="Delete section">🗑</button>
           </div>
 
@@ -166,49 +236,53 @@ export default function DocumentEditor({ doc, onChange }: Props) {
             </div>
           )}
 
-          {/* Style controls */}
-          <div className="border-t bg-gray-50 px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-            <label className="flex items-center gap-1 text-gray-500">Style
-              <select value={section.headingStyle ?? (section.level === 1 ? 'title' : 'brand')}
-                onChange={(e) => updateSection(section.id, { headingStyle: e.target.value as HeadingStyle })}
-                className="border rounded px-1.5 py-0.5 bg-white">
-                <option value="title">Brand (no bullet)</option><option value="brand">Blue (no bullet)</option><option value="accent">Accent + bullet</option><option value="plain">Plain</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-1 text-gray-500">Case
-              <select value={section.headingCase ?? 'none'} onChange={(e) => updateSection(section.id, { headingCase: e.target.value as TextCase })}
-                className="border rounded px-1.5 py-0.5 bg-white">
-                <option value="none">As typed</option><option value="upper">UPPERCASE</option>
-                <option value="sentence">Sentence</option><option value="title">Title Case</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-1 text-gray-500 cursor-pointer">
-              <input type="checkbox" checked={!!section.callout} onChange={(e) => updateSection(section.id, { callout: e.target.checked })} /> Callout
-            </label>
-            <label className="flex items-center gap-1 text-gray-500 cursor-pointer">
-              <input type="checkbox" checked={!!section.pageBreakBefore} onChange={(e) => updateSection(section.id, { pageBreakBefore: e.target.checked })} /> New page
-            </label>
-            <label className="flex items-center gap-1.5 text-gray-500 w-full" title="Drag to tighten or loosen the gaps between blocks — useful to pull content back from the next page">
-              <span className="shrink-0 w-12">Spacing</span>
-              <input
-                type="range" min="0.3" max="2" step="0.1"
-                value={section.spacing ?? 1}
-                onChange={(e) => updateSection(section.id, { spacing: parseFloat(e.target.value) })}
-                className="flex-1 accent-blue-500"
-              />
-              <span className="shrink-0 w-7 text-right tabular-nums">{(section.spacing ?? 1).toFixed(1)}×</span>
-            </label>
-            <label className="flex items-center gap-1.5 text-gray-500 w-full" title="Drag to tighten or loosen the lines within text and callouts">
-              <span className="shrink-0 w-12">Lines</span>
-              <input
-                type="range" min="0.7" max="1.6" step="0.05"
-                value={section.lineSpacing ?? 1}
-                onChange={(e) => updateSection(section.id, { lineSpacing: parseFloat(e.target.value) })}
-                className="flex-1 accent-blue-500"
-              />
-              <span className="shrink-0 w-7 text-right tabular-nums">{(section.lineSpacing ?? 1).toFixed(2)}×</span>
-            </label>
-          </div>
+          {/* Style controls — collapsible per block */}
+          {openStyles[section.id] && (
+            <div className="border-t border-gray-100 bg-slate-50 px-4 py-3 space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-500 mb-1">Heading style</label>
+                  <select value={section.headingStyle ?? (section.level === 1 ? 'title' : 'brand')}
+                    onChange={(e) => updateSection(section.id, { headingStyle: e.target.value as HeadingStyle })}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="title">Brand (no bullet)</option><option value="brand">Blue (no bullet)</option><option value="accent">Accent + bullet</option><option value="plain">Plain</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-500 mb-1">Capitalization</label>
+                  <select value={section.headingCase ?? 'none'} onChange={(e) => updateSection(section.id, { headingCase: e.target.value as TextCase })}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="none">As typed</option><option value="upper">UPPERCASE</option>
+                    <option value="sentence">Sentence</option><option value="title">Title Case</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => updateSection(section.id, { callout: !section.callout })}
+                  className={`rounded-full px-3 py-1 border transition-colors ${section.callout ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                  {section.callout ? '✓ ' : ''}Callout box
+                </button>
+                <button type="button" onClick={() => updateSection(section.id, { pageBreakBefore: !section.pageBreakBefore })}
+                  className={`rounded-full px-3 py-1 border transition-colors ${section.pageBreakBefore ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                  {section.pageBreakBefore ? '✓ ' : ''}Start on new page
+                </button>
+              </div>
+
+              <label className="flex items-center gap-2 text-gray-500" title="Tighten or loosen the gaps between blocks — useful to pull content back from the next page">
+                <span className="shrink-0 w-14 font-medium text-[11px]">Spacing</span>
+                <input type="range" min="0.3" max="2" step="0.1" value={section.spacing ?? 1}
+                  onChange={(e) => updateSection(section.id, { spacing: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
+                <span className="shrink-0 w-8 text-right tabular-nums">{(section.spacing ?? 1).toFixed(1)}×</span>
+              </label>
+              <label className="flex items-center gap-2 text-gray-500" title="Tighten or loosen the lines within text and callouts">
+                <span className="shrink-0 w-14 font-medium text-[11px]">Lines</span>
+                <input type="range" min="0.7" max="1.6" step="0.05" value={section.lineSpacing ?? 1}
+                  onChange={(e) => updateSection(section.id, { lineSpacing: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
+                <span className="shrink-0 w-8 text-right tabular-nums">{(section.lineSpacing ?? 1).toFixed(2)}×</span>
+              </label>
+            </div>
+          )}
 
           {/* Ordered content */}
           <div className="border-t bg-white divide-y divide-gray-100">

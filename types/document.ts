@@ -46,12 +46,20 @@ export interface Section {
 
 export type Spacing = 'compact' | 'normal' | 'relaxed';
 
+// Optional cover page rendered as page 1 of the PDF
+export interface CoverSettings {
+  enabled: boolean;
+  imageId?: string;   // references a COVER_IMAGES id in lib/covers.ts
+  subtitle?: string;  // optional line shown under the title on the cover
+}
+
 export interface DocumentModel {
   title: string;
   author: string;
   sections: Section[];
   titleCase?: TextCase;        // case transform for the document title
   bodySpacing?: Spacing;       // extra vertical space between paragraphs/lines
+  cover?: CoverSettings;       // optional branded cover page
 }
 
 export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum';

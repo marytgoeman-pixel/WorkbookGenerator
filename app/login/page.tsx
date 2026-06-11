@@ -37,8 +37,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
         <div className="text-center mb-6">
-          <div className="text-3xl mb-2">📘</div>
-          <h1 className="text-xl font-bold text-gray-900">Workbook PDF Generator</h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/the-learning-creative-logo.png"
+            alt="The Learning Creative"
+            className="mx-auto mb-3 w-full max-w-[220px] h-auto"
+          />
+          <h1 className="text-lg font-bold text-gray-900">Workbook PDF Generator</h1>
           <p className="text-sm text-gray-400 mt-1">Sign in to your branded workspace</p>
         </div>
 

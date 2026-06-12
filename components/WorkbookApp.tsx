@@ -33,8 +33,12 @@ export default function WorkbookApp({ branding }: Props) {
   // click so re-clicking the same section re-triggers the scroll.
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
 
-  const [savedCount, setSavedCount] = useState(0); // mount-safe (localStorage isn't available during SSR)
-  useEffect(() => { setSavedCount(listSaved(branding.id).length); }, [branding.id, savedRefresh, view]);
+  const [savedCount, setSavedCount] = useState(0);
+  useEffect(() => {
+    let active = true;
+    listSaved(branding.id).then((r) => { if (active) setSavedCount(r.items.length); });
+    return () => { active = false; };
+  }, [branding.id, savedRefresh, view]);
 
   function selectSection(id: string) {
     setView('work');
@@ -42,9 +46,9 @@ export default function WorkbookApp({ branding }: Props) {
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   }
 
-  function saveCurrent() {
+  async function saveCurrent() {
     if (!doc) return;
-    const id = saveWorkbook(branding.id, doc, savedId);
+    const { id } = await saveWorkbook(branding.id, doc, savedId);
     setSavedId(id);
     setSavedRefresh((n) => n + 1);
   }

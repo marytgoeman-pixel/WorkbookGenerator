@@ -11,29 +11,55 @@ interface Props {
 
 export default function SavedWorkbooks({ branding, onEdit, refreshKey }: Props) {
   const [items, setItems] = useState<SavedWorkbook[]>([]);
+  const [cloud, setCloud] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setItems(listSaved(branding.id));
+    let active = true;
+    setLoading(true);
+    listSaved(branding.id).then((r) => {
+      if (!active) return;
+      setItems(r.items);
+      setCloud(r.cloud);
+      setLoading(false);
+    });
+    return () => { active = false; };
   }, [branding.id, refreshKey]);
 
-  function remove(id: string, title: string) {
+  async function remove(id: string, title: string) {
     if (!window.confirm(`Delete the saved workbook "${title || 'Untitled'}"? This can't be undone.`)) return;
-    deleteSaved(branding.id, id);
-    setItems(listSaved(branding.id));
+    await deleteSaved(branding.id, id);
+    const r = await listSaved(branding.id);
+    setItems(r.items);
+    setCloud(r.cloud);
+  }
+
+  const localBanner = !loading && !cloud && (
+    <div className="mb-3 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+      ⚠️ Saved on <b>this browser only</b> — connect the database (Upstash) in Vercel so these sync across devices and survive a cleared browser.
+    </div>
+  );
+
+  if (loading) {
+    return <div className="text-sm text-gray-400 py-8 text-center">Loading saved workbooks…</div>;
   }
 
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center text-gray-400">
-        <div className="text-4xl mb-3">📁</div>
-        <p className="font-medium text-gray-600">No saved workbooks yet</p>
-        <p className="text-sm mt-1">Download a workbook (or hit Save) and it&apos;ll show up here so you can edit it later.</p>
-      </div>
+      <>
+        {localBanner}
+        <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center text-gray-400">
+          <div className="text-4xl mb-3">📁</div>
+          <p className="font-medium text-gray-600">No saved workbooks yet</p>
+          <p className="text-sm mt-1">Download a workbook (or hit Save) and it&apos;ll show up here so you can edit it later.</p>
+        </div>
+      </>
     );
   }
 
   return (
     <div className="space-y-3 max-w-3xl">
+      {localBanner}
       {items.map((w) => (
         <div key={w.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4">
           <div className="min-w-0">

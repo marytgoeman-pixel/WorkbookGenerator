@@ -1,11 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DocumentModel, ColorTheme, ClientBranding } from '@/types/document';
 import FileUpload from '@/components/FileUpload';
 import DocumentEditor from '@/components/DocumentEditor';
 import PDFPreview from '@/components/PDFPreview';
 import DownloadButton from '@/components/DownloadButton';
+import SavedWorkbooks from '@/components/SavedWorkbooks';
+import { saveWorkbook, listSaved, SavedWorkbook } from '@/lib/savedWorkbooks';
 import { APP_VERSION } from '@/lib/version';
 
 interface Props {
@@ -24,13 +26,34 @@ export default function WorkbookApp({ branding }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [doc, setDoc] = useState<DocumentModel | null>(null);
+  const [view, setView] = useState<'work' | 'saved'>('work');
+  const [savedId, setSavedId] = useState<string | null>(null);   // the saved-workbook this doc maps to
+  const [savedRefresh, setSavedRefresh] = useState(0);           // bump to re-read the saved list / count
   // Which section to scroll to in the editor (set by clicking the preview). `n` bumps each
   // click so re-clicking the same section re-triggers the scroll.
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
 
+  const [savedCount, setSavedCount] = useState(0); // mount-safe (localStorage isn't available during SSR)
+  useEffect(() => { setSavedCount(listSaved(branding.id).length); }, [branding.id, savedRefresh, view]);
+
   function selectSection(id: string) {
+    setView('work');
     setStep(2);
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+  }
+
+  function saveCurrent() {
+    if (!doc) return;
+    const id = saveWorkbook(branding.id, doc, savedId);
+    setSavedId(id);
+    setSavedRefresh((n) => n + 1);
+  }
+
+  function openSaved(w: SavedWorkbook) {
+    setDoc(w.doc);
+    setSavedId(w.id);
+    setStep(2);
+    setView('work');
   }
 
   // Jo's template + colors are fixed by her brand
@@ -43,6 +66,7 @@ export default function WorkbookApp({ branding }: Props) {
 
   function handleParsed(parsed: DocumentModel) {
     setDoc(parsed);
+    setSavedId(null); // a freshly uploaded doc is a new workbook until saved/downloaded
     setStep(2);
   }
 
@@ -66,33 +90,42 @@ export default function WorkbookApp({ branding }: Props) {
               Upload your Word doc → Review → Download your branded fillable PDF
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <nav className="flex items-center gap-1">
-              {STEPS.map((s, i) => (
-                <div key={s.num} className="flex items-center gap-1">
-                  <button
-                    onClick={() => (s.num <= step || doc) && setStep(s.num)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                      step === s.num
-                        ? 'text-white shadow'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                    style={step === s.num ? { backgroundColor: branding.colors.title } : undefined}
-                  >
-                    <span
-                      className="w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold text-white"
-                      style={{
-                        backgroundColor: step === s.num ? 'rgba(255,255,255,0.3)' : s.num < step ? '#22c55e' : '#cbd5e1',
-                      }}
+          <div className="flex items-center gap-3">
+            {view === 'work' && (
+              <nav className="flex items-center gap-1">
+                {STEPS.map((s, i) => (
+                  <div key={s.num} className="flex items-center gap-1">
+                    <button
+                      onClick={() => (s.num <= step || doc) && setStep(s.num)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                        step === s.num
+                          ? 'text-white shadow'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                      style={step === s.num ? { backgroundColor: branding.colors.title } : undefined}
                     >
-                      {s.num < step ? '✓' : s.num}
-                    </span>
-                    {s.label}
-                  </button>
-                  {i < STEPS.length - 1 && <span className="text-gray-300 mx-1">›</span>}
-                </div>
-              ))}
-            </nav>
+                      <span
+                        className="w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold text-white"
+                        style={{
+                          backgroundColor: step === s.num ? 'rgba(255,255,255,0.3)' : s.num < step ? '#22c55e' : '#cbd5e1',
+                        }}
+                      >
+                        {s.num < step ? '✓' : s.num}
+                      </span>
+                      {s.label}
+                    </button>
+                    {i < STEPS.length - 1 && <span className="text-gray-300 mx-1">›</span>}
+                  </div>
+                ))}
+              </nav>
+            )}
+            <button
+              onClick={() => setView((v) => (v === 'saved' ? 'work' : 'saved'))}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${view === 'saved' ? 'text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              style={view === 'saved' ? { backgroundColor: branding.colors.title } : undefined}
+            >
+              📁 Saved{savedCount > 0 ? ` (${savedCount})` : ''}
+            </button>
             <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5">
               Sign out
             </button>
@@ -100,7 +133,17 @@ export default function WorkbookApp({ branding }: Props) {
         </div>
       </header>
 
+      {/* Saved Workbooks view */}
+      {view === 'saved' && (
+        <div className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-6 py-6 overflow-y-auto">
+          <h2 className="text-lg font-bold text-gray-900">Saved Workbooks</h2>
+          <p className="text-xs text-gray-400 mt-0.5 mb-4">Reopen a past workbook to keep editing. Workbooks are saved automatically when you download — or hit <b>Save</b> in the Review step.</p>
+          <SavedWorkbooks branding={branding} onEdit={openSaved} refreshKey={savedRefresh} />
+        </div>
+      )}
+
       {/* Main content */}
+      {view === 'work' && (
       <div className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-6 py-6 flex gap-6">
         {/* Left panel */}
         <div className="w-[420px] shrink-0 space-y-4 overflow-y-auto min-h-0 pr-1">
@@ -141,13 +184,22 @@ export default function WorkbookApp({ branding }: Props) {
               {step === 2 && (
                 <div className="p-5 space-y-4">
                   <DocumentEditor doc={doc} onChange={setDoc} branding={branding} focus={focus} />
-                  <button
-                    onClick={() => setStep(3)}
-                    className="w-full py-2.5 text-white rounded-xl font-medium transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: branding.colors.title }}
-                  >
-                    Continue to Download →
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={saveCurrent}
+                      className="shrink-0 px-4 py-2.5 rounded-xl font-medium border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors"
+                      title="Save this workbook so you can edit it later"
+                    >
+                      💾 Save
+                    </button>
+                    <button
+                      onClick={() => setStep(3)}
+                      className="flex-1 py-2.5 text-white rounded-xl font-medium transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: branding.colors.title }}
+                    >
+                      Continue to Download →
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
@@ -160,7 +212,7 @@ export default function WorkbookApp({ branding }: Props) {
                 <h2 className="font-semibold text-gray-800 text-sm">Step 3 — Download</h2>
               </div>
               <div className="p-5">
-                <DownloadButton doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} />
+                <DownloadButton doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} onDownloaded={saveCurrent} />
               </div>
             </section>
           )}
@@ -171,6 +223,7 @@ export default function WorkbookApp({ branding }: Props) {
           <PDFPreview doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} onSelectSection={selectSection} />
         </div>
       </div>
+      )}
     </div>
   );
 }

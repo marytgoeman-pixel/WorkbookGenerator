@@ -8,9 +8,10 @@ interface Props {
   templateId: TemplateId;
   colorTheme: ColorTheme;
   branding?: ClientBranding;
+  onDownloaded?: () => void; // fired after a successful download (used to save the workbook)
 }
 
-export default function DownloadButton({ doc, templateId, colorTheme, branding }: Props) {
+export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleDownload() {
@@ -31,6 +32,8 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: doc.title }),
       }).catch(() => {});
+      // Save the workbook so it can be reopened and edited later
+      onDownloaded?.();
     } finally {
       setLoading(false);
     }

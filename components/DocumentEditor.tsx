@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding,
 } from '@/types/document';
-import { COVER_IMAGES } from '@/lib/covers';
+import { coverImagesFor } from '@/lib/covers';
 
 interface Props {
   doc: DocumentModel;
@@ -197,7 +197,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus }: Props
           <div className="px-4 py-3 space-y-3 border-t border-gray-100">
             <p className="text-[11px] text-gray-500">Pick a background image for the cover. The title, author, and tagline sit in a branded band over it.</p>
             <div className="grid grid-cols-5 gap-2">
-              {COVER_IMAGES.map((img) => {
+              {coverImagesFor(branding?.id).map((img) => {
                 const selected = cover.imageId === img.id;
                 return (
                   <button key={img.id} type="button" title={img.label}

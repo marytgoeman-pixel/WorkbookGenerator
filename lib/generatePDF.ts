@@ -307,7 +307,7 @@ export async function generatePDF(
   let hasCover = false;
   if (branded && doc.cover?.enabled) {
     if (sellit) {
-      await drawSellItCover(pdfDoc, page, tmpl, doc, branding!, boldFont, font, brandLogo, sellitMark);
+      await drawSellItCover(pdfDoc, page, tmpl, doc, branding!, boldFont, font, brandLogo, whiteLogo);
     } else {
       await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, whiteLogo);
     }
@@ -795,7 +795,7 @@ async function drawSellItCover(
   boldFont: PDFFontT,
   font: PDFFontT,
   logo: PDFImage | null,
-  mark: PDFImage | null
+  whiteLogo: PDFImage | null
 ) {
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
   const blue = hexToRgb(branding.colors.header);
@@ -816,18 +816,14 @@ async function drawSellItCover(
   page.drawLine({ start: { x: pad, y: ty }, end: { x: W - pad, y: ty }, thickness: 1, color: ink });
   ty -= 50;
 
-  // Title (blue) aligned at the left margin; the icon mark hangs in the margin to its left.
-  // The "Workbook" label renders inline (ink) after the title.
+  // Title (blue) at the left margin; the "Workbook" label renders inline (ink) after it.
+  // (No icon mark on the cover.)
   let tSize = 38;
   const title = applyCase(doc.title || 'Untitled', 'none');
   const wbLabel = (doc.cover?.workbookLabel ?? 'Workbook').trim();
-  const ratio = mark ? mark.width / mark.height : 0;
   let titleLines = wrapText(title, innerW, boldFont, tSize);
   while (titleLines.length > 3 && tSize > 24) { tSize -= 3; titleLines = wrapText(title, innerW, boldFont, tSize); }
-  const markH = tSize * 1.08; // a bit bigger
-  const markW = mark ? markH * ratio : 0;
-  const tx = pad; // title aligns left with the rest of the text
-  if (mark) page.drawImage(mark, { x: Math.max(6, pad - markW - 8), y: ty + tSize * 0.36 - markH / 2, width: markW, height: markH });
+  const tx = pad;
   const titleLineH = tSize + 6;
   for (let i = 0; i < titleLines.length; i++) {
     const ln = titleLines[i];
@@ -856,21 +852,32 @@ async function drawSellItCover(
     for (const ln of wrapText(descriptor, innerW, font, 13)) { page.drawText(ln, { x: pad, y: ty, size: 13, font, color: gray }); ty -= 18; }
   }
 
-  // Cover image — fills the lower area at content width and bleeds off the bottom of the page
+  // Cover image — framed at content width for EVERY image (cropped left/right, bleeds off the bottom)
+  const frameTop = ty - 18;
   const chosen = coverById(doc.cover?.imageId);
   const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
-  if (img) {
-    const imgTop = ty - 18;
-    if (imgTop > 130) {
-      const scale = Math.max(innerW / img.width, imgTop / img.height); // cover-fit → fills + bleeds off bottom
-      const dw = img.width * scale, dh = img.height * scale;
-      page.drawImage(img, { x: pad - (dw - innerW) / 2, y: imgTop - dh, width: dw, height: dh });
-      // Sell It blue fade rising over the image: opaque blue at the bottom edge → clear toward the top
-      const strips = 60;
+  if (img && frameTop > 130) {
+    // Cover-fit into the content-width frame [pad..W-pad] × [0..frameTop]
+    const scale = Math.max(innerW / img.width, frameTop / img.height);
+    const dw = img.width * scale, dh = img.height * scale;
+    page.drawImage(img, { x: pad - (dw - innerW) / 2, y: frameTop - dh, width: dw, height: dh });
+    // Mask side overflow so every image is framed at the same content width
+    page.drawRectangle({ x: 0, y: 0, width: pad, height: frameTop, color: rgb(1, 1, 1) });
+    page.drawRectangle({ x: W - pad, y: 0, width: pad, height: frameTop, color: rgb(1, 1, 1) });
+    // Smooth blue fade over the picture ONLY (gradient image → no banding): blue at the bottom → clear at the top
+    const fade = await tryEmbedImage(pdfDoc, branding.logoUrl.replace(/[^/]*$/, 'blue-fade.png'));
+    if (fade) {
+      page.drawImage(fade, { x: pad, y: 0, width: innerW, height: frameTop });
+    } else {
+      const strips = 80;
       for (let s = 0; s < strips; s++) {
-        const op = 0.9 * Math.pow(1 - s / strips, 1.5);
-        page.drawRectangle({ x: 0, y: (s / strips) * imgTop, width: W, height: imgTop / strips + 0.6, color: blue, opacity: op });
+        page.drawRectangle({ x: pad, y: (s / strips) * frameTop, width: innerW, height: frameTop / strips + 0.8, color: blue, opacity: 0.9 * Math.pow(1 - s / strips, 1.25) });
       }
+    }
+    // White Sell It logo, bottom-right, over the fade
+    if (whiteLogo) {
+      const lh = 40, lw = lh * (whiteLogo.width / whiteLogo.height);
+      page.drawImage(whiteLogo, { x: W - pad - lw, y: 28, width: lw, height: lh });
     }
   }
 }

@@ -315,7 +315,8 @@ export async function generatePDF(
     if (sellit) {
       await drawSellItCover(pdfDoc, page, tmpl, doc, branding!, boldFont, font, brandLogo, whiteLogo);
     } else {
-      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, whiteLogo);
+      // TLC: full-color logo on a light chip (so the green leaf shows); others: reversed white logo
+      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, tlc ? brandLogo : whiteLogo, tlc);
     }
     hasCover = true;
     newPage();
@@ -722,23 +723,29 @@ export async function generatePDF(
         else if (item.kind === 'table') renderTable(item.table);
       }
     } else {
-      // Track whether the previous block was a "box" (textarea/dropdown/table) so a
-      // following text line (e.g. the next numbered question) gets clear separation.
+      // Track the previous block kind so a following text line gets clear separation
+      // from a "box" (textarea/dropdown/table) above it — and from a bullet list above it.
       let lastWasBox = false;
+      let lastWasBullet = false;
       for (const item of section.content) {
         if (item.kind === 'text') {
           if (lastWasBox) y -= 12 * sp;
+          else if (lastWasBullet) y -= 8 * sp; // breathing room between a bullet list and the text that follows it
           renderText(item.text, item.color);
           lastWasBox = false;
+          lastWasBullet = false;
         } else if (item.kind === 'bullet') {
           renderBullet(item.text, item.color);
           lastWasBox = false;
+          lastWasBullet = true;
         } else if (item.kind === 'field') {
           renderField(item.field);
           lastWasBox = item.field.type === 'textarea' || item.field.type === 'dropdown' || item.field.type === 'text';
+          lastWasBullet = false;
         } else if (item.kind === 'table') {
           renderTable(item.table);
           lastWasBox = true;
+          lastWasBullet = false;
         }
       }
     }
@@ -933,7 +940,8 @@ async function drawCoverPage(
   boldFont: PDFFontT,
   font: PDFFontT,
   italicFont: PDFFontT,
-  logo: PDFImage | null
+  logo: PDFImage | null,
+  logoOnChip = false
 ) {
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
   const navy = hexToRgb(branding.colors.header);
@@ -1014,7 +1022,13 @@ async function drawCoverPage(
     const targetH = 54;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
-    page.drawImage(logo, { x: W - pad - w, y: 22, width: w, height: targetH });
+    const lx = W - pad - w, ly = 22;
+    if (logoOnChip) {
+      // A full-color logo can't read on the navy band, so sit it on a clean white card
+      const cpad = 10;
+      page.drawRectangle({ x: lx - cpad, y: ly - cpad, width: w + cpad * 2, height: targetH + cpad * 2, color: rgb(1, 1, 1) });
+    }
+    page.drawImage(logo, { x: lx, y: ly, width: w, height: targetH });
   }
 }
 
@@ -1138,35 +1152,40 @@ function drawBrandedChrome(
   const centerY = footerH / 2 - 2;
 
   // Logo (left). If not yet uploaded, fall back to styled text.
+  // rowMid = the logo's vertical center; the tagline, social icons, and page
+  // number are all centered to it so they sit level with the wordmark.
+  let rowMid = centerY + 5;
   if (logo) {
     const targetH = 42;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
     // Raised off the page bottom so it isn't crammed against the edge
-    page.drawImage(logo, { x: tmpl.marginLeft, y: centerY - targetH / 2 + 12, width: w, height: targetH });
+    const logoY = centerY - targetH / 2 + 12;
+    page.drawImage(logo, { x: tmpl.marginLeft, y: logoY, width: w, height: targetH });
+    rowMid = logoY + targetH / 2;
   } else {
     page.drawText(sanitize(branding.displayName), { x: tmpl.marginLeft, y: centerY, size: 14, font: boldFont, color: hexToRgb(branding.colors.title) });
   }
 
-  // Tagline (center, italic) — sanitize keeps the middot (·, 0xB7) which Helvetica supports
+  // Tagline (center) — vertically centered to the logo. sanitize keeps the middot (·).
   const tagline = sanitize(branding.tagline);
   const tagSize = 8.5;
   const tagWidth = italicFont.widthOfTextAtSize(tagline, tagSize);
   page.drawText(tagline, {
     x: (W - tagWidth) / 2,
-    y: centerY,
+    y: rowMid - tagSize * 0.34,
     size: tagSize,
     font: italicFont,
     color: headerColor,
   });
 
-  // Social icons (right), clickable
+  // Social icons (right), clickable — vertically centered to the logo
   const iconSize = 16;
   const gap = 8;
   const count = branding.social.length;
   const pageNumW = 18;
   let ix = W - tmpl.marginRight - pageNumW - count * (iconSize + gap);
-  const iconY = centerY - 4;
+  const iconY = rowMid - iconSize / 2;
   for (const s of branding.social) {
     const img = socialIcons[s.type];
     if (img) {
@@ -1179,10 +1198,10 @@ function drawBrandedChrome(
     ix += iconSize + gap;
   }
 
-  // Page number (far right)
+  // Page number (far right) — vertically centered to the logo
   page.drawText(`${pageNum}`, {
     x: W - tmpl.marginRight - 6,
-    y: centerY,
+    y: rowMid - 9 * 0.34,
     size: 9,
     font,
     color: rgb(0.5, 0.5, 0.5),

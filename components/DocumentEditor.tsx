@@ -450,7 +450,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                         <div className="flex items-center gap-2">
                           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Text</span>
                           <textarea rows={Math.max(1, item.text.split('\n').length)}
-                            className="flex-1 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1 resize-y leading-snug"
+                            className="flex-1 min-w-0 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1 resize-y leading-snug"
                             value={item.text} placeholder="Reading text… (Enter = line break)" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
                         </div>
                         <div className="flex gap-1.5 pl-1">
@@ -463,7 +463,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                     {item.kind === 'bullet' && (
                       <div className="flex items-center gap-2">
                         <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Bullet</span>
-                        <input className="flex-1 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
+                        <input className="flex-1 min-w-0 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
                           value={item.text} placeholder="Bullet point…" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
                       </div>
                     )}
@@ -472,9 +472,13 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                       <>
                         <div className="flex items-center gap-2">
                           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-blue-700 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5">{fieldTypeLabel[item.field.type]}</span>
-                          <input className="flex-1 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
+                          <input className="flex-1 min-w-0 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
                             value={item.field.label} placeholder="Question / prompt…" onChange={(e) => updateFieldLabel(section.id, item.id, e.target.value)} />
-                          {(item.field.type === 'text' || item.field.type === 'textarea') && (
+                        </div>
+                        {/* Live answer-box preview (short line vs tall box, brand color) + size stepper beside it */}
+                        {(item.field.type === 'text' || item.field.type === 'textarea') && (
+                          <div className="flex items-start gap-2 ml-1">
+                            <div className="flex-1 min-w-0 rounded border" style={{ height: item.field.type === 'text' ? 16 : Math.min(130, Math.round(34 * (item.field.heightScale ?? 1)) + 8), backgroundColor: fieldBg, borderColor: fieldBorder }} />
                             <span className="flex items-center gap-0.5 shrink-0" title="Make THIS answer box taller or shorter">
                               <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.max(0.5, Math.round(((item.field.heightScale ?? 1) - 0.25) * 100) / 100) })}
                                 className="w-5 h-5 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 text-[13px]">−</button>
@@ -482,14 +486,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                               <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.min(5, Math.round(((item.field.heightScale ?? 1) + 0.25) * 100) / 100) })}
                                 className="w-5 h-5 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 text-[13px]">+</button>
                             </span>
-                          )}
-                        </div>
-                        {/* Live preview of the answer box — short line vs tall box, in the brand color */}
-                        {item.field.type === 'text' && (
-                          <div className="rounded border ml-1" style={{ height: 16, backgroundColor: fieldBg, borderColor: fieldBorder }} />
-                        )}
-                        {item.field.type === 'textarea' && (
-                          <div className="rounded border ml-1" style={{ height: Math.min(130, Math.round(34 * (item.field.heightScale ?? 1)) + 8), backgroundColor: fieldBg, borderColor: fieldBorder }} />
+                          </div>
                         )}
                         {item.field.type === 'checkbox' && (
                           <div className="flex items-center gap-1.5 text-[11px] text-gray-400 ml-1"><span className="inline-block w-3.5 h-3.5 border rounded-sm" style={{ borderColor: fieldBorder, backgroundColor: fieldBg }} /> tick box</div>

@@ -35,13 +35,30 @@ export const SELLIT_COVER_IMAGES: CoverImage[] = [
   { id: 'sellit-11', thumb: '/covers/sellit-thumb-11.jpg', cover: '/covers/sellit-11.jpg', label: 'Curved glass building' },
 ];
 
+// The Learning Creative — hand-drawn botanical & geometric patterns in the brand palette.
+export const TLC_COVER_IMAGES: CoverImage[] = [
+  { id: 'tlc-1', thumb: '/covers/tlc-thumb-1.jpg', cover: '/covers/tlc-1.jpg', label: 'Botanical leaves — terracotta & sage' },
+  { id: 'tlc-2', thumb: '/covers/tlc-thumb-2.jpg', cover: '/covers/tlc-2.jpg', label: 'Fine geometric lattice' },
+  { id: 'tlc-3', thumb: '/covers/tlc-thumb-3.jpg', cover: '/covers/tlc-3.jpg', label: 'Diamond lattice — blush' },
+  { id: 'tlc-4', thumb: '/covers/tlc-thumb-4.jpg', cover: '/covers/tlc-4.jpg', label: 'Ornamental trellis' },
+  { id: 'tlc-5', thumb: '/covers/tlc-thumb-5.jpg', cover: '/covers/tlc-5.jpg', label: 'Delicate diamond grid' },
+  { id: 'tlc-6', thumb: '/covers/tlc-thumb-6.jpg', cover: '/covers/tlc-6.jpg', label: 'Soft blue foliage' },
+  { id: 'tlc-7', thumb: '/covers/tlc-thumb-7.jpg', cover: '/covers/tlc-7.jpg', label: 'Line-art leaves — green' },
+  { id: 'tlc-8', thumb: '/covers/tlc-thumb-8.jpg', cover: '/covers/tlc-8.jpg', label: 'Ink leaf sprigs' },
+  { id: 'tlc-9', thumb: '/covers/tlc-thumb-9.jpg', cover: '/covers/tlc-9.jpg', label: 'Autumn foliage — gold & rust' },
+  { id: 'tlc-10', thumb: '/covers/tlc-thumb-10.jpg', cover: '/covers/tlc-10.jpg', label: 'Geometric star dot' },
+];
+
 // The cover-image set a given client should choose from.
 export function coverImagesFor(brandId: string | undefined): CoverImage[] {
-  // Sell It and the TLC demo use the sleek architecture set; Jo keeps her real-estate set.
-  return brandId === 'sellit' || brandId === 'thelearningcreative' ? SELLIT_COVER_IMAGES : COVER_IMAGES;
+  if (brandId === 'thelearningcreative') return TLC_COVER_IMAGES; // TLC uses its own botanical art
+  if (brandId === 'sellit') return SELLIT_COVER_IMAGES;           // Sell It uses the architecture set
+  return COVER_IMAGES;                                            // Jo keeps her real-estate set
 }
 
 export function coverById(id: string | undefined): CoverImage | undefined {
   if (!id) return undefined;
-  return COVER_IMAGES.find((c) => c.id === id) || SELLIT_COVER_IMAGES.find((c) => c.id === id);
+  return COVER_IMAGES.find((c) => c.id === id)
+    || SELLIT_COVER_IMAGES.find((c) => c.id === id)
+    || TLC_COVER_IMAGES.find((c) => c.id === id);
 }

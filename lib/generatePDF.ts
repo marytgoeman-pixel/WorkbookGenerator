@@ -315,8 +315,7 @@ export async function generatePDF(
     if (sellit) {
       await drawSellItCover(pdfDoc, page, tmpl, doc, branding!, boldFont, font, brandLogo, whiteLogo);
     } else {
-      // TLC: full-color logo on a light chip (so the green leaf shows); others: reversed white logo
-      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, tlc ? brandLogo : whiteLogo, tlc);
+      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, whiteLogo);
     }
     hasCover = true;
     newPage();
@@ -940,8 +939,7 @@ async function drawCoverPage(
   boldFont: PDFFontT,
   font: PDFFontT,
   italicFont: PDFFontT,
-  logo: PDFImage | null,
-  logoOnChip = false
+  logo: PDFImage | null
 ) {
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
   const navy = hexToRgb(branding.colors.header);
@@ -1017,18 +1015,12 @@ async function drawCoverPage(
   ty -= byGap + 2;
   page.drawText(tagline, { x: pad, y: ty, size: 9, font: italicFont, color: rgb(0.85, 0.9, 0.94) });
 
-  // Logo bottom-right within the band, if available
+  // Logo bottom-right within the band, if available (white wordmark + green leaf reads on navy)
   if (logo) {
-    const targetH = 54;
+    const targetH = 50;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
-    const lx = W - pad - w, ly = 22;
-    if (logoOnChip) {
-      // A full-color logo can't read on the navy band, so sit it on a clean white card
-      const cpad = 10;
-      page.drawRectangle({ x: lx - cpad, y: ly - cpad, width: w + cpad * 2, height: targetH + cpad * 2, color: rgb(1, 1, 1) });
-    }
-    page.drawImage(logo, { x: lx, y: ly, width: w, height: targetH });
+    page.drawImage(logo, { x: W - pad - w, y: 22, width: w, height: targetH });
   }
 }
 

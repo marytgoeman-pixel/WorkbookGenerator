@@ -225,6 +225,8 @@ export async function generatePDF(
     : null;
   // Sell It's icon mark (the converging-arrows symbol) in brand blue, drawn beside page titles
   const sellitMark = sellit ? await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'sellitmark-blue.png')) : null;
+  // The Learning Creative leaf mark — accents callout panels (website-style, not a dark box)
+  const leafMark = tlc ? await tryEmbedImage(pdfDoc, '/leaf.png') : null;
 
   // Pre-embed social icon PNGs from the same folder as the logo (e.g. /clients/jo/linkedin.png)
   const socialIcons: Record<string, PDFImage | null> = {};
@@ -658,6 +660,40 @@ export async function generatePDF(
     };
 
     const renderCalloutBox = (lines: string[]) => {
+      // The Learning Creative: a light, leaf-accented panel (matches the website) —
+      // pale-green background, a solid green left accent bar, the leaf mark top-left,
+      // and navy body text. No dark fill, no dashed border.
+      if (tlc) {
+        const pad = 14;
+        const accentW = 4;                                   // green left accent bar
+        const cLineH = tmpl.lineHeight * ls;
+        const paraGap = cLineH * 0.5;
+        const panelBg = hexToRgb(branding!.colors.grayBox);  // pale lime tint
+        const barColor = hexToRgb(branding!.colors.subtitle);// dark green
+        const textColor = hexToRgb(branding!.colors.header); // navy
+        const textX = tmpl.marginLeft + accentW + pad;
+        const innerW = mainColWidth - accentW - pad * 2;
+        const paras = lines.map((l) => wrapText(l, innerW, font, tmpl.bodySize)).filter((p) => p.join('').trim());
+        const leafW = leafMark ? 30 : 0;
+        const leafH = leafMark ? leafW * (leafMark.height / leafMark.width) : 0;
+        const leafGap = leafMark ? 9 : 0;
+        const textH = paras.reduce((h, p) => h + p.length * cLineH, 0) + Math.max(0, paras.length - 1) * paraGap;
+        const boxH = pad + leafH + leafGap + textH + pad;
+        ensureSpace(boxH + 8);
+        const boxTop = y + tmpl.bodySize;
+        page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: panelBg });
+        page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: accentW, height: boxH, color: barColor });
+        if (leafMark) {
+          page.drawImage(leafMark, { x: textX, y: boxTop - pad - leafH, width: leafW, height: leafH });
+        }
+        let cy = boxTop - pad - leafH - leafGap - tmpl.bodySize + 2;
+        paras.forEach((p, i) => {
+          for (const wline of p) { page.drawText(wline, { x: textX, y: cy, size: tmpl.bodySize, font, color: textColor }); cy -= cLineH; }
+          if (i < paras.length - 1) cy -= paraGap;
+        });
+        y = boxTop - boxH - tmpl.paragraphSpacing;
+        return;
+      }
       const calloutBg = hexToRgb(branding!.colors.calloutBg);
       const pad = 12;
       const innerW = mainColWidth - pad * 2;

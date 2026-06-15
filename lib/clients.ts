@@ -73,13 +73,13 @@ export const CLIENTS: ClientAccount[] = [
       logoUrl: '/clients/tlc/logo.png',
       social: [{ type: 'website', url: 'https://thelearningcreative.com' }],
       colors: {
-        header: '#102A3D',     // brand navy — top bar, cover band, H1 titles
-        title: '#102A3D',      // navy — main page titles
-        subtitle: '#47A635',   // brand green — section labels
-        accent: '#47A635',     // green — bullets, field borders
-        calloutBg: '#102A3D',
-        calloutBorder: '#47A635',
-        grayBox: '#EAF6E8',    // soft green tint for fillable fields
+        header: '#163446',     // brand navy — top bar, cover band, H1 titles
+        title: '#163446',      // brand navy — main page titles
+        subtitle: '#009346',   // dark green — section labels / byline (readable on white)
+        accent: '#009346',     // dark green — bullets, field borders (crisp on white)
+        calloutBg: '#163446',
+        calloutBorder: '#8DC63D', // light green — pops on the navy callout box
+        grayBox: '#F0F7E6',    // pale lime tint for fillable-field backgrounds
       },
     },
   },

@@ -52,9 +52,9 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/the-learning-creative-logo.png"
+            src="/logonew.png"
             alt="The Learning Creative"
-            className="mx-auto mb-3 w-full max-w-[220px] h-auto"
+            className="mx-auto mb-4 w-full max-w-[250px] h-auto"
           />
           <h1 className="text-lg font-bold text-gray-900">
             Workbook PDF Generator

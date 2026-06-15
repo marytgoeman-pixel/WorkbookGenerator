@@ -37,7 +37,8 @@ export const SELLIT_COVER_IMAGES: CoverImage[] = [
 
 // The cover-image set a given client should choose from.
 export function coverImagesFor(brandId: string | undefined): CoverImage[] {
-  return brandId === 'sellit' ? SELLIT_COVER_IMAGES : COVER_IMAGES;
+  // Sell It and the TLC demo use the sleek architecture set; Jo keeps her real-estate set.
+  return brandId === 'sellit' || brandId === 'thelearningcreative' ? SELLIT_COVER_IMAGES : COVER_IMAGES;
 }
 
 export function coverById(id: string | undefined): CoverImage | undefined {

@@ -5,6 +5,7 @@ import { modernTemplate } from './templates/modern';
 import { workbookTemplate } from './templates/workbook';
 import { jomangumTemplate } from './templates/jomangum';
 import { sellitTemplate } from './templates/sellit';
+import { tlcTemplate } from './templates/tlc';
 import { coverById } from './covers';
 import fontkit from '@pdf-lib/fontkit';
 
@@ -80,6 +81,7 @@ function getTemplate(id: TemplateId): Template {
   if (id === 'workbook') return workbookTemplate;
   if (id === 'jomangum') return jomangumTemplate;
   if (id === 'sellit') return sellitTemplate;
+  if (id === 'tlc') return tlcTemplate;
   return classicTemplate;
 }
 
@@ -184,7 +186,9 @@ export async function generatePDF(
 
   const jo = templateId === 'jomangum' && !!branding;
   const sellit = templateId === 'sellit' && !!branding;
-  const branded = jo || sellit;
+  const tlc = templateId === 'tlc' && !!branding;
+  // 'tlc' reuses the navy-bar + footer chrome (drawBrandedChrome) and the standard cover.
+  const branded = jo || sellit || tlc;
 
   // Sell It uses its own typefaces: Aeonik (bold) for headings, Inter for body.
   if (sellit) {
@@ -935,6 +939,8 @@ async function drawCoverPage(
   const titleLH = tSize + 6;
 
   const orange = hexToRgb(branding.colors.title);
+  // Author highlight: use the title color when it contrasts the band; otherwise the accent so it always pops
+  const hlColor = branding.colors.title.toLowerCase() !== branding.colors.header.toLowerCase() ? orange : gold;
   const sub = doc.cover?.subtitle?.trim();
   const tagline = sanitize(branding.tagline);
   // Just the author's name (no "A workbook by" prefix). Falls back to the brand name if blank.
@@ -1103,8 +1109,7 @@ function drawBrandedChrome(
     // Raised off the page bottom so it isn't crammed against the edge
     page.drawImage(logo, { x: tmpl.marginLeft, y: centerY - targetH / 2 + 12, width: w, height: targetH });
   } else {
-    page.drawText('Jo', { x: tmpl.marginLeft, y: centerY, size: 16, font: boldFont, color: hexToRgb(branding.colors.title) });
-    page.drawText('Mangum', { x: tmpl.marginLeft + 18, y: centerY, size: 14, font: italicFont, color: headerColor });
+    page.drawText(sanitize(branding.displayName), { x: tmpl.marginLeft, y: centerY, size: 14, font: boldFont, color: hexToRgb(branding.colors.title) });
   }
 
   // Tagline (center, italic) — sanitize keeps the middot (·, 0xB7) which Helvetica supports

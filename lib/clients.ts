@@ -61,6 +61,29 @@ export const CLIENTS: ClientAccount[] = [
     },
   },
   {
+    // Demo account: The Learning Creative (your own brand — for showing prospects).
+    // Default password: LearningCreative2025!  (change by replacing the hash)
+    username: 'tlc',
+    passwordHash: '$2b$10$4W5ovBK8tH2U6YEE9pguy.687xgCkCNV3FiLU.t4q.7DP01bAY1f.',
+    branding: {
+      id: 'thelearningcreative',
+      displayName: 'The Learning Creative',
+      templateId: 'tlc',
+      tagline: 'Custom Learning Experiences',
+      logoUrl: '/clients/tlc/logo.png',
+      social: [{ type: 'website', url: 'https://thelearningcreative.com' }],
+      colors: {
+        header: '#102A3D',     // brand navy — top bar, cover band, H1 titles
+        title: '#102A3D',      // navy — main page titles
+        subtitle: '#47A635',   // brand green — section labels
+        accent: '#47A635',     // green — bullets, field borders
+        calloutBg: '#102A3D',
+        calloutBorder: '#47A635',
+        grayBox: '#EAF6E8',    // soft green tint for fillable fields
+      },
+    },
+  },
+  {
     // Admin account — sees the analytics dashboard, not a workbook workspace.
     // Default password: JoAdmin2025!  (change by replacing the hash)
     username: 'admin',

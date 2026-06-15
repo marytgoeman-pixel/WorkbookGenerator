@@ -72,7 +72,7 @@ export interface DocumentModel {
   legalPage?: boolean;         // append a legal/disclaimer page at the end (Jo only)
 }
 
-export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum' | 'sellit';
+export type TemplateId = 'classic' | 'modern' | 'workbook' | 'jomangum' | 'sellit' | 'tlc';
 
 export interface SocialLink {
   type: 'website' | 'linkedin' | 'youtube' | 'instagram' | 'facebook';

@@ -591,7 +591,10 @@ export async function generatePDF(
       const TFS = 12;          // table font size — kept at the 12pt minimum
       const cellLineH = 15;    // line height for wrapped cell text
       const vpad = 8;          // vertical padding inside a cell
-      const minRowH = 30;
+      // Calendar mode: a cell carrying BOTH a date label and a fillable field — give rows
+      // enough height to actually type a note inside each day.
+      const isCalendar = table.rows.some((r) => r.some((c) => !!(c && c.text && c.field)));
+      const minRowH = isCalendar ? 54 : 30;
       const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
       const solidHeader = sellit; // Sell It: solid blue header + white text; others: light tint
 
@@ -639,13 +642,25 @@ export async function generatePDF(
           if (!cell) continue;
           if (cell.field) {
             const name = `${section.id}__${cell.field.id}`;
-            const fh = Math.min(rh - 8, 20), fw = colW - 10, fx = cx + 5, fy = rowTop - rh + 4 + (rh - fh) / 2;
+            const hasDate = !!(cell.text && cell.text.trim());
+            const fw = colW - 10, fx = cx + 5;
+            let fh: number, fy: number;
+            if (hasDate) {
+              // Calendar day: small date number top-left, fillable note area filling the rest
+              page.drawText(cell.text!, { x: cx + 5, y: rowTop - 13, size: 9, font: boldFont, color: branded ? hexToRgb(branding.colors.subtitle) : primaryColor });
+              fh = Math.max(14, rh - 24);
+              fy = rowTop - rh + 7;
+            } else {
+              fh = Math.min(rh - 8, 20);
+              fy = rowTop - rh + 4 + (rh - fh) / 2;
+            }
             if (cell.field.type === 'dropdown' && cell.field.options) {
               const dd = form.createDropdown(name); dd.addOptions(cell.field.options);
               dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
               dd.setFontSize(TFS);
             } else {
               const tf = form.createTextField(name);
+              if (cell.field.type === 'textarea') tf.enableMultiline();
               tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
               tf.setFontSize(TFS);
             }

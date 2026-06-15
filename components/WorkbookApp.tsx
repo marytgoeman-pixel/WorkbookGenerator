@@ -8,6 +8,7 @@ import PDFPreview from '@/components/PDFPreview';
 import DownloadButton from '@/components/DownloadButton';
 import SavedWorkbooks from '@/components/SavedWorkbooks';
 import { saveWorkbook, listSaved, SavedWorkbook } from '@/lib/savedWorkbooks';
+import { buildSampleWorkbook } from '@/lib/sampleWorkbook';
 import { APP_VERSION } from '@/lib/version';
 
 interface Props {
@@ -104,6 +105,17 @@ export default function WorkbookApp({ branding }: Props) {
     setStep(2);
   }
 
+  // Clear the current workbook and return to the upload step, without signing out.
+  function startNew() {
+    if (doc && !confirm('Start a new workbook? Any unsaved changes to the current one will be lost.')) return;
+    setDoc(null);
+    setSavedId(null);
+    setPast([]); setFuture([]);
+    setFocus(null);
+    setStep(1);
+    setView('work');
+  }
+
   async function logout() {
     await fetch('/api/logout', { method: 'POST' });
     router.push('/login');
@@ -153,6 +165,15 @@ export default function WorkbookApp({ branding }: Props) {
                 ))}
               </nav>
             )}
+            {doc && (
+              <button
+                onClick={startNew}
+                className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                title="Start a new workbook without signing out"
+              >
+                ＋ New workbook
+              </button>
+            )}
             <button
               onClick={() => setView((v) => (v === 'saved' ? 'work' : 'saved'))}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${view === 'saved' ? 'text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
@@ -197,8 +218,19 @@ export default function WorkbookApp({ branding }: Props) {
               )}
             </div>
             {step === 1 ? (
-              <div className="p-5">
+              <div className="p-5 space-y-3">
                 <FileUpload onParsed={handleParsed} />
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-300">
+                  <span className="flex-1 border-t border-gray-100" />or<span className="flex-1 border-t border-gray-100" />
+                </div>
+                <button
+                  onClick={() => handleParsed(buildSampleWorkbook(branding.id))}
+                  className="w-full py-2.5 rounded-xl font-medium text-sm border-2 transition-colors hover:bg-gray-50"
+                  style={{ borderColor: branding.colors.accent, color: branding.colors.title }}
+                  title="Load a ready-made interactive sample (calendar, checkboxes, answer boxes)"
+                >
+                  ✨ Load an interactive sample workbook
+                </button>
               </div>
             ) : doc ? (
               <div className="px-5 py-3 text-sm text-gray-600">

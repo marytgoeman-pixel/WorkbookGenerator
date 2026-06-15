@@ -22,6 +22,31 @@ async function docxToHtml(file: File): Promise<string> {
   return result.value;
 }
 
+// Extract selectable text from a PDF (outline) using pdf.js, preserving line breaks
+async function pdfToText(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  // @ts-ignore - legacy build path has no bundled type declarations
+  const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as typeof import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    let line = '';
+    for (const item of content.items) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const it = item as any;
+      if (typeof it.str !== 'string') continue;
+      line += it.str;
+      if (it.hasEOL) { text += line.trimEnd() + '\n'; line = ''; }
+    }
+    if (line.trim()) text += line.trimEnd() + '\n';
+    text += '\n'; // blank line between pages
+  }
+  return text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 type AiResult = { document: DocumentModel } | { reason: string };
 
 // Ask the AI endpoint to structure the document; returns a reason string on failure
@@ -92,14 +117,27 @@ export default function FileUpload({ onParsed }: Props) {
   }
 
   function handleFile(file: File) {
-    if (!file.name.match(/\.(txt|md|docx)$/i)) {
-      setError('Please upload a .txt, .md, or .docx file.');
+    if (!file.name.match(/\.(txt|md|docx|pdf)$/i)) {
+      setError('Please upload a .txt, .md, .docx, or .pdf file.');
       return;
     }
     if (file.name.match(/\.docx$/i)) {
       docxToHtml(file)
         .then((html) => formatAndDeliver(html, parseWorkbookHtml(html), file.name))
         .catch(() => setError('Failed to read Word document. Please check the file and try again.'));
+    } else if (file.name.match(/\.pdf$/i)) {
+      setError('');
+      setLoading(true);
+      pdfToText(file)
+        .then((text) => {
+          if (!text || text.length < 20) {
+            setError('Couldn’t read text from this PDF — it may be scanned/image-based. Try a Word doc, or paste the outline text.');
+            return;
+          }
+          return formatAndDeliver(text, parseWorkbook(text), file.name);
+        })
+        .catch(() => setError('Failed to read the PDF. Please try a Word doc or paste the text.'))
+        .finally(() => setLoading(false));
     } else {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -146,12 +184,12 @@ export default function FileUpload({ onParsed }: Props) {
           onClick={() => !loading && inputRef.current?.click()}
         >
           <div className="text-4xl mb-3">📄</div>
-          <p className="font-medium text-gray-700">Drop your .txt, .md, or .docx file here</p>
-          <p className="text-sm text-gray-400 mt-1">or click to browse</p>
+          <p className="font-medium text-gray-700">Drop a Word doc, PDF, or text file here</p>
+          <p className="text-sm text-gray-400 mt-1">.docx · .pdf · .txt · .md — or click to browse</p>
           <input
             ref={inputRef}
             type="file"
-            accept=".txt,.md,.docx"
+            accept=".txt,.md,.docx,.pdf"
             className="hidden"
             onChange={onFileChange}
           />

@@ -11,7 +11,7 @@ export interface FormField {
 
 // A cell is either static text or a fillable field
 export interface TableCell {
-  text: string;
+  text?: string;       // static label / date number (optional — a cell may be field-only)
   field?: FormField;
 }
 
@@ -19,6 +19,8 @@ export interface DocTable {
   id: string;
   headers: string[];
   rows: TableCell[][];
+  fullPage?: boolean;   // expand rows to fill the page height (calendars, SWOT, grids)
+  labelSize?: number;   // point size for in-cell labels (date numbers, quadrant titles)
 }
 
 export type HeadingStyle = 'accent' | 'brand' | 'plain' | 'title';
@@ -30,7 +32,8 @@ export type ContentItem =
   | { id: string; kind: 'text'; text: string; color?: string }   // color: hex (#E04927) or name
   | { id: string; kind: 'bullet'; text: string; color?: string }
   | { id: string; kind: 'field'; field: FormField }
-  | { id: string; kind: 'table'; table: DocTable };
+  | { id: string; kind: 'table'; table: DocTable }
+  | { id: string; kind: 'lines'; rows?: number };   // ruled notes area (fills the page if rows omitted)
 
 export interface Section {
   id: string;

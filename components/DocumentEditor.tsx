@@ -4,6 +4,7 @@ import {
   DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding,
 } from '@/types/document';
 import { coverImagesFor } from '@/lib/covers';
+import { ELEMENTS, calendarElement } from '@/lib/elements';
 
 interface Props {
   doc: DocumentModel;
@@ -32,6 +33,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
   const fieldBg = branding?.colors.grayBox ?? '#eef2ff';
   const fieldBorder = branding?.colors.accent ?? '#9ca3af';
   const addBtn = 'text-xs px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors';
+  const elBtn = 'text-xs px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors font-medium';
 
   // When the preview is clicked, scroll the matching section into view and flash a highlight.
   useEffect(() => {
@@ -50,6 +52,11 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingAuthor, setEditingAuthor] = useState(false);
   const [openStyles, setOpenStyles] = useState<Record<string, boolean>>({});
+  // Add-element palette state (calendar month/year picker)
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [yearOptions] = useState(() => { const b = new Date().getFullYear(); return [b - 1, b, b + 1, b + 2, b + 3]; });
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   function toggleStyle(id: string) {
     setOpenStyles((m) => ({ ...m, [id]: !m[id] }));
@@ -137,6 +144,10 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
     sections.splice(afterIndex + 1, 0, ns);
     onChange({ ...doc, sections });
     setEditingId(ns.id);
+  }
+  // Append a ready-made element (calendar, notes page, SWOT, etc.) to the document.
+  function addElement(secs: Section[]) {
+    onChange({ ...doc, sections: [...doc.sections, ...secs] });
   }
 
   return (
@@ -499,8 +510,15 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
 
                     {item.kind === 'table' && (
                       <div className="flex items-center gap-2">
-                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">Table</span>
-                        <span className="flex-1 text-xs text-gray-600">{item.table.headers.length} cols × {item.table.rows.length} rows</span>
+                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">{item.table.fullPage ? 'Grid' : 'Table'}</span>
+                        <span className="flex-1 text-xs text-gray-600">{item.table.headers.length || item.table.rows[0]?.length || 0} cols × {item.table.rows.length} rows</span>
+                      </div>
+                    )}
+
+                    {item.kind === 'lines' && (
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-teal-700 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">Lines</span>
+                        <span className="flex-1 text-xs text-gray-600">Ruled notes area {item.rows ? `(${item.rows} lines)` : '(fills the page)'}</span>
                       </div>
                     )}
                   </div>
@@ -533,6 +551,26 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
           </div>
         </div>
       ))}
+
+      {/* Add an element — ready-made pages & grids */}
+      <div className="rounded-xl border-2 border-dashed border-gray-200 p-4 space-y-3">
+        <div className="text-sm font-semibold text-gray-700 flex items-center gap-2"><span>✨</span> Add an element</div>
+        <p className="text-[11px] text-gray-400 -mt-1.5">Drop in a ready-made page or grid — it&apos;s added at the end, then drag it up with ▲.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={calMonth} onChange={(e) => setCalMonth(+e.target.value)} className="text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+            {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+          </select>
+          <select value={calYear} onChange={(e) => setCalYear(+e.target.value)} className="text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+            {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button onClick={() => addElement(calendarElement(calYear, calMonth))} className={elBtn}>📅 Add calendar</button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {ELEMENTS.filter((e) => e.key !== 'calendar').map((e) => (
+            <button key={e.key} onClick={() => addElement(e.make())} className={elBtn}>{e.icon} {e.label}</button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

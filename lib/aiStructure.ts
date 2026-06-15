@@ -233,9 +233,13 @@ function docToAi(doc: DocumentModel): AiDoc {
             tableRows: it.table.rows.map((r) => ({
               cells: r.map((c) => c.field
                 ? { text: '', fieldType: c.field.type, options: c.field.options ?? [] }
-                : { text: c.text, fieldType: '' as const, options: [] }),
+                : { text: c.text ?? '', fieldType: '' as const, options: [] }),
             })),
           };
+        }
+        if (it.kind === 'lines') {
+          // The AI flat schema has no "lines" kind; represent it as an empty text block.
+          return { kind: 'text', text: '', color: '', fieldType: '', options: [], tableHeaders: [], tableRows: [] };
         }
         return { kind: it.kind, text: stripHtml(it.text), color: it.color ?? '', fieldType: '', options: [], tableHeaders: [], tableRows: [] };
       }),

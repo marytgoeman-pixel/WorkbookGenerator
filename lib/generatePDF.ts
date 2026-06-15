@@ -430,7 +430,8 @@ export async function generatePDF(
       // raw (not pre-sanitized) so wrapText() can honor hard line breaks in the heading
       const headingText = applyCase(section.title, section.headingCase);
       const headingColor =
-        style === 'brand' ? hexToRgb(branding!.colors.subtitle)
+        tlc ? hexToRgb(branding!.colors.subtitle)          // TLC: dark-green headers
+        : style === 'brand' ? hexToRgb(branding!.colors.subtitle)
         : style === 'plain' ? rgb(0.15, 0.15, 0.15)
         : primaryColor; // 'title' and 'accent' both use the primary brand color
       const sq = Math.round(size * 0.55);
@@ -438,7 +439,8 @@ export async function generatePDF(
       const useMark = sellit && section.level === 1 && !!sellitMark;
       const markH = size + 12;
       const markW = useMark ? markH * (sellitMark!.width / sellitMark!.height) : 0;
-      const drawBullet = !useMark && style === 'accent';
+      // TLC puts a bullet on every header; otherwise only the opt-in 'accent' style is bulleted.
+      const drawBullet = !useMark && (style === 'accent' || tlc);
       // With the mark, the heading text aligns LEFT with the body text and the mark hangs in the margin.
       const textX = drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
       const markX = Math.max(6, tmpl.marginLeft - markW - 8);
@@ -597,13 +599,15 @@ export async function generatePDF(
       const minRowH = isCalendar ? 54 : 30;
       const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
       const solidHeader = sellit; // Sell It: solid blue header + white text; others: light tint
+      const labelSize = table.labelSize ?? 9;          // in-cell label size (date number / quadrant title)
+      const hasHeaders = table.headers.some((h) => h && h.trim());
 
       const wrapCell = (text: string, f: typeof font) => wrapText(text, colW - 8, f, TFS);
 
-      // Header height grows to fit wrapped header labels
+      // Header height grows to fit wrapped header labels (omitted entirely when there are none)
       const headerWrapped = table.headers.map((h) => wrapCell(h, boldFont));
       const headerLines = Math.max(1, ...headerWrapped.map((l) => l.length));
-      const headerH = Math.max(minRowH, headerLines * cellLineH + vpad);
+      const headerH = hasHeaders ? Math.max(28, headerLines * cellLineH + vpad) : 0;
 
       const drawHeader = () => {
         page.drawRectangle({ x: tmpl.marginLeft, y: y - headerH + 4, width: mainColWidth, height: headerH, color: headerColor, opacity: solidHeader ? 1 : 0.12 });
@@ -623,17 +627,24 @@ export async function generatePDF(
 
       // Pre-wrap static text cells and compute each row's height
       const rowWrapped = table.rows.map((row) => row.map((cell) => (cell && cell.text && !cell.field) ? wrapCell(cell.text, font) : ['']));
-      const rowHeights = rowWrapped.map((cells) => Math.max(minRowH, Math.max(1, ...cells.map((l) => l.length)) * cellLineH + vpad));
+      let rowHeights = rowWrapped.map((cells) => Math.max(minRowH, Math.max(1, ...cells.map((l) => l.length)) * cellLineH + vpad));
+
+      // Full-page tables (calendars, SWOT, grids) expand their rows to fill the page.
+      if (table.fullPage) {
+        const avail = y - tmpl.marginBottom - headerH - 4;
+        const per = Math.max(minRowH, Math.floor(avail / Math.max(1, table.rows.length)));
+        rowHeights = table.rows.map(() => per);
+      }
 
       // Keep the table together if it fits on a fresh page
       const total = headerH + rowHeights.reduce((a, b) => a + b, 0);
       const usable = tmpl.pageHeight - tmpl.marginTop - tmpl.marginBottom;
-      if (y - total < tmpl.marginBottom && total <= usable) newPage();
+      if (!table.fullPage && y - total < tmpl.marginBottom && total <= usable) newPage();
 
-      drawHeader();
+      if (hasHeaders) drawHeader();
       table.rows.forEach((row, ri) => {
         const rh = rowHeights[ri];
-        if (y - rh < tmpl.marginBottom) { newPage(); drawHeader(); }
+        if (y - rh < tmpl.marginBottom) { newPage(); if (hasHeaders) drawHeader(); }
         const rowTop = y;
         for (let c = 0; c < cols; c++) {
           const cell = row[c];
@@ -646,10 +657,14 @@ export async function generatePDF(
             const fw = colW - 10, fx = cx + 5;
             let fh: number, fy: number;
             if (hasDate) {
-              // Calendar day: small date number top-left, fillable note area filling the rest
-              page.drawText(cell.text!, { x: cx + 5, y: rowTop - 13, size: 9, font: boldFont, color: branded ? hexToRgb(branding.colors.subtitle) : primaryColor });
-              fh = Math.max(14, rh - 24);
+              // Labelled cell (calendar day / SWOT quadrant): label top-left, fill area below
+              page.drawText(cell.text!, { x: cx + 5, y: rowTop - labelSize - 3, size: labelSize, font: boldFont, color: branded ? hexToRgb(branding.colors.subtitle) : primaryColor });
+              fh = Math.max(14, rh - labelSize - 14);
               fy = rowTop - rh + 7;
+            } else if (table.fullPage) {
+              // Grid cell with no label — fill the whole cell
+              fh = Math.max(14, rh - 12);
+              fy = rowTop - rh + 4 + 4;
             } else {
               fh = Math.min(rh - 8, 20);
               fy = rowTop - rh + 4 + (rh - fh) / 2;
@@ -672,6 +687,27 @@ export async function generatePDF(
         y -= rh;
       });
       y -= tmpl.paragraphSpacing;
+    };
+
+    // A ruled notes area: light horizontal rules at a fixed pitch, with one transparent
+    // multiline field over them so people can type (text wraps down onto the lines).
+    const renderLines = (count?: number) => {
+      const pitch = 24;            // spacing between rules
+      const top = y - 4;
+      const bottomLimit = tmpl.marginBottom + 4;
+      const maxN = Math.max(1, Math.floor((top - bottomLimit) / pitch));
+      const n = count && count > 0 ? Math.min(count, maxN) : maxN;
+      const areaH = n * pitch;
+      const areaBottom = top - areaH;
+      for (let i = 1; i <= n; i++) {
+        const ly = top - i * pitch + 5;
+        page.drawLine({ start: { x: tmpl.marginLeft, y: ly }, end: { x: tmpl.marginLeft + mainColWidth, y: ly }, thickness: 0.5, color: rgb(0.8, 0.83, 0.86) });
+      }
+      const tf = form.createTextField(`${section.id}__notes`);
+      tf.enableMultiline();
+      tf.addToPage(page, { x: tmpl.marginLeft + 2, y: areaBottom, width: mainColWidth - 4, height: areaH, borderWidth: 0 });
+      tf.setFontSize(12);
+      y = areaBottom - tmpl.paragraphSpacing;
     };
 
     const renderCalloutBox = (lines: string[]) => {
@@ -758,6 +794,10 @@ export async function generatePDF(
           lastWasBullet = false;
         } else if (item.kind === 'table') {
           renderTable(item.table);
+          lastWasBox = true;
+          lastWasBullet = false;
+        } else if (item.kind === 'lines') {
+          renderLines(item.rows);
           lastWasBox = true;
           lastWasBullet = false;
         }

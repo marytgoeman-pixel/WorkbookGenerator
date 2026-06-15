@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { DocumentModel, ColorTheme, ClientBranding } from '@/types/document';
 import FileUpload from '@/components/FileUpload';
@@ -40,6 +40,34 @@ export default function WorkbookApp({ branding }: Props) {
     return () => { active = false; };
   }, [branding.id, savedRefresh, view]);
 
+  // Undo/redo history for editor changes (rapid keystrokes within 700ms are coalesced)
+  const [past, setPast] = useState<DocumentModel[]>([]);
+  const [future, setFuture] = useState<DocumentModel[]>([]);
+  const lastEditRef = useRef(0);
+
+  function setDocTracked(next: DocumentModel) {
+    if (doc) {
+      const now = Date.now();
+      if (now - lastEditRef.current > 700) { setPast((p) => [...p.slice(-49), doc]); setFuture([]); }
+      lastEditRef.current = now;
+    }
+    setDoc(next);
+  }
+  function undo() {
+    if (!doc || past.length === 0) return;
+    setFuture((f) => [doc, ...f]);
+    setDoc(past[past.length - 1]);
+    setPast((p) => p.slice(0, -1));
+    lastEditRef.current = 0;
+  }
+  function redo() {
+    if (!doc || future.length === 0) return;
+    setPast((p) => [...p, doc]);
+    setDoc(future[0]);
+    setFuture((f) => f.slice(1));
+    lastEditRef.current = 0;
+  }
+
   function selectSection(id: string) {
     setView('work');
     setStep(2);
@@ -56,6 +84,7 @@ export default function WorkbookApp({ branding }: Props) {
   function openSaved(w: SavedWorkbook) {
     setDoc(w.doc);
     setSavedId(w.id);
+    setPast([]); setFuture([]);
     setStep(2);
     setView('work');
   }
@@ -71,6 +100,7 @@ export default function WorkbookApp({ branding }: Props) {
   function handleParsed(parsed: DocumentModel) {
     setDoc(parsed);
     setSavedId(null); // a freshly uploaded doc is a new workbook until saved/downloaded
+    setPast([]); setFuture([]);
     setStep(2);
   }
 
@@ -187,7 +217,8 @@ export default function WorkbookApp({ branding }: Props) {
               </div>
               {step === 2 && (
                 <div className="p-5 space-y-4">
-                  <DocumentEditor doc={doc} onChange={setDoc} branding={branding} focus={focus} />
+                  <DocumentEditor doc={doc} onChange={setDocTracked} branding={branding} focus={focus}
+                    onUndo={undo} onRedo={redo} canUndo={past.length > 0} canRedo={future.length > 0} />
                   <div className="flex gap-2">
                     <button
                       onClick={saveCurrent}

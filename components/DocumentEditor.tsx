@@ -10,19 +10,28 @@ interface Props {
   onChange: (doc: DocumentModel) => void;
   branding?: ClientBranding;
   focus?: { id: string; n: number } | null; // scroll to + highlight this section (from preview clicks)
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 function uid(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-const fieldTypeIcon: Record<FieldType, string> = { text: '—', textarea: '≡', checkbox: '☐', dropdown: '▾' };
-const fieldTypeLabel: Record<FieldType, string> = { text: 'Text field', textarea: 'Text area', checkbox: 'Checkbox', dropdown: 'Dropdown' };
+// Clear, friendly names: a single-line write-in vs a multi-line box
+const fieldTypeLabel: Record<FieldType, string> = { text: 'Short answer', textarea: 'Paragraph', checkbox: 'Checkbox', dropdown: 'Dropdown' };
 
-export default function DocumentEditor({ doc, onChange, branding, focus }: Props) {
+export default function DocumentEditor({ doc, onChange, branding, focus, onUndo, onRedo, canUndo, canRedo }: Props) {
   const isJo = branding?.id === 'jomangum';
   const isSellit = branding?.id === 'sellit';
   const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  // Answer-box preview colors mirror the actual PDF field styling for this client
+  const fieldBg = branding?.colors.grayBox ?? '#eef2ff';
+  const fieldBorder = branding?.colors.accent ?? '#9ca3af';
+  const addBtn = 'text-xs px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors';
 
   // When the preview is clicked, scroll the matching section into view and flash a highlight.
   useEffect(() => {
@@ -132,6 +141,18 @@ export default function DocumentEditor({ doc, onChange, branding, focus }: Props
 
   return (
     <div className="space-y-4">
+      {/* Undo / Redo */}
+      {(onUndo || onRedo) && (
+        <div className="flex items-center gap-2">
+          <button onClick={onUndo} disabled={!canUndo}
+            className="flex items-center gap-1.5 text-xs font-medium rounded-lg border border-gray-200 px-3 py-1.5 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="Undo">↶ Undo</button>
+          <button onClick={onRedo} disabled={!canRedo}
+            className="flex items-center gap-1.5 text-xs font-medium rounded-lg border border-gray-200 px-3 py-1.5 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="Redo">↷ Redo</button>
+        </div>
+      )}
+
       {/* Title & Author */}
       <div className="bg-gray-50 rounded-xl p-4 space-y-2">
         <Row label="Title">
@@ -413,75 +434,98 @@ export default function DocumentEditor({ doc, onChange, branding, focus }: Props
 
           {/* Ordered content */}
           <div className="border-t bg-white divide-y divide-gray-100">
-            {section.content.map((item, i) => (
-              <div key={item.id} className="flex items-center gap-1.5 px-3 py-1.5">
-                <div className="flex flex-col">
-                  <button onClick={() => moveItem(section.id, i, -1)} disabled={i === 0} className="text-gray-300 hover:text-gray-600 disabled:opacity-20 text-[9px] leading-none">▲</button>
-                  <button onClick={() => moveItem(section.id, i, 1)} disabled={i === section.content.length - 1} className="text-gray-300 hover:text-gray-600 disabled:opacity-20 text-[9px] leading-none">▼</button>
+            {section.content.map((item, i) => {
+              const reorder = (
+                <div className="flex flex-col pt-1 text-gray-300 shrink-0">
+                  <button onClick={() => moveItem(section.id, i, -1)} disabled={i === 0} className="hover:text-gray-700 disabled:opacity-20 text-[10px] leading-none">▲</button>
+                  <button onClick={() => moveItem(section.id, i, 1)} disabled={i === section.content.length - 1} className="hover:text-gray-700 disabled:opacity-20 text-[10px] leading-none">▼</button>
                 </div>
-
-                {item.kind === 'text' && (
-                  <>
-                    <span className="text-gray-300 text-xs w-4" title="Text">¶</span>
-                    <textarea rows={Math.max(1, item.text.split('\n').length)}
-                      className="flex-1 text-xs border border-dashed border-gray-200 rounded bg-transparent focus:outline-none focus:border-blue-400 px-1 py-0.5 resize-y leading-snug"
-                      value={item.text} placeholder="Text… (Enter = line break)" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
-                    <button onClick={() => textToField(section.id, item.id, 'textarea')} className="text-[10px] px-1 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600" title="Make a write-in box">→box</button>
-                    <button onClick={() => textToField(section.id, item.id, 'checkbox')} className="text-[10px] px-1 rounded bg-gray-50 border border-gray-200 hover:border-blue-400 hover:text-blue-600" title="Make a checkbox">→check</button>
-                  </>
-                )}
-
-                {item.kind === 'bullet' && (
-                  <>
-                    <span className="text-gray-400 text-xs w-4" title="Bullet">•</span>
-                    <input className="flex-1 text-xs border-b border-dashed border-gray-200 bg-transparent focus:outline-none focus:border-blue-400 py-0.5"
-                      value={item.text} placeholder="Bullet…" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
-                  </>
-                )}
-
-                {item.kind === 'field' && (
-                  <>
-                    <span className="text-gray-400 text-xs w-4">{fieldTypeIcon[item.field.type]}</span>
-                    <input className="flex-1 text-xs border-b border-dashed border-gray-300 bg-transparent focus:outline-none focus:border-blue-400 py-0.5"
-                      value={item.field.label} placeholder={`${fieldTypeLabel[item.field.type]} label…`} onChange={(e) => updateFieldLabel(section.id, item.id, e.target.value)} />
-                    {item.field.options && (
-                      <span className="text-[10px] text-gray-400">({item.field.options[0]}–{item.field.options[item.field.options.length - 1]})</span>
+              );
+              return (
+                <div key={item.id} className="flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50/60">
+                  {reorder}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {item.kind === 'text' && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Text</span>
+                          <textarea rows={Math.max(1, item.text.split('\n').length)}
+                            className="flex-1 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1 resize-y leading-snug"
+                            value={item.text} placeholder="Reading text… (Enter = line break)" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
+                        </div>
+                        <div className="flex gap-1.5 pl-1">
+                          <button onClick={() => textToField(section.id, item.id, 'textarea')} className="text-[10px] text-gray-500 rounded px-1.5 py-0.5 border border-gray-200 hover:border-blue-400 hover:text-blue-600">→ make a write-in box</button>
+                          <button onClick={() => textToField(section.id, item.id, 'checkbox')} className="text-[10px] text-gray-500 rounded px-1.5 py-0.5 border border-gray-200 hover:border-blue-400 hover:text-blue-600">→ make a checkbox</button>
+                        </div>
+                      </>
                     )}
-                    {(item.field.type === 'text' || item.field.type === 'textarea') && (
-                      <span className="flex items-center gap-0.5 text-orange-500 font-semibold" title="Make THIS answer box taller or shorter">
-                        <span className="text-xs">↕</span>
-                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.max(0.5, Math.round(((item.field.heightScale ?? 1) - 0.25) * 100) / 100) })}
-                          className="w-4 h-4 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-500 text-[12px]">−</button>
-                        <span className="text-[11px] tabular-nums w-8 text-center text-orange-600">{(item.field.heightScale ?? 1).toFixed(2)}×</span>
-                        <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.min(5, Math.round(((item.field.heightScale ?? 1) + 0.25) * 100) / 100) })}
-                          className="w-4 h-4 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-500 text-[12px]">+</button>
-                      </span>
+
+                    {item.kind === 'bullet' && (
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Bullet</span>
+                        <input className="flex-1 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
+                          value={item.text} placeholder="Bullet point…" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
+                      </div>
                     )}
-                  </>
-                )}
 
-                {item.kind === 'table' && (
-                  <>
-                    <span className="text-gray-400 text-xs w-4">▦</span>
-                    <span className="flex-1 text-xs text-gray-600">Table · {item.table.headers.length} cols × {item.table.rows.length} rows</span>
-                  </>
-                )}
+                    {item.kind === 'field' && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-blue-700 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5">{fieldTypeLabel[item.field.type]}</span>
+                          <input className="flex-1 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
+                            value={item.field.label} placeholder="Question / prompt…" onChange={(e) => updateFieldLabel(section.id, item.id, e.target.value)} />
+                          {(item.field.type === 'text' || item.field.type === 'textarea') && (
+                            <span className="flex items-center gap-0.5 shrink-0" title="Make THIS answer box taller or shorter">
+                              <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.max(0.5, Math.round(((item.field.heightScale ?? 1) - 0.25) * 100) / 100) })}
+                                className="w-5 h-5 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 text-[13px]">−</button>
+                              <span className="text-[10px] tabular-nums w-9 text-center text-orange-600 font-semibold">{(item.field.heightScale ?? 1).toFixed(2)}×</span>
+                              <button onClick={() => updateFieldProp(section.id, item.id, { heightScale: Math.min(5, Math.round(((item.field.heightScale ?? 1) + 0.25) * 100) / 100) })}
+                                className="w-5 h-5 leading-none rounded border border-orange-300 text-orange-600 hover:bg-orange-50 text-[13px]">+</button>
+                            </span>
+                          )}
+                        </div>
+                        {/* Live preview of the answer box — short line vs tall box, in the brand color */}
+                        {item.field.type === 'text' && (
+                          <div className="rounded border ml-1" style={{ height: 16, backgroundColor: fieldBg, borderColor: fieldBorder }} />
+                        )}
+                        {item.field.type === 'textarea' && (
+                          <div className="rounded border ml-1" style={{ height: Math.min(130, Math.round(34 * (item.field.heightScale ?? 1)) + 8), backgroundColor: fieldBg, borderColor: fieldBorder }} />
+                        )}
+                        {item.field.type === 'checkbox' && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-gray-400 ml-1"><span className="inline-block w-3.5 h-3.5 border rounded-sm" style={{ borderColor: fieldBorder, backgroundColor: fieldBg }} /> tick box</div>
+                        )}
+                        {item.field.type === 'dropdown' && item.field.options && (
+                          <div className="text-[11px] text-gray-400 ml-1">Choices: {item.field.options[0]}–{item.field.options[item.field.options.length - 1]}</div>
+                        )}
+                      </>
+                    )}
 
-                <button onClick={() => removeItem(section.id, item.id)} className="text-red-400 hover:text-red-600 text-xs" title="Remove">✕</button>
-              </div>
-            ))}
+                    {item.kind === 'table' && (
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">Table</span>
+                        <span className="flex-1 text-xs text-gray-600">{item.table.headers.length} cols × {item.table.rows.length} rows</span>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => removeItem(section.id, item.id)} className="text-gray-300 hover:text-red-600 text-sm shrink-0 mt-1" title="Remove">✕</button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Add controls */}
-          <div className="border-t bg-gray-50 px-4 py-2 flex flex-wrap gap-2 items-center">
-            <span className="text-xs text-gray-400 mr-1">Add:</span>
-            <button onClick={() => addItem(section.id, { id: uid('c'), kind: 'text', text: '' })} className="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 hover:border-blue-400 hover:text-blue-600">¶ text</button>
-            <button onClick={() => addItem(section.id, { id: uid('c'), kind: 'bullet', text: '' })} className="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 hover:border-blue-400 hover:text-blue-600">• bullet</button>
-            {(['text', 'textarea', 'checkbox'] as FieldType[]).map((type) => (
-              <button key={type} onClick={() => addField(section.id, type)} className="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 hover:border-blue-400 hover:text-blue-600">
-                {fieldTypeIcon[type]} {type}
-              </button>
-            ))}
+          <div className="border-t bg-gray-50 px-4 py-2.5 space-y-1.5">
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="text-[11px] text-gray-400 w-12 shrink-0">Content</span>
+              <button onClick={() => addItem(section.id, { id: uid('c'), kind: 'text', text: '' })} className={addBtn}>¶ Text</button>
+              <button onClick={() => addItem(section.id, { id: uid('c'), kind: 'bullet', text: '' })} className={addBtn}>• Bullet</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="text-[11px] text-gray-400 w-12 shrink-0">Fill-in</span>
+              <button onClick={() => addField(section.id, 'text')} className={addBtn} title="One-line write-in">— Short answer</button>
+              <button onClick={() => addField(section.id, 'textarea')} className={addBtn} title="Multi-line write-in box">≡ Paragraph</button>
+              <button onClick={() => addField(section.id, 'checkbox')} className={addBtn}>☐ Checkbox</button>
+            </div>
           </div>
 
           {/* Insert section */}

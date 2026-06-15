@@ -439,8 +439,8 @@ export async function generatePDF(
       const useMark = sellit && section.level === 1 && !!sellitMark;
       const markH = size + 12;
       const markW = useMark ? markH * (sellitMark!.width / sellitMark!.height) : 0;
-      // TLC puts a bullet on every header; otherwise only the opt-in 'accent' style is bulleted.
-      const drawBullet = !useMark && (style === 'accent' || tlc);
+      // TLC headers carry no bullet (dark-green text only); otherwise only the opt-in 'accent' style is bulleted.
+      const drawBullet = !useMark && !tlc && style === 'accent';
       // With the mark, the heading text aligns LEFT with the body text and the mark hangs in the margin.
       const textX = drawBullet ? tmpl.marginLeft + sq + 7 : tmpl.marginLeft;
       const markX = Math.max(6, tmpl.marginLeft - markW - 8);

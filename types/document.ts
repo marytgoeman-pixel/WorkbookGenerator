@@ -101,8 +101,9 @@ export interface ClientBranding {
     grayBox: string;          // light gray answer box
   };
   plan?: {
-    name: string;                       // 'Starter' | 'Pro' | 'Agency' | 'Enterprise'
+    name: string;                       // 'Starter' | 'Pro' | 'Agency' | 'Enterprise' | 'Trial'
     downloadsPerMonth: number | null;   // monthly download cap (null = unlimited)
+    trial?: boolean;                    // true = 7-day free trial; downloads lock after it expires
   };
 }
 

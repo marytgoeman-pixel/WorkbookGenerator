@@ -39,3 +39,22 @@ export async function setStoredPlan(clientId: string, planId: PlanId): Promise<v
     /* never break billing flow */
   }
 }
+
+// --- Trial tracking: records when a client's 7-day trial started (first login) ---
+const trialKey = (clientId: string) => `trial:${clientId}`;
+
+// Returns the trial start (epoch ms), setting it to now on first call. When Redis
+// isn't configured, returns now each time (so dev/local trials read as freshly started).
+export async function ensureTrialStart(clientId: string): Promise<number> {
+  const r = getRedis();
+  if (!r) return Date.now();
+  try {
+    const existing = await r.get<number>(trialKey(clientId));
+    if (existing) return Number(existing);
+    const now = Date.now();
+    await r.set(trialKey(clientId), now);
+    return now;
+  } catch {
+    return Date.now();
+  }
+}

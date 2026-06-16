@@ -87,6 +87,26 @@ export const CLIENTS: ClientAccount[] = [
     },
   },
   {
+    // Trial demo: a fresh client on the 7-day free trial. Mark any real onboarded
+    // client the same way (plan.trial = true) and their trial starts on first login.
+    // Default password: TrialDemo2025!  (change by replacing the hash)
+    username: 'trial',
+    passwordHash: '$2b$10$PXP9jU8DwuKksckEYzuPoO2a5fBS6S1a0BHinhn/AmndH3novvxTi',
+    branding: {
+      id: 'trialdemo',
+      displayName: 'Trial Account',
+      templateId: 'tlc',
+      tagline: 'Custom Learning Experiences',
+      logoUrl: '/clients/tlc/logo.png',
+      social: [{ type: 'website', url: 'https://thelearningcreative.com' }],
+      colors: {
+        header: '#163446', title: '#163446', subtitle: '#009346', accent: '#009346',
+        calloutBg: '#163446', calloutBorder: '#8DC63D', grayBox: '#F0F7E6',
+      },
+      plan: { name: 'Trial', downloadsPerMonth: null, trial: true },
+    },
+  },
+  {
     // Admin account — sees the analytics dashboard, not a workbook workspace.
     // Default password: JoAdmin2025!  (change by replacing the hash)
     username: 'admin',

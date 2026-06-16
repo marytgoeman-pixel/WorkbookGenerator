@@ -11,8 +11,11 @@ import { saveWorkbook, listSaved, SavedWorkbook } from '@/lib/savedWorkbooks';
 import { buildSampleWorkbook } from '@/lib/sampleWorkbook';
 import { APP_VERSION } from '@/lib/version';
 
+export type TrialInfo = { state: 'active' | 'expired'; daysLeft: number } | null;
+
 interface Props {
   branding: ClientBranding;
+  trial?: TrialInfo;
 }
 
 type Step = 1 | 2 | 3;
@@ -23,7 +26,7 @@ const STEPS = [
   { num: 3 as Step, label: 'Download' },
 ];
 
-export default function WorkbookApp({ branding }: Props) {
+export default function WorkbookApp({ branding, trial }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [doc, setDoc] = useState<DocumentModel | null>(null);
@@ -52,13 +55,14 @@ export default function WorkbookApp({ branding }: Props) {
       .catch(() => {});
   }
   useEffect(() => { refreshUsage(); }, [branding.id]);
-  const atLimit = downloadLimit != null && usage >= downloadLimit;
+  // Downloads are blocked when a trial has expired, or when a paid plan's monthly cap is hit.
+  const atLimit = trial?.state === 'expired' || (downloadLimit != null && usage >= downloadLimit);
 
   // Stripe checkout (with graceful email fallback when billing isn't configured)
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
   const [justUpgraded, setJustUpgraded] = useState(false);
-  async function startCheckout(plan: 'pro' | 'agency') {
+  async function startCheckout(plan: 'starter' | 'pro' | 'agency') {
     setCheckoutBusy(plan);
     try {
       const res = await fetch('/api/checkout', {
@@ -235,6 +239,20 @@ export default function WorkbookApp({ branding }: Props) {
         </div>
       </header>
 
+      {/* Trial banner */}
+      {trial && (
+        <div className={`px-6 py-2 text-sm flex items-center justify-center gap-3 ${trial.state === 'active' ? 'bg-[#F0F7E6] text-[#163446]' : 'bg-amber-50 text-amber-800 border-b border-amber-200'}`}>
+          {trial.state === 'active' ? (
+            <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> in your free trial.</span>
+          ) : (
+            <span>⏳ Your free trial has ended. Subscribe to keep downloading. (You can still edit your workbooks.)</span>
+          )}
+          <button onClick={() => setShowUpgrade(true)} className="shrink-0 px-3 py-1 rounded-full text-white text-xs font-semibold" style={{ backgroundColor: branding.colors.accent }}>
+            {trial.state === 'active' ? 'Subscribe' : 'Subscribe now'}
+          </button>
+        </div>
+      )}
+
       {/* Saved Workbooks view */}
       {view === 'saved' && (
         <div className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-6 py-6 overflow-y-auto">
@@ -367,7 +385,7 @@ export default function WorkbookApp({ branding }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setShowUpgrade(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
-              <h2 className="text-lg font-bold" style={{ color: branding.colors.title }}>Upgrade your plan</h2>
+              <h2 className="text-lg font-bold" style={{ color: branding.colors.title }}>{trial ? 'Choose a plan' : 'Upgrade your plan'}</h2>
               <button onClick={() => setShowUpgrade(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
             <p className="text-sm text-gray-500 mt-1">
@@ -386,6 +404,7 @@ export default function WorkbookApp({ branding }: Props) {
 
             <div className="mt-4 space-y-3">
               {([
+                { id: 'starter' as const, name: 'Starter', blurb: '2 downloads/mo', monthly: '$39/mo', annual: '$429/yr' },
                 { id: 'pro' as const, name: 'Pro', blurb: '4 downloads/mo · all elements', monthly: '$79/mo', annual: '$869/yr' },
                 { id: 'agency' as const, name: 'Agency', blurb: 'Unlimited downloads · up to 2 brands', monthly: '$149/mo', annual: '$1,639/yr' },
               ]).map((t) => (

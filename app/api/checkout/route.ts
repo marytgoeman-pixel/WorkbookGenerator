@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const plan = body?.plan;
   const interval: BillingInterval = body?.interval === 'annual' ? 'annual' : 'monthly';
-  if (!isPlanId(plan) || plan === 'starter' || plan === 'enterprise') {
+  if (!isPlanId(plan) || plan === 'enterprise') {
     return NextResponse.json({ error: 'bad_plan' }, { status: 400 });
   }
   if (!priceIdFor(plan, interval)) {

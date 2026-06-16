@@ -92,6 +92,8 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   }
   // The client's current plan id (matches a tier row), so we badge it instead of offering it.
   const currentPlanId = (branding.plan?.name ?? '').toLowerCase();
+  // Add-on elements (calendars, SWOT, notes, grids…) are a Pro+ feature — locked on Starter.
+  const elementsLocked = currentPlanId === 'starter';
   // Returning from a successful Stripe Checkout
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded')) {
@@ -343,7 +345,8 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
               {step === 2 && (
                 <div className="p-5 space-y-4">
                   <DocumentEditor doc={doc} onChange={setDocTracked} branding={branding} focus={focus}
-                    onUndo={undo} onRedo={redo} canUndo={past.length > 0} canRedo={future.length > 0} />
+                    onUndo={undo} onRedo={redo} canUndo={past.length > 0} canRedo={future.length > 0}
+                    lockElements={elementsLocked} onUpgrade={() => setShowUpgrade(true)} />
                   <div className="flex gap-2">
                     <button
                       onClick={saveCurrent}
@@ -375,7 +378,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
                 <DownloadButton doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding}
                   atLimit={atLimit}
                   onBlocked={() => setShowUpgrade(true)}
-                  onDownloaded={() => { saveCurrent(); setUsage((u) => u + 1); }} />
+                  onDownloaded={(count) => { saveCurrent(); setUsage((u) => (typeof count === 'number' ? count : u + 1)); }} />
                 {downloadLimit != null && (
                   <p className="text-xs text-center text-gray-400">
                     {usage}/{downloadLimit} downloads used this month on the {branding.plan?.name} plan

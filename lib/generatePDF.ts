@@ -597,6 +597,8 @@ export async function generatePDF(
       // enough height to actually type a note inside each day.
       const isCalendar = table.rows.some((r) => r.some((c) => !!(c && c.text && c.field)));
       const minRowH = isCalendar ? 54 : 30;
+      // Calendar day boxes are small — use a smaller field font so more text fits per box.
+      const cellFieldSize = isCalendar ? 8 : TFS;
       const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
       const solidHeader = sellit; // Sell It: solid blue header + white text; others: light tint
       const labelSize = table.labelSize ?? 9;          // in-cell label size (date number / quadrant title)
@@ -674,12 +676,12 @@ export async function generatePDF(
             if (cell.field.type === 'dropdown' && cell.field.options) {
               const dd = form.createDropdown(name); dd.addOptions(cell.field.options);
               dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
-              dd.setFontSize(TFS);
+              dd.setFontSize(cellFieldSize);
             } else {
               const tf = form.createTextField(name);
               if (cell.field.type === 'textarea') tf.enableMultiline();
               tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
-              tf.setFontSize(TFS);
+              tf.setFontSize(cellFieldSize);
             }
           } else if (cell.text) {
             let cy = rowTop - vpad - TFS + 5;

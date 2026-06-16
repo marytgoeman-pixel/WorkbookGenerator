@@ -16,6 +16,8 @@ interface Props {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  lockElements?: boolean;     // Starter plan: grey out the add-element palette
+  onUpgrade?: () => void;     // open the upgrade / manage-subscription modal
 }
 
 function uid(prefix: string) {
@@ -25,7 +27,7 @@ function uid(prefix: string) {
 // Clear, friendly names: a single-line write-in vs a multi-line box
 const fieldTypeLabel: Record<FieldType, string> = { text: 'Short answer', textarea: 'Paragraph', checkbox: 'Checkbox', dropdown: 'Dropdown' };
 
-export default function DocumentEditor({ doc, onChange, branding, focus, onUndo, onRedo, canUndo, canRedo }: Props) {
+export default function DocumentEditor({ doc, onChange, branding, focus, onUndo, onRedo, canUndo, canRedo, lockElements, onUpgrade }: Props) {
   const isJo = branding?.id === 'jomangum';
   const isSellit = branding?.id === 'sellit';
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -650,27 +652,48 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
       ))}
 
       {/* Add an element — ready-made pages & grids */}
-      <div className="rounded-xl border-2 border-dashed border-gray-200 p-4 space-y-3">
-        <div className="text-sm font-semibold text-gray-700 flex items-center gap-2"><span>✨</span> Add an element</div>
-        <p className="text-[11px] text-gray-400 -mt-1.5">Drop in a ready-made page or grid — it&apos;s added at the end, then drag it up with ▲.</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <select value={calMonth} onChange={(e) => setCalMonth(+e.target.value)} className="text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-            {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
-          </select>
-          <select value={calYear} onChange={(e) => setCalYear(+e.target.value)} className="text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-            {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={calWorkWeek} onChange={(e) => setCalWorkWeek(e.target.checked)} /> Work week (Mon–Fri)
-          </label>
-          <button onClick={() => addElement(calendarElement(calYear, calMonth, calWorkWeek))} className={elBtn}>📅 Add calendar</button>
+      {lockElements ? (
+        <div className="rounded-xl border-2 border-dashed border-gray-200 p-4 space-y-3">
+          <div className="text-sm font-semibold text-gray-500 flex items-center gap-2"><span>🔒</span> Add an element</div>
+          <p className="text-[11px] text-gray-400 -mt-1.5">Calendars, notes pages, SWOT, 90-day plans, and grids are available on Pro and above.</p>
+          {/* Greyed-out preview of what unlocks */}
+          <div className="flex flex-wrap gap-2 opacity-50 select-none pointer-events-none" aria-hidden="true">
+            <span className={elBtn}>📅 Add calendar</span>
+            {ELEMENTS.filter((e) => e.key !== 'calendar').map((e) => (
+              <span key={e.key} className={elBtn}>{e.icon} {e.label}</span>
+            ))}
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="w-full mt-1 px-3 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: branding?.colors.accent ?? '#009346' }}
+          >
+            ⬆ Upgrade to unlock elements
+          </button>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {ELEMENTS.filter((e) => e.key !== 'calendar').map((e) => (
-            <button key={e.key} onClick={() => addElement(e.make())} className={elBtn}>{e.icon} {e.label}</button>
-          ))}
+      ) : (
+        <div className="rounded-xl border-2 border-dashed border-gray-200 p-4 space-y-3">
+          <div className="text-sm font-semibold text-gray-700 flex items-center gap-2"><span>✨</span> Add an element</div>
+          <p className="text-[11px] text-gray-400 -mt-1.5">Drop in a ready-made page or grid — it&apos;s added at the end, then drag it up with ▲.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={calMonth} onChange={(e) => setCalMonth(+e.target.value)} className="text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+            </select>
+            <select value={calYear} onChange={(e) => setCalYear(+e.target.value)} className="text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={calWorkWeek} onChange={(e) => setCalWorkWeek(e.target.checked)} /> Work week (Mon–Fri)
+            </label>
+            <button onClick={() => addElement(calendarElement(calYear, calMonth, calWorkWeek))} className={elBtn}>📅 Add calendar</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ELEMENTS.filter((e) => e.key !== 'calendar').map((e) => (
+              <button key={e.key} onClick={() => addElement(e.make())} className={elBtn}>{e.icon} {e.label}</button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

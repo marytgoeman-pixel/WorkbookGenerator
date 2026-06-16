@@ -11,9 +11,10 @@ interface Props {
   onDownloaded?: (counts?: { monthly?: number; lifetime?: number }) => void; // fired after a download; passes the server's counts
   atLimit?: boolean;         // when true, downloading is gated → prompt to upgrade instead
   onBlocked?: () => void;    // fired when a download is attempted at the monthly cap
+  watermark?: string;        // demo mode: stamp a watermark and skip server-side tracking
 }
 
-export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded, atLimit, onBlocked }: Props) {
+export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded, atLimit, onBlocked, watermark }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleDownload() {
@@ -21,7 +22,7 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
     if (atLimit) { onBlocked?.(); return; }
     setLoading(true);
     try {
-      const bytes = await generatePDF(doc, templateId, colorTheme, branding);
+      const bytes = await generatePDF(doc, templateId, colorTheme, branding, undefined, watermark ? { watermark } : undefined);
       const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -31,21 +32,24 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
       URL.revokeObjectURL(url);
       // Record the download and use the server's authoritative monthly count to update
       // the cap (so the count can't drift and let an extra download slip through).
+      // Demo (watermark) mode is public/sessionless — skip server tracking entirely.
       let counts: { monthly?: number; lifetime?: number } | undefined;
-      try {
-        const res = await fetch('/api/track-download', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: doc.title }),
-        });
-        if (res.ok) {
-          const d = await res.json();
-          counts = {
-            monthly: typeof d.downloads === 'number' ? d.downloads : undefined,
-            lifetime: typeof d.lifetime === 'number' ? d.lifetime : undefined,
-          };
-        }
-      } catch { /* best-effort — fall back to optimistic count */ }
+      if (!watermark) {
+        try {
+          const res = await fetch('/api/track-download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: doc.title }),
+          });
+          if (res.ok) {
+            const d = await res.json();
+            counts = {
+              monthly: typeof d.downloads === 'number' ? d.downloads : undefined,
+              lifetime: typeof d.lifetime === 'number' ? d.lifetime : undefined,
+            };
+          }
+        } catch { /* best-effort — fall back to optimistic count */ }
+      }
       // Save the workbook so it can be reopened and edited later
       onDownloaded?.(counts);
     } finally {

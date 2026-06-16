@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts, RGB, PDFString, PDFName, PDFPage, PDFImage } from 'pdf-lib';
+import { PDFDocument, rgb, degrees, StandardFonts, RGB, PDFString, PDFName, PDFPage, PDFImage } from 'pdf-lib';
 import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable } from '@/types/document';
 import { classicTemplate } from './templates/classic';
 import { modernTemplate } from './templates/modern';
@@ -176,7 +176,8 @@ export async function generatePDF(
   templateId: TemplateId,
   theme: ColorTheme,
   branding?: ClientBranding,
-  anchors?: import('@/types/document').SectionAnchor[]  // optional: collects per-section positions for click-to-edit
+  anchors?: import('@/types/document').SectionAnchor[],  // optional: collects per-section positions for click-to-edit
+  opts?: { watermark?: string }                          // optional: stamp a diagonal demo watermark on every page
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const form = pdfDoc.getForm();
@@ -848,6 +849,28 @@ export async function generatePDF(
         size: 9,
         font,
         color: rgb(0.6, 0.6, 0.6),
+      });
+    }
+  }
+
+  // Demo watermark: a single light diagonal stamp centered on every page (drawn last, so
+  // it sits behind the fillable field widgets). Used by the public "Try Me" sandbox.
+  if (opts?.watermark) {
+    const wm = sanitize(opts.watermark);
+    const unit = boldFont.widthOfTextAtSize(wm, 1) || 1;
+    for (const p of pdfDoc.getPages()) {
+      const W = p.getWidth(), H = p.getHeight();
+      const size = Math.max(14, Math.min(40, (Math.hypot(W, H) * 0.6) / unit));
+      const textW = boldFont.widthOfTextAtSize(wm, size);
+      const half = (textW / 2) * Math.SQRT1_2; // half the text vector along a 45° diagonal
+      p.drawText(wm, {
+        x: W / 2 - half,
+        y: H / 2 - half,
+        size,
+        font: boldFont,
+        color: rgb(0.55, 0.58, 0.6),
+        opacity: 0.16,
+        rotate: degrees(45),
       });
     }
   }

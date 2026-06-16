@@ -8,10 +8,11 @@ interface Props {
   templateId: TemplateId;
   colorTheme: ColorTheme;
   branding?: ClientBranding;
+  watermark?: string; // demo mode: stamp a diagonal watermark on the preview/PDF
   onSelectSection?: (sectionId: string) => void; // click a spot in the preview → edit that section
 }
 
-export default function PDFPreview({ doc, templateId, colorTheme, branding, onSelectSection }: Props) {
+export default function PDFPreview({ doc, templateId, colorTheme, branding, watermark, onSelectSection }: Props) {
   const [pageImages, setPageImages] = useState<string[]>([]);
   const [anchors, setAnchors] = useState<SectionAnchor[]>([]);
   // Native-PDF fallback (used if pdf.js can't render — e.g. older Safari): a blob URL in an <iframe>
@@ -34,7 +35,7 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding, onSe
       };
       try {
         const collected: SectionAnchor[] = [];
-        const bytes = await generatePDF(doc, templateId, colorTheme, branding, collected);
+        const bytes = await generatePDF(doc, templateId, colorTheme, branding, collected, watermark ? { watermark } : undefined);
 
         // Always prepare a native-PDF blob URL as a robust fallback for any browser
         // whose pdf.js canvas path fails (notably older Safari on macOS).
@@ -95,7 +96,7 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding, onSe
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [doc, templateId, colorTheme, branding]);
+  }, [doc, templateId, colorTheme, branding, watermark]);
 
   // Revoke any outstanding blob URL on unmount
   useEffect(() => () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); }, []);

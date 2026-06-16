@@ -121,7 +121,8 @@ export default function LandingPage() {
             <h1 className="text-3xl md:text-[2.6rem] font-bold leading-tight">Branded, fillable workbooks, without the busywork.</h1>
             <p className="mt-4 text-white/80 text-lg">Turn an outline into a beautifully branded, genuinely fillable PDF your clients type right into, then download it as a real file, not an online-only link.</p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <a href="#pricing" className="px-5 py-3 rounded-xl font-semibold transition" style={{ backgroundColor: LIME, color: '#10241a' }}>See pricing</a>
+              <a href="/try" className="px-5 py-3 rounded-xl font-semibold transition" style={{ backgroundColor: LIME, color: '#10241a' }}>Try it free</a>
+              <a href="#pricing" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">See pricing</a>
               <a href="#inquiry" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">Request access</a>
             </div>
             <p className="mt-5 text-white/60 text-sm">No per-learner fees · download &amp; distribute to unlimited learners.</p>

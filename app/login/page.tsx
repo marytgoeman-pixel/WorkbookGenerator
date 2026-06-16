@@ -38,6 +38,8 @@ export default function LandingPage() {
   const [iPlan, setIPlan] = useState('Pro');
   const [iMessage, setIMessage] = useState('');
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sentDraft, setSentDraft] = useState(false); // true when we fell back to the mail app
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,9 +65,22 @@ export default function LandingPage() {
     }
   }
 
-  function sendInquiry(e: React.FormEvent) {
+  async function sendInquiry(e: React.FormEvent) {
     e.preventDefault();
-    const subject = `Workbook tool, access request from ${iName || 'a prospect'}`;
+    setSending(true);
+    try {
+      const res = await fetch('/api/inquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: iName, email: iEmail, company: iCompany, plan: iPlan, message: iMessage }),
+      });
+      if (res.ok) {
+        const d = await res.json().catch(() => ({}));
+        if (d.sent) { setSent(true); setSending(false); return; } // delivered server-side
+      }
+    } catch { /* fall through to the mail-app fallback */ }
+    // Email service not configured (or failed) → open the visitor's mail app instead
+    const subject = `Workbook access request from ${iName || 'a prospect'}`;
     const body =
       `Name: ${iName}\n` +
       `Email: ${iEmail}\n` +
@@ -73,7 +88,9 @@ export default function LandingPage() {
       `Plan interested in: ${iPlan}\n\n` +
       `Message:\n${iMessage}\n`;
     window.location.href = `mailto:mary@thelearningcreative.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setSentDraft(true);
     setSent(true);
+    setSending(false);
   }
 
   const input = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009346]';
@@ -197,12 +214,21 @@ export default function LandingPage() {
       <section id="inquiry" className="max-w-3xl mx-auto px-5 py-16 md:py-20">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Request access</h2>
-          <p className="text-gray-500 mt-3">Tell me a bit about your brand and I’ll get you set up. This opens your email to send the request to <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
+          <p className="text-gray-500 mt-3">Tell me a bit about your brand and I’ll get you set up. I’ll reply to the email you provide, or reach me directly at <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
         </div>
         {sent ? (
           <div className="mt-8 rounded-2xl border p-6 text-center" style={{ borderColor: GREEN, backgroundColor: '#F0F7E6' }}>
-            <p className="font-semibold" style={{ color: NAVY }}>Thanks! Your email draft is ready to send.</p>
-            <p className="text-sm text-gray-600 mt-1">If your mail app didn’t open, email me directly at <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
+            {sentDraft ? (
+              <>
+                <p className="font-semibold" style={{ color: NAVY }}>Thanks! Your email draft is ready to send.</p>
+                <p className="text-sm text-gray-600 mt-1">If your mail app didn’t open, email me directly at <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold" style={{ color: NAVY }}>Thanks! Your request has been sent.</p>
+                <p className="text-sm text-gray-600 mt-1">I’ll be in touch shortly at the email you provided.</p>
+              </>
+            )}
           </div>
         ) : (
           <form onSubmit={sendInquiry} className="mt-8 grid sm:grid-cols-2 gap-4">
@@ -229,7 +255,7 @@ export default function LandingPage() {
               <textarea className={`${input} h-28 resize-y`} value={iMessage} onChange={(e) => setIMessage(e.target.value)} placeholder="A sentence or two about your courses, audience, and the workbooks you want to brand…" />
             </div>
             <div className="sm:col-span-2">
-              <button type="submit" className="w-full py-3 rounded-xl font-semibold text-white transition" style={{ backgroundColor: NAVY }}>Send my request</button>
+              <button type="submit" disabled={sending} className="w-full py-3 rounded-xl font-semibold text-white transition disabled:opacity-60" style={{ backgroundColor: NAVY }}>{sending ? 'Sending…' : 'Send my request'}</button>
             </div>
           </form>
         )}

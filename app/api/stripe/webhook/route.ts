@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { getStripe } from '@/lib/stripeBilling';
 import { setStoredPlan, setStoredCustomer } from '@/lib/planStore';
-import { isPlanId } from '@/lib/plans';
+import { isPlanId, PlanId } from '@/lib/plans';
 
 const customerId = (c: string | { id: string } | null | undefined): string | null =>
   typeof c === 'string' ? c : c?.id ?? null;
@@ -45,7 +45,22 @@ export async function POST(req: NextRequest) {
     } else if (event.type === 'customer.subscription.deleted') {
       const sub = event.data.object as Stripe.Subscription;
       const clientId = sub.metadata?.clientId;
-      if (clientId) await setStoredPlan(clientId, 'starter'); // lapsed → back to Starter
+      const cust = customerId(sub.customer);
+      if (clientId) {
+        // Don't blindly downgrade — the client may still have ANOTHER active subscription
+        // (e.g. they cancelled a duplicate). Reflect a remaining active sub's plan if present.
+        let nextPlan: PlanId = 'starter'; // truly lapsed → back to Starter
+        if (cust) {
+          try {
+            const actives = await stripe.subscriptions.list({ customer: cust, status: 'active', limit: 10 });
+            const other = actives.data.find(
+              (x) => x.id !== sub.id && x.metadata?.clientId === clientId && isPlanId(x.metadata?.plan),
+            );
+            if (other && isPlanId(other.metadata?.plan)) nextPlan = other.metadata.plan as PlanId;
+          } catch { /* fall back to starter */ }
+        }
+        await setStoredPlan(clientId, nextPlan);
+      }
     }
   } catch (e) {
     console.error('Stripe webhook handling failed:', e);

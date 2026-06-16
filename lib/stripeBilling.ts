@@ -76,6 +76,30 @@ export async function confirmCheckoutSession(sessionId: string): Promise<{ clien
   return null;
 }
 
+// Find the client's existing ACTIVE subscription by the clientId we stamp on subscription
+// metadata at checkout. Used to prevent creating a duplicate subscription on "upgrade"
+// (which would double-charge) and to backfill the customer id for older subscribers.
+export async function findActiveSubscription(
+  clientId: string,
+): Promise<{ subscriptionId: string; customerId: string; plan: PlanId | null } | null> {
+  const s = getStripe();
+  if (!s) return null;
+  try {
+    const res = await s.subscriptions.search({
+      query: `status:'active' AND metadata['clientId']:'${clientId}'`,
+      limit: 1,
+    });
+    const sub = res.data[0];
+    if (!sub) return null;
+    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null;
+    if (!customerId) return null;
+    const planMeta = sub.metadata?.plan;
+    return { subscriptionId: sub.id, customerId, plan: isPlanId(planMeta) ? planMeta : null };
+  } catch {
+    return null;
+  }
+}
+
 // Open the Stripe Customer Portal so an existing subscriber can change/cancel their plan
 // (edits the existing subscription — no double charge). Returns null if not configured.
 // opts.flow === 'update' deep-links straight to the plan-picker for their active

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { getBrandingById } from '@/lib/clients';
 import { getStoredPlan, setStoredPlan, ensureTrialStart, getStoredCustomer, setStoredCustomer } from '@/lib/planStore';
-import { confirmCheckoutSession } from '@/lib/stripeBilling';
+import { confirmCheckoutSession, findActiveSubscription } from '@/lib/stripeBilling';
 import WorkbookApp, { TrialInfo } from '@/components/WorkbookApp';
 
 const TRIAL_DAYS = 7;
@@ -44,7 +44,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
 
   // A subscriber (has a stored Stripe customer) manages their plan via the Customer Portal
   // instead of buying again through Checkout — prevents creating a duplicate subscription.
-  const manageable = !!(await getStoredCustomer(session.clientId));
+  let storedCustomer = await getStoredCustomer(session.clientId);
+  // Backfill the customer id for subscribers who paid before we tracked it, so they get
+  // the "Manage" (portal) experience instead of being offered Checkout again.
+  if (!storedCustomer && stored) {
+    const active = await findActiveSubscription(session.clientId);
+    if (active) {
+      await setStoredCustomer(session.clientId, active.customerId);
+      storedCustomer = active.customerId;
+    }
+  }
+  const manageable = !!storedCustomer;
 
   return <WorkbookApp branding={branding} trial={trial} manageable={manageable} />;
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
-import { stripeConfigured, createCheckoutUrl, priceIdFor, BillingInterval } from '@/lib/stripeBilling';
+import { stripeConfigured, createCheckoutUrl, priceIdFor, BillingInterval, findActiveSubscription, createPortalUrl } from '@/lib/stripeBilling';
+import { setStoredCustomer } from '@/lib/planStore';
 import { isPlanId } from '@/lib/plans';
 
 export const runtime = 'nodejs';
@@ -20,6 +21,21 @@ export async function POST(req: NextRequest) {
   }
   if (!priceIdFor(plan, interval)) {
     return NextResponse.json({ error: 'no_price' }, { status: 503 });
+  }
+
+  // HARD GUARD: never create a second subscription for a client that already has one
+  // (that double-charges). Send them to the portal's plan-change flow instead, and
+  // backfill their customer id so the UI shows "Manage" going forward.
+  try {
+    const existing = await findActiveSubscription(s.clientId);
+    if (existing) {
+      await setStoredCustomer(s.clientId, existing.customerId);
+      const portalUrl = await createPortalUrl(existing.customerId, req.nextUrl.origin, { flow: 'update' });
+      if (portalUrl) return NextResponse.json({ url: portalUrl, viaPortal: true });
+      return NextResponse.json({ error: 'already_subscribed' }, { status: 409 });
+    }
+  } catch (e) {
+    console.error('Duplicate-subscription guard failed:', e);
   }
 
   try {

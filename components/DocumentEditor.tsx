@@ -658,7 +658,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
       {lockElements ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 p-4 space-y-3">
           <div className="text-sm font-semibold text-gray-500 flex items-center gap-2"><span>🔒</span> Add an element</div>
-          <p className="text-[11px] text-gray-400 -mt-1.5">Calendars, notes pages, SWOT, 90-day plans, and grids are available on Pro and above.</p>
+          <p className="text-[11px] text-gray-400 -mt-1.5">Calendars, notes pages, SWOT, 90-day plans, and grids are available on Agency and above.</p>
           {/* Greyed-out preview of what unlocks */}
           <div className="flex flex-wrap gap-2 opacity-50 select-none pointer-events-none" aria-hidden="true">
             <span className={elBtn}>📅 Add calendar</span>

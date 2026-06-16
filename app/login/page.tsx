@@ -13,14 +13,14 @@ const FEATURES = [
 ];
 
 const TIERS = [
-  { name: 'Starter', price: '$39', annual: '$429 / yr', highlight: false, custom: false,
+  { name: 'Starter', price: '$99', annual: '$1,089 / yr', highlight: false, custom: false,
+    features: ['1 brand', '1 workbook download / month', 'Core builder (no add-on elements)', 'Unlimited learners'] },
+  { name: 'Pro', price: '$180', annual: '$1,980 / yr', highlight: true, custom: false,
     features: ['1 brand', 'Up to 2 workbook downloads / month', 'Core builder (no add-on elements)', 'Unlimited learners'] },
-  { name: 'Pro', price: '$79', annual: '$869 / yr', highlight: true, custom: false,
-    features: ['1 brand', 'Up to 4 workbook downloads / month', 'All elements (calendars, SWOT, grids, notes)', 'Request custom elements anytime', 'Unlimited learners'] },
-  { name: 'Agency', price: '$149', annual: '$1,639 / yr', highlight: false, custom: false,
-    features: ['Up to 2 brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
+  { name: 'Agency', price: '$499', annual: '$5,489 / yr', highlight: false, custom: false,
+    features: ['1 brand', 'Unlimited workbook downloads', 'All elements (calendars, SWOT, grids, notes)', 'Request custom elements anytime', 'Unlimited learners'] },
   { name: 'Enterprise', price: 'Call', annual: 'for pricing', highlight: false, custom: true,
-    features: ['3+ brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
+    features: ['2+ brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
 ];
 
 export default function LandingPage() {

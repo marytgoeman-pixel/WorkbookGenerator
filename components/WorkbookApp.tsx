@@ -113,8 +113,9 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   }
   // The client's current plan id (matches a tier row), so we badge it instead of offering it.
   const currentPlanId = (branding.plan?.name ?? '').toLowerCase();
-  // Add-on elements (calendars, SWOT, notes, grids…) are a Pro+ feature — locked on Starter.
-  const elementsLocked = currentPlanId === 'starter';
+  // Add-on elements (calendars, SWOT, notes, grids…) are an Agency+ feature —
+  // locked on the core-builder plans (Starter and Pro).
+  const elementsLocked = currentPlanId === 'starter' || currentPlanId === 'pro';
   // Returning from a successful Stripe Checkout
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded')) {
@@ -470,9 +471,9 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
 
             <div className="mt-4 space-y-3">
               {([
-                { id: 'starter' as const, name: 'Starter', blurb: '2 downloads/mo', monthly: '$39/mo', annual: '$429/yr' },
-                { id: 'pro' as const, name: 'Pro', blurb: '4 downloads/mo · all elements', monthly: '$79/mo', annual: '$869/yr' },
-                { id: 'agency' as const, name: 'Agency', blurb: 'Unlimited downloads · up to 2 brands', monthly: '$149/mo', annual: '$1,639/yr' },
+                { id: 'starter' as const, name: 'Starter', blurb: '1 download/mo · core builder', monthly: '$99/mo', annual: '$1,089/yr' },
+                { id: 'pro' as const, name: 'Pro', blurb: '2 downloads/mo · core builder', monthly: '$180/mo', annual: '$1,980/yr' },
+                { id: 'agency' as const, name: 'Agency', blurb: 'Unlimited downloads · all elements', monthly: '$499/mo', annual: '$5,489/yr' },
               ]).map((t) => (
                 <div key={t.id} className={`flex items-center justify-between gap-3 border rounded-xl p-3 ${t.id === currentPlanId ? 'border-gray-300 bg-gray-50' : 'border-gray-100'}`}>
                   <div className="min-w-0">
@@ -497,7 +498,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
                 </div>
               ))}
               <div className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl p-3">
-                <div><div className="font-semibold text-gray-800">Enterprise <span className="text-gray-400 font-normal">· 3+ brands</span></div><div className="text-xs text-gray-500">Custom pricing</div></div>
+                <div><div className="font-semibold text-gray-800">Enterprise <span className="text-gray-400 font-normal">· 2+ brands</span></div><div className="text-xs text-gray-500">Custom pricing</div></div>
                 <a href={`mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Enterprise inquiry from ' + branding.displayName)}`} className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border" style={{ color: branding.colors.title, borderColor: branding.colors.title }}>Contact</a>
               </div>
             </div>

@@ -9,8 +9,8 @@ export interface PlanDef {
 }
 
 export const PLANS: Record<PlanId, PlanDef> = {
-  starter: { id: 'starter', name: 'Starter', downloadsPerMonth: 2 },
-  pro: { id: 'pro', name: 'Pro', downloadsPerMonth: 4 },
+  starter: { id: 'starter', name: 'Starter', downloadsPerMonth: 1 },
+  pro: { id: 'pro', name: 'Pro', downloadsPerMonth: 2 },
   agency: { id: 'agency', name: 'Agency', downloadsPerMonth: null },
   enterprise: { id: 'enterprise', name: 'Enterprise', downloadsPerMonth: null },
 };

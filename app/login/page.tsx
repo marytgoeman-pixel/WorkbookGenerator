@@ -6,21 +6,21 @@ import { APP_VERSION } from '@/lib/version';
 const NAVY = '#163446', GREEN = '#009346', LIME = '#8DC63D';
 
 const FEATURES = [
-  { icon: '✏️', title: 'Truly fillable PDFs', body: 'Recipients type right into the PDF in any reader, offline. Not a flat printout — and not an online-only link.' },
-  { icon: '🎨', title: 'On-brand, every time', body: 'Your logo, colors, and fonts are baked in. Every workbook comes out consistent — no design drift.' },
+  { icon: '✏️', title: 'Truly fillable PDFs', body: 'Recipients type right into the PDF in any reader, offline. Not a flat printout,and not an online-only link.' },
+  { icon: '🎨', title: 'On-brand, every time', body: 'Your logo, colors, and fonts are baked in. Every workbook comes out consistent,no design drift.' },
   { icon: '⚡', title: 'Outline in, workbook out', body: 'Upload a Word or PDF outline and it’s auto-formatted into a fillable workbook in minutes.' },
-  { icon: '🧩', title: 'Add what you need', body: 'Calendars, SWOT, 90-day plans, notes pages, checklists and rating scales — drop them in and download.' },
+  { icon: '🧩', title: 'Add what you need', body: 'Calendars, SWOT, 90-day plans, notes pages, checklists and rating scales,drop them in and download.' },
 ];
 
 const TIERS = [
   { name: 'Starter', price: '$39', annual: '$429 / yr', highlight: false, custom: false,
     features: ['1 brand', 'Up to 2 workbook downloads / month', 'Core builder (no add-on elements)', 'Unlimited learners'] },
   { name: 'Pro', price: '$79', annual: '$869 / yr', highlight: true, custom: false,
-    features: ['1 brand', 'Up to 4 workbook downloads / month', 'All elements (calendars, SWOT, grids, notes)', 'Custom additions, ongoing', 'Unlimited learners'] },
+    features: ['1 brand', 'Up to 4 workbook downloads / month', 'All elements (calendars, SWOT, grids, notes)', 'Request custom elements anytime', 'Unlimited learners'] },
   { name: 'Agency', price: '$149', annual: '$1,639 / yr', highlight: false, custom: false,
-    features: ['2 brands', 'Unlimited workbook downloads', 'All elements', 'Custom additions, ongoing', 'Unlimited learners'] },
+    features: ['2 brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
   { name: 'Enterprise', price: 'Call', annual: 'for pricing', highlight: false, custom: true,
-    features: ['3+ brands', 'Unlimited workbook downloads', 'All elements', 'Custom additions, ongoing', 'Unlimited learners'] },
+    features: ['3+ brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
 ];
 
 export default function LandingPage() {
@@ -65,7 +65,7 @@ export default function LandingPage() {
 
   function sendInquiry(e: React.FormEvent) {
     e.preventDefault();
-    const subject = `Workbook tool — access request from ${iName || 'a prospect'}`;
+    const subject = `Workbook tool,access request from ${iName || 'a prospect'}`;
     const body =
       `Name: ${iName}\n` +
       `Email: ${iEmail}\n` +
@@ -101,8 +101,8 @@ export default function LandingPage() {
         <div className="relative max-w-6xl mx-auto px-5 py-16 md:py-24 grid md:grid-cols-2 gap-10 items-center">
           <div className="text-white">
             <span className="inline-block font-semibold text-sm tracking-wide uppercase mb-3" style={{ color: LIME }}>Custom Learning Experiences</span>
-            <h1 className="text-3xl md:text-[2.6rem] font-bold leading-tight">Branded, fillable workbooks — without the busywork.</h1>
-            <p className="mt-4 text-white/80 text-lg">Turn an outline into a beautifully branded, genuinely fillable PDF your clients type right into — then download it as a real file, not an online-only link.</p>
+            <h1 className="text-3xl md:text-[2.6rem] font-bold leading-tight">Branded, fillable workbooks,without the busywork.</h1>
+            <p className="mt-4 text-white/80 text-lg">Turn an outline into a beautifully branded, genuinely fillable PDF your clients type right into,then download it as a real file, not an online-only link.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <a href="#pricing" className="px-5 py-3 rounded-xl font-semibold transition" style={{ backgroundColor: LIME, color: '#10241a' }}>See pricing</a>
               <a href="#inquiry" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">Request access</a>
@@ -144,7 +144,7 @@ export default function LandingPage() {
       {/* FEATURES */}
       <section id="features" className="max-w-6xl mx-auto px-5 py-16 md:py-20">
         <div className="text-center max-w-2xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Everything a course creator needs — in one tool</h2>
+          <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Everything a course creator needs,in one tool</h2>
           <p className="text-gray-500 mt-3">Design tools make flat PDFs. Online tools lock workbooks behind a login. This does the thing neither does: a downloadable, truly fillable, on-brand workbook.</p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-10">
@@ -163,7 +163,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-5 py-16 md:py-20">
           <div className="text-center max-w-2xl mx-auto">
             <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Simple pricing</h2>
-            <p className="text-gray-500 mt-3">Each plan is your own branded workspace. Annual billing is about one month free. <span className="font-semibold" style={{ color: GREEN }}>No per-learner fees</span> — distribute to unlimited learners.</p>
+            <p className="text-gray-500 mt-3">Each plan is your own branded workspace. Annual billing is about one month free. <span className="font-semibold" style={{ color: GREEN }}>No per-learner fees</span>,distribute to unlimited learners.</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mt-10 items-stretch">
             {TIERS.map((t) => (
@@ -188,7 +188,7 @@ export default function LandingPage() {
             ))}
           </div>
           <p className="text-center text-sm text-gray-500 mt-8">
-            <span className="font-semibold" style={{ color: NAVY }}>One-time setup &amp; brand build: $499</span> — I configure your branded workspace (logo, colors, fonts) and your first template.
+            <span className="font-semibold" style={{ color: NAVY }}>One-time setup &amp; brand build: $499</span>,I configure your branded workspace (logo, colors, fonts) and your first template.
           </p>
         </div>
       </section>

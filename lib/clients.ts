@@ -20,7 +20,7 @@ export const CLIENTS: ClientAccount[] = [
       displayName: 'Jo',
       templateId: 'jomangum',
       tagline: 'Clear · Candid · Sustainable Growth for Real Estate Professionals',
-      logoUrl: '/clients/jo/logo.png',
+      logoUrl: '/clients/jo/logonew.png',
       social: [
         { type: 'website', url: 'https://jomangum.com/' },
         { type: 'linkedin', url: 'https://www.linkedin.com/in/jomangum/' },

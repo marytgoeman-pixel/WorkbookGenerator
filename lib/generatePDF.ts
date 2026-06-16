@@ -689,8 +689,9 @@ export async function generatePDF(
       y -= tmpl.paragraphSpacing;
     };
 
-    // A ruled notes area: evenly-spaced horizontal rules to write or type on.
-    // (No covering form field — an empty field's appearance paints white over the rules.)
+    // A ruled, typeable notes area: each line is a visible rule with a single-line fill
+    // field resting just ABOVE it (so the field never covers the rules), letting people
+    // type a line that sits right on the rule — or print it and write by hand.
     const renderLines = (count?: number) => {
       const pitch = 26;            // comfortable spacing between rules
       const top = y - 4;
@@ -699,8 +700,11 @@ export async function generatePDF(
       const n = count && count > 0 ? Math.min(count, maxN) : maxN;
       const lineColor = branded ? hexToRgb(branding.colors.subtitle) : rgb(0.62, 0.66, 0.72);
       for (let i = 1; i <= n; i++) {
-        const ly = top - i * pitch + 5;
-        page.drawLine({ start: { x: tmpl.marginLeft, y: ly }, end: { x: tmpl.marginLeft + mainColWidth, y: ly }, thickness: 0.6, color: lineColor, opacity: 0.4 });
+        const ruleY = top - i * pitch + 5;
+        page.drawLine({ start: { x: tmpl.marginLeft, y: ruleY }, end: { x: tmpl.marginLeft + mainColWidth, y: ruleY }, thickness: 0.6, color: lineColor, opacity: 0.4 });
+        const tf = form.createTextField(`${section.id}__line${i}`);
+        tf.addToPage(page, { x: tmpl.marginLeft + 2, y: ruleY + 2, width: mainColWidth - 4, height: pitch - 7, borderWidth: 0 });
+        tf.setFontSize(12);
       }
       y = top - n * pitch - tmpl.paragraphSpacing;
     };

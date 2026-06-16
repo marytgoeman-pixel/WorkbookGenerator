@@ -112,9 +112,10 @@ export const CLIENTS: ClientAccount[] = [
   },
   {
     // Admin account — sees the analytics dashboard, not a workbook workspace.
-    // Default password: JoAdmin2025!  (change by replacing the hash)
+    // Password is stored only as a bcrypt hash (changed 2026-06). To change it, generate
+    // a new hash: node -e "console.log(require('bcryptjs').hashSync('NEW_PASSWORD',10))"
     username: 'admin',
-    passwordHash: '$2b$10$QNlfEg3s08OARDBTspocDu3.3uatMe8HYTxxzuNUTZ.tWur2icz1W',
+    passwordHash: '$2b$10$26r53luIhRHUCgGLFAr9WeMj.k.HrHTOYqUtNVxXoSN1.b41bl6WC',
     isAdmin: true,
     branding: {
       id: 'admin', displayName: 'Admin', templateId: 'classic', tagline: '', logoUrl: '', social: [],

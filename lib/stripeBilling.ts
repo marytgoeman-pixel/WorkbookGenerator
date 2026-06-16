@@ -34,8 +34,16 @@ export async function createCheckoutUrl(opts: {
   email?: string;
 }): Promise<string | null> {
   const s = getStripe();
-  const price = priceIdFor(opts.plan, opts.interval);
+  let price = priceIdFor(opts.plan, opts.interval);
   if (!s || !price) return null;
+  // Accept either a price ID (price_…) or a product ID (prod_…); resolve a product to its default price.
+  if (price.startsWith('prod_')) {
+    const product = await s.products.retrieve(price);
+    const dp = product.default_price;
+    const resolved = typeof dp === 'string' ? dp : dp?.id;
+    if (!resolved) return null;
+    price = resolved;
+  }
   const session = await s.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price, quantity: 1 }],

@@ -35,7 +35,8 @@ export const CLIENTS: ClientAccount[] = [
         calloutBorder: '#F8BC24',
         grayBox: '#F0F0F0',
       },
-      plan: { name: 'Agency', downloadsPerMonth: null },
+      // On the 7-day free trial — starts on next login (ensureTrialStart).
+      plan: { name: 'Trial', downloadsPerMonth: null, trial: true },
     },
   },
   {
@@ -59,7 +60,8 @@ export const CLIENTS: ClientAccount[] = [
         calloutBorder: '#3F69FF',
         grayBox: '#E6EBFF',    // light periwinkle — fillable field background
       },
-      plan: { name: 'Agency', downloadsPerMonth: null },
+      // On the 7-day free trial — starts on next login (ensureTrialStart).
+      plan: { name: 'Trial', downloadsPerMonth: null, trial: true },
     },
   },
   {

@@ -18,6 +18,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
   const base = getBrandingById(session.clientId);
   if (!base) redirect('/login');
 
+  // Internal / comp accounts: always full access (their base plan, e.g. Enterprise) with
+  // no trial or billing resolution. These are our own working logins.
+  const COMP_ACCOUNTS = new Set(['thelearningcreative', 'trialdemo']);
+  if (COMP_ACCOUNTS.has(session.clientId)) {
+    return <WorkbookApp branding={base} trial={null} manageable={false} />;
+  }
+
   // Returning from Stripe Checkout: confirm the session directly and activate the plan
   // immediately (doesn't rely on the webhook landing first).
   const sp = await searchParams;
@@ -29,19 +36,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
     }
   }
 
-  // The permanent demo account is ALWAYS a trial (ignore any stale override) so it always
-  // shows the trial → "Choose a plan" experience for prospects.
-  const isDemo = session.clientId === 'trialdemo';
-
-  let stored = isDemo ? null : await getStoredPlan(session.clientId);
-  let storedCustomer = isDemo ? null : await getStoredCustomer(session.clientId);
+  let stored = await getStoredPlan(session.clientId);
+  let storedCustomer = await getStoredCustomer(session.clientId);
 
   // SELF-HEAL: the live Stripe subscription is the source of truth. If the client has a
   // subscription (or a stored override that might be stale), reconcile the plan + customer
   // id against Stripe so a stale value can't strand them on the wrong plan/screen. We only
   // CORRECT when an active sub is actually found — never downgrade on a (lagging) empty
   // result, which would wrongly revert someone who just subscribed.
-  if (!isDemo && (stored || storedCustomer)) {
+  if (stored || storedCustomer) {
     const active = await findActiveSubscription(session.clientId);
     if (active?.plan) {
       if (active.plan !== stored?.id) { await setStoredPlan(session.clientId, active.plan); stored = PLANS[active.plan]; }

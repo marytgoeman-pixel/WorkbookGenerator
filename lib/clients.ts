@@ -85,7 +85,8 @@ export const CLIENTS: ClientAccount[] = [
         calloutBorder: '#8DC63D', // light green — pops on the navy callout box
         grayBox: '#F0F7E6',    // pale lime tint for fillable-field backgrounds
       },
-      plan: { name: 'Starter', downloadsPerMonth: 2 },
+      // Internal/comp account — full access (see COMP_ACCOUNTS in app/page.tsx).
+      plan: { name: 'Enterprise', downloadsPerMonth: null },
     },
   },
   {
@@ -105,7 +106,8 @@ export const CLIENTS: ClientAccount[] = [
         header: '#163446', title: '#163446', subtitle: '#009346', accent: '#009346',
         calloutBg: '#163446', calloutBorder: '#8DC63D', grayBox: '#F0F7E6',
       },
-      plan: { name: 'Trial', downloadsPerMonth: 1, trial: true },
+      // Internal/comp account — full access (see COMP_ACCOUNTS in app/page.tsx).
+      plan: { name: 'Enterprise', downloadsPerMonth: null },
     },
   },
   {

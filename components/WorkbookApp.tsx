@@ -309,7 +309,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
           {/* Brand banner */}
           <div className="rounded-2xl p-4 text-white text-sm shadow-sm" style={{ backgroundColor: branding.colors.header }}>
             <div className="font-semibold">Your template is ready</div>
-            <div className="text-white/70 text-xs mt-0.5">{branding.tagline}</div>
+            {branding.id !== 'sellit' && <div className="text-white/70 text-xs mt-0.5">{branding.tagline}</div>}
           </div>
 
           {/* Step 1: Upload */}

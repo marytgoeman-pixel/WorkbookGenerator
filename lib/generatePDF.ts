@@ -933,12 +933,13 @@ async function drawSellItCover(
     page.drawText(ln, { x: tx, y: ty, size: tSize, font: boldFont, color: blue });
     if (i === titleLines.length - 1 && wbLabel) {
       const lnW = boldFont.widthOfTextAtSize(ln, tSize);
-      const lblW = boldFont.widthOfTextAtSize(' ' + wbLabel, tSize);
+      // "Workbook" label renders in the REGULAR weight (unbold) for contrast with the bold title.
+      const lblW = font.widthOfTextAtSize(' ' + wbLabel, tSize);
       if (tx + lnW + lblW <= W - pad) {
-        page.drawText(' ' + wbLabel, { x: tx + lnW, y: ty, size: tSize, font: boldFont, color: ink });
+        page.drawText(' ' + wbLabel, { x: tx + lnW, y: ty, size: tSize, font, color: ink });
       } else {
         ty -= titleLineH;
-        page.drawText(wbLabel, { x: tx, y: ty, size: tSize, font: boldFont, color: ink });
+        page.drawText(wbLabel, { x: tx, y: ty, size: tSize, font, color: ink });
       }
     }
     ty -= titleLineH;
@@ -977,10 +978,10 @@ async function drawSellItCover(
         page.drawRectangle({ x: pad, y: (s / strips) * frameTop, width: innerW, height: frameTop / strips + 0.8, color: blue, opacity: 0.9 * Math.pow(1 - s / strips, 1.25) });
       }
     }
-    // White Sell It logo, bottom-right, over the fade
+    // White Sell It logo, bottom-right, over the fade — nudged a bit further right than the margin
     if (whiteLogo) {
       const lh = 40, lw = lh * (whiteLogo.width / whiteLogo.height);
-      page.drawImage(whiteLogo, { x: W - pad - lw, y: 28, width: lw, height: lh });
+      page.drawImage(whiteLogo, { x: W - pad - lw + 20, y: 28, width: lw, height: lh });
     }
   }
 }

@@ -54,6 +54,32 @@ export default function WorkbookApp({ branding }: Props) {
   useEffect(() => { refreshUsage(); }, [branding.id]);
   const atLimit = downloadLimit != null && usage >= downloadLimit;
 
+  // Stripe checkout (with graceful email fallback when billing isn't configured)
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
+  const [justUpgraded, setJustUpgraded] = useState(false);
+  async function startCheckout(plan: 'pro' | 'agency') {
+    setCheckoutBusy(plan);
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, interval: billingInterval }),
+      });
+      if (res.ok) { const d = await res.json(); if (d.url) { window.location.href = d.url; return; } }
+    } catch { /* fall through to email */ }
+    // Stripe not set up (or failed) → email the request instead
+    window.location.href = `mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Upgrade request from ' + branding.displayName)}&body=${encodeURIComponent('Hi Mary, I would like to upgrade to ' + plan + ' (' + billingInterval + '). Account: ' + branding.displayName + '.')}`;
+    setCheckoutBusy(null);
+  }
+  // Returning from a successful Stripe Checkout
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded') === '1') {
+      setJustUpgraded(true);
+      refreshUsage();
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
+
   // Undo/redo history for editor changes (rapid keystrokes within 700ms are coalesced)
   const [past, setPast] = useState<DocumentModel[]>([]);
   const [future, setFuture] = useState<DocumentModel[]>([]);
@@ -330,6 +356,13 @@ export default function WorkbookApp({ branding }: Props) {
       </div>
       )}
 
+      {justUpgraded && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white border rounded-xl shadow-lg px-4 py-2 text-sm flex items-center gap-2" style={{ borderColor: branding.colors.accent }}>
+          <span style={{ color: branding.colors.accent }}>✓</span> You’re on the {branding.plan?.name} plan now.
+          <button onClick={() => setJustUpgraded(false)} className="text-gray-400 hover:text-gray-700 ml-1">×</button>
+        </div>
+      )}
+
       {showUpgrade && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setShowUpgrade(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
@@ -340,19 +373,40 @@ export default function WorkbookApp({ branding }: Props) {
             <p className="text-sm text-gray-500 mt-1">
               You’re on the <b>{branding.plan?.name ?? 'current'}</b> plan{downloadLimit != null ? ` (${downloadLimit} downloads/month, ${usage} used)` : ''}.
             </p>
-            <ul className="mt-4 space-y-2 text-sm text-gray-700">
-              <li className="flex justify-between border-b border-gray-100 pb-2"><span><b>Pro</b> · 4 downloads/mo · all elements</span><span className="font-semibold">$79/mo</span></li>
-              <li className="flex justify-between border-b border-gray-100 pb-2"><span><b>Agency</b> · unlimited · up to 2 brands</span><span className="font-semibold">$149/mo</span></li>
-              <li className="flex justify-between"><span><b>Enterprise</b> · 3+ brands</span><span className="font-semibold">Let’s talk</span></li>
-            </ul>
-            <a
-              href={`mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Upgrade request from ' + branding.displayName)}&body=${encodeURIComponent('Hi Mary, I would like to upgrade my plan (currently ' + (branding.plan?.name || 'unknown') + '). Account: ' + branding.displayName + '.')}`}
-              className="mt-5 block text-center py-2.5 rounded-xl font-semibold text-white"
-              style={{ backgroundColor: branding.colors.accent }}
-            >
-              Request upgrade
-            </a>
-            <p className="text-[11px] text-center text-gray-400 mt-2">We’ll confirm by email and switch your plan over. Online checkout coming soon.</p>
+
+            <div className="mt-4 inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+              {(['monthly', 'annual'] as const).map((iv) => (
+                <button key={iv} onClick={() => setBillingInterval(iv)}
+                  className={`px-3 py-1.5 ${billingInterval === iv ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  style={billingInterval === iv ? { backgroundColor: branding.colors.title } : undefined}>
+                  {iv === 'monthly' ? 'Monthly' : 'Annual (~1 mo free)'}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {([
+                { id: 'pro' as const, name: 'Pro', blurb: '4 downloads/mo · all elements', monthly: '$79/mo', annual: '$869/yr' },
+                { id: 'agency' as const, name: 'Agency', blurb: 'Unlimited downloads · up to 2 brands', monthly: '$149/mo', annual: '$1,639/yr' },
+              ]).map((t) => (
+                <div key={t.id} className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl p-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-gray-800">{t.name} <span className="text-gray-400 font-normal">· {billingInterval === 'monthly' ? t.monthly : t.annual}</span></div>
+                    <div className="text-xs text-gray-500">{t.blurb}</div>
+                  </div>
+                  <button onClick={() => startCheckout(t.id)} disabled={checkoutBusy === t.id}
+                    className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                    style={{ backgroundColor: branding.colors.accent }}>
+                    {checkoutBusy === t.id ? '…' : 'Upgrade'}
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl p-3">
+                <div><div className="font-semibold text-gray-800">Enterprise <span className="text-gray-400 font-normal">· 3+ brands</span></div><div className="text-xs text-gray-500">Custom pricing</div></div>
+                <a href={`mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Enterprise inquiry from ' + branding.displayName)}`} className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border" style={{ color: branding.colors.title, borderColor: branding.colors.title }}>Contact</a>
+              </div>
+            </div>
+            <p className="text-[11px] text-center text-gray-400 mt-3">Secure checkout via Stripe · your plan updates automatically after payment.</p>
           </div>
         </div>
       )}

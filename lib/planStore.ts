@@ -64,8 +64,23 @@ export async function setStoredCustomer(clientId: string, customerId: string): P
   }
 }
 
+// Wipe any paid-plan override + stored Stripe customer for a client (admin reset),
+// so they fall back to their base plan / trial.
+export async function clearStoredPlan(clientId: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try { await Promise.all([r.del(key(clientId)), r.del(custKey(clientId))]); } catch { /* ignore */ }
+}
+
 // --- Trial tracking: records when a client's 7-day trial started (first login) ---
 const trialKey = (clientId: string) => `trial:${clientId}`;
+
+// Reset a client's trial clock so the 7 days restart on their next login (admin reset).
+export async function clearTrialStart(clientId: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try { await r.del(trialKey(clientId)); } catch { /* ignore */ }
+}
 
 // Returns the trial start (epoch ms), setting it to now on first call. When Redis
 // isn't configured, returns now each time (so dev/local trials read as freshly started).

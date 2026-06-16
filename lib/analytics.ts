@@ -87,6 +87,21 @@ export async function getUsage(clientId: string): Promise<{ downloads: number; a
   }
 }
 
+// Reset a client's download counters (lifetime + this month) so their trial download
+// becomes available again — used by the admin "Reset trial" action for demos.
+export async function resetDownloadCounts(clientId: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try {
+    await Promise.all([
+      r.del(`stats:${clientId}:downloads`),
+      r.del(`usage:${clientId}:${ym()}:download`),
+    ]);
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function getStats(clientIds: string[]): Promise<ClientStats[]> {
   const r = getRedis();
   if (!r) return [];

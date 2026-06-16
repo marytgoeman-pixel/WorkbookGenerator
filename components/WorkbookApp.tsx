@@ -313,7 +313,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
       {/* Saved Workbooks view */}
       {view === 'saved' && (
         <div className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-6 py-6 overflow-y-auto">
-          <button onClick={() => setView('work')} className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-1.5 bg-white hover:border-gray-300 transition-colors">
+          <button onClick={() => setView('work')} className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-white rounded-lg px-4 py-2 shadow-sm transition-opacity hover:opacity-90" style={{ backgroundColor: branding.colors.title }}>
             ← Back{doc ? ' to workbook' : ' to upload'}
           </button>
           <h2 className="text-lg font-bold text-gray-900">Saved Workbooks</h2>

@@ -4,6 +4,7 @@ import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { clientIds, displayNameForId } from '@/lib/clients';
 import { getStats, analyticsConfigured } from '@/lib/analytics';
 import LogoutButton from '@/components/LogoutButton';
+import ResetTrialButton from '@/components/ResetTrialButton';
 
 function fmt(ts: number | null): string {
   if (!ts) return '—';
@@ -73,11 +74,12 @@ export default async function AdminPage() {
                 <th className="text-right px-5 py-3">AI credits</th>
                 <th className="text-right px-5 py-3">Logins</th>
                 <th className="text-left px-5 py-3">Last seen</th>
+                <th className="text-right px-5 py-3">Trial</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {stats.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-6 text-center text-gray-400">No data yet.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-6 text-center text-gray-400">No data yet.</td></tr>
               ) : stats.map((s) => (
                 <tr key={s.clientId}>
                   <td className="px-5 py-3 font-medium text-gray-800">{displayNameForId(s.clientId)}</td>
@@ -85,6 +87,7 @@ export default async function AdminPage() {
                   <td className="px-5 py-3 text-right font-semibold" style={{ color: '#009346' }}>{s.ais}</td>
                   <td className="px-5 py-3 text-right text-gray-700">{s.logins}</td>
                   <td className="px-5 py-3 text-gray-500">{fmt(s.lastSeen)}</td>
+                  <td className="px-5 py-3 text-right"><ResetTrialButton clientId={s.clientId} name={displayNameForId(s.clientId)} /></td>
                 </tr>
               ))}
             </tbody>

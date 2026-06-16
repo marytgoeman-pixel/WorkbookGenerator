@@ -1,6 +1,6 @@
 import 'server-only';
 import Stripe from 'stripe';
-import { PlanId } from './plans';
+import { PlanId, isPlanId } from './plans';
 
 // Lazy Stripe client from STRIPE_SECRET_KEY. When absent, billing is a safe no-op
 // and the UI falls back to the email-request path.
@@ -52,8 +52,25 @@ export async function createCheckoutUrl(opts: {
     metadata: { clientId: opts.clientId, plan: opts.plan },
     subscription_data: { metadata: { clientId: opts.clientId, plan: opts.plan } },
     allow_promotion_codes: true,
-    success_url: `${opts.origin}/?upgraded=1`,
+    success_url: `${opts.origin}/?upgraded={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/`,
   });
   return session.url;
+}
+
+// Verify a completed Checkout Session on return (uses the same key that created it,
+// so it works regardless of webhook timing/environment). Returns who to upgrade.
+export async function confirmCheckoutSession(sessionId: string): Promise<{ clientId: string; plan: PlanId } | null> {
+  const s = getStripe();
+  if (!s || !sessionId.startsWith('cs_')) return null;
+  try {
+    const session = await s.checkout.sessions.retrieve(sessionId);
+    const paid = session.payment_status === 'paid' || session.status === 'complete';
+    const clientId = session.metadata?.clientId;
+    const plan = session.metadata?.plan;
+    if (paid && clientId && isPlanId(plan)) return { clientId, plan };
+  } catch {
+    /* ignore */
+  }
+  return null;
 }

@@ -77,7 +77,7 @@ export default function WorkbookApp({ branding, trial }: Props) {
   }
   // Returning from a successful Stripe Checkout
   useEffect(() => {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded') === '1') {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded')) {
       setJustUpgraded(true);
       refreshUsage();
       window.history.replaceState({}, '', '/');

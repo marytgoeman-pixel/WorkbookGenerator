@@ -2,12 +2,13 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { getBrandingById } from '@/lib/clients';
-import { getStoredPlan, ensureTrialStart } from '@/lib/planStore';
+import { getStoredPlan, setStoredPlan, ensureTrialStart } from '@/lib/planStore';
+import { confirmCheckoutSession } from '@/lib/stripeBilling';
 import WorkbookApp, { TrialInfo } from '@/components/WorkbookApp';
 
 const TRIAL_DAYS = 7;
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
   const cookieStore = await cookies();
   const session = await verifySession(cookieStore.get(SESSION_COOKIE)?.value);
   if (!session) redirect('/login');
@@ -16,7 +17,17 @@ export default async function Home() {
   const base = getBrandingById(session.clientId);
   if (!base) redirect('/login');
 
-  // A paid upgrade (recorded by the Stripe webhook) overrides everything, incl. the trial.
+  // Returning from Stripe Checkout: confirm the session directly and activate the plan
+  // immediately (doesn't rely on the webhook landing first).
+  const sp = await searchParams;
+  if (sp?.upgraded && sp.upgraded.startsWith('cs_')) {
+    const confirmed = await confirmCheckoutSession(sp.upgraded);
+    if (confirmed && confirmed.clientId === session.clientId) {
+      await setStoredPlan(confirmed.clientId, confirmed.plan);
+    }
+  }
+
+  // A paid upgrade (confirmed above or recorded by the webhook) overrides everything, incl. the trial.
   const stored = await getStoredPlan(session.clientId);
   let branding = base;
   let trial: TrialInfo = null;

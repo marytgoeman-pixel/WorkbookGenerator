@@ -68,19 +68,22 @@ export function recordAiUse(clientId: string) {
   return record(clientId, { type: 'ai', ts: Date.now() });
 }
 
-// Current calendar-month usage for one client (for the download cap + reporting)
-export async function getUsage(clientId: string): Promise<{ downloads: number; ai: number; month: string }> {
+// Current calendar-month usage for one client (for the download cap + reporting).
+// `lifetime` is the all-time download count — used to cap the free trial at 1 download
+// for the whole trial (a lifetime cap that does not reset at the month boundary).
+export async function getUsage(clientId: string): Promise<{ downloads: number; ai: number; month: string; lifetime: number }> {
   const r = getRedis();
   const month = ym();
-  if (!r) return { downloads: 0, ai: 0, month };
+  if (!r) return { downloads: 0, ai: 0, month, lifetime: 0 };
   try {
-    const [d, a] = await Promise.all([
+    const [d, a, life] = await Promise.all([
       r.get<number>(`usage:${clientId}:${month}:download`),
       r.get<number>(`usage:${clientId}:${month}:ai`),
+      r.get<number>(`stats:${clientId}:downloads`),
     ]);
-    return { downloads: Number(d ?? 0), ai: Number(a ?? 0), month };
+    return { downloads: Number(d ?? 0), ai: Number(a ?? 0), month, lifetime: Number(life ?? 0) };
   } catch {
-    return { downloads: 0, ai: 0, month };
+    return { downloads: 0, ai: 0, month, lifetime: 0 };
   }
 }
 

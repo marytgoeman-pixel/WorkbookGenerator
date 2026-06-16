@@ -8,7 +8,7 @@ interface Props {
   templateId: TemplateId;
   colorTheme: ColorTheme;
   branding?: ClientBranding;
-  onDownloaded?: (monthlyCount?: number) => void; // fired after a download; passes the server's monthly count
+  onDownloaded?: (counts?: { monthly?: number; lifetime?: number }) => void; // fired after a download; passes the server's counts
   atLimit?: boolean;         // when true, downloading is gated → prompt to upgrade instead
   onBlocked?: () => void;    // fired when a download is attempted at the monthly cap
 }
@@ -31,17 +31,23 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
       URL.revokeObjectURL(url);
       // Record the download and use the server's authoritative monthly count to update
       // the cap (so the count can't drift and let an extra download slip through).
-      let monthlyCount: number | undefined;
+      let counts: { monthly?: number; lifetime?: number } | undefined;
       try {
         const res = await fetch('/api/track-download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: doc.title }),
         });
-        if (res.ok) { const d = await res.json(); if (typeof d.downloads === 'number') monthlyCount = d.downloads; }
+        if (res.ok) {
+          const d = await res.json();
+          counts = {
+            monthly: typeof d.downloads === 'number' ? d.downloads : undefined,
+            lifetime: typeof d.lifetime === 'number' ? d.lifetime : undefined,
+          };
+        }
       } catch { /* best-effort — fall back to optimistic count */ }
       // Save the workbook so it can be reopened and edited later
-      onDownloaded?.(monthlyCount);
+      onDownloaded?.(counts);
     } finally {
       setLoading(false);
     }

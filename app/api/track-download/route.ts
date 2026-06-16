@@ -11,5 +11,5 @@ export async function POST(req: NextRequest) {
   const { title } = await req.json().catch(() => ({}));
   await recordDownload(session.clientId, typeof title === 'string' ? title.slice(0, 120) : undefined);
   const usage = await getUsage(session.clientId);
-  return NextResponse.json({ ok: true, downloads: usage.downloads });
+  return NextResponse.json({ ok: true, downloads: usage.downloads, lifetime: usage.lifetime });
 }

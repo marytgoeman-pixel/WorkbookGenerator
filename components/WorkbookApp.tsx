@@ -278,7 +278,11 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
       {trial && (
         <div className={`px-6 py-2 text-sm flex items-center justify-center gap-3 ${trial.state === 'active' ? 'bg-[#F0F7E6] text-[#163446]' : 'bg-amber-50 text-amber-800 border-b border-amber-200'}`}>
           {trial.state === 'active' ? (
-            <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> in your free trial.</span>
+            downloadLimit != null && usage >= downloadLimit ? (
+              <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> · you’ve used your free download — subscribe to download more.</span>
+            ) : (
+              <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> in your free trial{downloadLimit != null ? ` · ${downloadLimit} free download${downloadLimit === 1 ? '' : 's'} included` : ''}.</span>
+            )
           ) : (
             <span>⏳ Your free trial has ended. Subscribe to keep downloading. (You can still edit your workbooks.)</span>
           )}

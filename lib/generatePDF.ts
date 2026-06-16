@@ -689,25 +689,20 @@ export async function generatePDF(
       y -= tmpl.paragraphSpacing;
     };
 
-    // A ruled notes area: light horizontal rules at a fixed pitch, with one transparent
-    // multiline field over them so people can type (text wraps down onto the lines).
+    // A ruled notes area: evenly-spaced horizontal rules to write or type on.
+    // (No covering form field — an empty field's appearance paints white over the rules.)
     const renderLines = (count?: number) => {
-      const pitch = 24;            // spacing between rules
+      const pitch = 26;            // comfortable spacing between rules
       const top = y - 4;
       const bottomLimit = tmpl.marginBottom + 4;
       const maxN = Math.max(1, Math.floor((top - bottomLimit) / pitch));
       const n = count && count > 0 ? Math.min(count, maxN) : maxN;
-      const areaH = n * pitch;
-      const areaBottom = top - areaH;
+      const lineColor = branded ? hexToRgb(branding.colors.subtitle) : rgb(0.62, 0.66, 0.72);
       for (let i = 1; i <= n; i++) {
         const ly = top - i * pitch + 5;
-        page.drawLine({ start: { x: tmpl.marginLeft, y: ly }, end: { x: tmpl.marginLeft + mainColWidth, y: ly }, thickness: 0.5, color: rgb(0.8, 0.83, 0.86) });
+        page.drawLine({ start: { x: tmpl.marginLeft, y: ly }, end: { x: tmpl.marginLeft + mainColWidth, y: ly }, thickness: 0.6, color: lineColor, opacity: 0.4 });
       }
-      const tf = form.createTextField(`${section.id}__notes`);
-      tf.enableMultiline();
-      tf.addToPage(page, { x: tmpl.marginLeft + 2, y: areaBottom, width: mainColWidth - 4, height: areaH, borderWidth: 0 });
-      tf.setFontSize(12);
-      y = areaBottom - tmpl.paragraphSpacing;
+      y = top - n * pitch - tmpl.paragraphSpacing;
     };
 
     const renderCalloutBox = (lines: string[]) => {

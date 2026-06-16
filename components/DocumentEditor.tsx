@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding,
+  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding, DocTable,
 } from '@/types/document';
 import { coverImagesFor } from '@/lib/covers';
 import { ELEMENTS, calendarElement } from '@/lib/elements';
@@ -148,6 +148,18 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
   // Append a ready-made element (calendar, notes page, SWOT, etc.) to the document.
   function addElement(secs: Section[]) {
     onChange({ ...doc, sections: [...doc.sections, ...secs] });
+  }
+
+  // --- Editing the headers / labels of an inserted grid (table) ---
+  function updateTable(sectionId: string, itemId: string, mut: (t: DocTable) => DocTable) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    setContent(sectionId, s.content.map((it) => (it.id === itemId && it.kind === 'table' ? { ...it, table: mut(it.table) } : it)));
+  }
+  function updateTableHeader(sectionId: string, itemId: string, ci: number, value: string) {
+    updateTable(sectionId, itemId, (t) => ({ ...t, headers: t.headers.map((h, i) => (i === ci ? value : h)) }));
+  }
+  function updateTableCellText(sectionId: string, itemId: string, ri: number, ci: number, value: string) {
+    updateTable(sectionId, itemId, (t) => ({ ...t, rows: t.rows.map((row, r) => (r === ri ? row.map((cell, c) => (c === ci ? { ...cell, text: value } : cell)) : row)) }));
   }
 
   return (
@@ -509,9 +521,41 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                     )}
 
                     {item.kind === 'table' && (
-                      <div className="flex items-center gap-2">
-                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">{item.table.fullPage ? 'Grid' : 'Table'}</span>
-                        <span className="flex-1 text-xs text-gray-600">{item.table.headers.length || item.table.rows[0]?.length || 0} cols × {item.table.rows.length} rows</span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">{item.table.fullPage ? 'Grid' : 'Table'}</span>
+                          <span className="flex-1 text-xs text-gray-600">{item.table.headers.length || item.table.rows[0]?.length || 0} cols × {item.table.rows.length} rows · type-in grid</span>
+                        </div>
+                        {item.table.headers.length > 0 && (
+                          <div>
+                            <div className="text-[10px] text-gray-400 mb-0.5">Column headers</div>
+                            <div className="flex flex-wrap gap-1">
+                              {item.table.headers.map((h, ci) => (
+                                <input key={ci} value={h ?? ''}
+                                  onChange={(e) => updateTableHeader(section.id, item.id, ci, e.target.value)}
+                                  placeholder={`Col ${ci + 1}`}
+                                  className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white w-24 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {(() => {
+                          const labels = item.table.rows.flatMap((row, ri) => row.map((cell, ci) => ({ cell, ri, ci })))
+                            .filter((x) => x.cell.text && x.cell.text.trim() && isNaN(Number(x.cell.text)));
+                          if (labels.length === 0) return null;
+                          return (
+                            <div>
+                              <div className="text-[10px] text-gray-400 mb-0.5">Labels</div>
+                              <div className="flex flex-wrap gap-1">
+                                {labels.map(({ cell, ri, ci }) => (
+                                  <input key={`${ri}-${ci}`} value={cell.text ?? ''}
+                                    onChange={(e) => updateTableCellText(section.id, item.id, ri, ci, e.target.value)}
+                                    className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white w-28 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 

@@ -54,7 +54,8 @@ export type Spacing = 'compact' | 'normal' | 'relaxed';
 // Optional cover page rendered as page 1 of the PDF
 export interface CoverSettings {
   enabled: boolean;
-  imageId?: string;                          // references a COVER_IMAGES id in lib/covers.ts
+  imageId?: string;                          // references a COVER_IMAGES id in lib/covers.ts (or a user-upload id)
+  imageUrl?: string;                         // a user-uploaded cover image as a data URL (overrides imageId lookup)
   subtitle?: string;                         // session line (blue) — e.g. "Session 1 - June 11, 1PM ET"
   imageAlign?: 'left' | 'center' | 'right';   // horizontal focus when the photo is wider than the page
   imageAlignV?: 'top' | 'center' | 'bottom';  // vertical focus when the photo is taller than the page

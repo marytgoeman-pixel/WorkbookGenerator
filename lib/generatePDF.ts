@@ -120,10 +120,10 @@ async function tryEmbedImage(pdfDoc: PDFDocument, url: string): Promise<PDFImage
     const res = await fetch(url);
     if (!res.ok) return null;
     const buf = new Uint8Array(await res.arrayBuffer());
-    if (url.toLowerCase().endsWith('.jpg') || url.toLowerCase().endsWith('.jpeg')) {
-      return await pdfDoc.embedJpg(buf);
-    }
-    return await pdfDoc.embedPng(buf);
+    // Detect format by magic bytes so data: URLs (user-uploaded covers) embed correctly:
+    // JPEG starts FF D8; otherwise treat as PNG.
+    const isJpg = (buf[0] === 0xFF && buf[1] === 0xD8) || /\.jpe?g$/i.test(url);
+    return isJpg ? await pdfDoc.embedJpg(buf) : await pdfDoc.embedPng(buf);
   } catch {
     return null;
   }
@@ -955,8 +955,8 @@ async function drawSellItCover(
 
   // Cover image — framed at content width for EVERY image (cropped left/right, bleeds off the bottom)
   const frameTop = ty - 18;
-  const chosen = coverById(doc.cover?.imageId);
-  const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
+  const coverSrc = doc.cover?.imageUrl || coverById(doc.cover?.imageId)?.cover;
+  const img = coverSrc ? await tryEmbedImage(pdfDoc, coverSrc) : null;
   if (img && frameTop > 130) {
     // Cover-fit into the content-width frame [pad..W-pad] × [0..frameTop]
     const scale = Math.max(innerW / img.width, frameTop / img.height);
@@ -1008,8 +1008,8 @@ async function drawCoverPage(
   // Background image. Base scale fills the page (cover-fit); imageZoom scales from
   // there (>1 zooms in/crops, <1 zooms out and lets the navy base show around it).
   // imageAlign / imageAlignV choose which part stays in frame.
-  const chosen = coverById(doc.cover?.imageId);
-  const img = chosen ? await tryEmbedImage(pdfDoc, chosen.cover) : null;
+  const coverSrc = doc.cover?.imageUrl || coverById(doc.cover?.imageId)?.cover;
+  const img = coverSrc ? await tryEmbedImage(pdfDoc, coverSrc) : null;
   if (img) {
     const zoom = Math.max(0.4, Math.min(3, doc.cover?.imageZoom ?? 1));
     const scale = Math.max(W / img.width, H / img.height) * zoom;

@@ -5,6 +5,7 @@ import {
 } from '@/types/document';
 import { coverImagesFor } from '@/lib/covers';
 import { ELEMENTS, calendarElement } from '@/lib/elements';
+import { listUserCovers, addUserCover, deleteUserCover, MAX_USER_COVERS, UserCover } from '@/lib/userCovers';
 
 interface Props {
   doc: DocumentModel;
@@ -56,6 +57,26 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calWorkWeek, setCalWorkWeek] = useState(false);
+  // User-uploaded cover photos (per brand, capped at MAX_USER_COVERS)
+  const [userCovers, setUserCovers] = useState<UserCover[]>([]);
+  const [coverErr, setCoverErr] = useState('');
+  useEffect(() => { listUserCovers(branding?.id).then(setUserCovers).catch(() => {}); }, [branding?.id]);
+
+  async function uploadCover(file: File) {
+    setCoverErr('');
+    try {
+      const { list, added } = await addUserCover(branding?.id, file);
+      setUserCovers(list);
+      setCover({ imageId: added.id, imageUrl: added.dataUrl }); // auto-select the new photo
+    } catch (e) {
+      setCoverErr((e as Error).message === 'LIMIT' ? `You have ${MAX_USER_COVERS} photos — delete one to add another.` : 'Could not add that image. Try a JPG or PNG.');
+    }
+  }
+  async function removeCover(id: string) {
+    const list = await deleteUserCover(branding?.id, id);
+    setUserCovers(list);
+    if (cover.imageId === id) setCover({ imageId: undefined, imageUrl: undefined });
+  }
   const [yearOptions] = useState(() => { const b = new Date().getFullYear(); return [b - 1, b, b + 1, b + 2, b + 3]; });
   const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -246,7 +267,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                 const selected = cover.imageId === img.id;
                 return (
                   <button key={img.id} type="button" title={img.label}
-                    onClick={() => setCover({ imageId: selected ? undefined : img.id })}
+                    onClick={() => setCover({ imageId: selected ? undefined : img.id, imageUrl: undefined })}
                     className={`relative aspect-[3/2] rounded-lg overflow-hidden border-2 transition-all ${
                       selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-transparent hover:border-gray-300'
                     }`}>
@@ -260,7 +281,38 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                   </button>
                 );
               })}
+              {userCovers.map((uc) => {
+                const selected = cover.imageId === uc.id;
+                return (
+                  <div key={uc.id} className="relative group">
+                    <button type="button" title={uc.label}
+                      onClick={() => setCover({ imageId: selected ? undefined : uc.id, imageUrl: selected ? undefined : uc.dataUrl })}
+                      className={`relative w-full aspect-[3/2] rounded-lg overflow-hidden border-2 transition-all ${selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-transparent hover:border-gray-300'}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={uc.dataUrl} alt={uc.label} className="w-full h-full object-cover" />
+                      {selected && (
+                        <span className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                          <span className="bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">✓</span>
+                        </span>
+                      )}
+                    </button>
+                    <button type="button" onClick={() => removeCover(uc.id)} title="Delete photo"
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white border border-gray-300 text-gray-500 text-[11px] leading-none shadow hover:text-red-600 hover:border-red-300 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                  </div>
+                );
+              })}
+              {userCovers.length < MAX_USER_COVERS ? (
+                <label className="aspect-[3/2] rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-600 cursor-pointer text-center">
+                  <span className="text-lg leading-none">＋</span>
+                  <span className="text-[9px] mt-0.5">Upload</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCover(f); e.currentTarget.value = ''; }} />
+                </label>
+              ) : (
+                <div className="aspect-[3/2] rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px] text-center px-1 leading-tight">20/20 — delete to add</div>
+              )}
             </div>
+            {coverErr && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">{coverErr}</p>}
+            <p className="text-[10px] text-gray-400">Upload your own photos ({userCovers.length}/{MAX_USER_COVERS}) — saved in your browser for this brand.</p>
             {cover.imageId && (
               <div className="space-y-2">
                 <label className="block text-[11px] font-medium text-gray-500">Image focus (which part stays in frame)</label>

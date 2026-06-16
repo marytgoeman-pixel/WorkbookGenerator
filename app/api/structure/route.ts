@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { structureWithAI } from '@/lib/aiStructure';
 import { recordAiUse } from '@/lib/analytics';
+import { geoFromHeaders } from '@/lib/geo';
 
 // Cap the input so one oversized upload can't run up a large AI bill (~50k tokens).
 const MAX_INPUT_CHARS = 200_000;
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const document = await structureWithAI(html);
-    recordAiUse(session.clientId).catch(() => {}); // count the AI credit (best-effort)
+    recordAiUse(session.clientId, geoFromHeaders(req.headers)).catch(() => {}); // count the AI credit (best-effort)
     return NextResponse.json({ document });
   } catch (e) {
     console.error('AI structuring failed:', e);

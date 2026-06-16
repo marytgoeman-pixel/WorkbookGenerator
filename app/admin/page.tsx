@@ -8,7 +8,12 @@ import ResetTrialButton from '@/components/ResetTrialButton';
 
 function fmt(ts: number | null): string {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString();
+  // Always show Central Time (handles CST/CDT automatically) so timestamps are consistent.
+  return new Date(ts).toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'numeric', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+  }) + ' CT';
 }
 
 export default async function AdminPage() {
@@ -106,6 +111,7 @@ export default async function AdminPage() {
                   </span>
                   <span className="text-gray-500">{fmt(e.ts)}</span>
                   {e.title && <span className="text-gray-700 truncate">· {e.title}</span>}
+                  {e.loc && <span className="text-gray-400 truncate">· 📍 {e.loc}</span>}
                 </li>
               ))}
             </ul>

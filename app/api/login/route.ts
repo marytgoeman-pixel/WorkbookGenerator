@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { findClientByUsername } from '@/lib/clients';
 import { createSession, SESSION_COOKIE } from '@/lib/auth';
 import { recordLogin } from '@/lib/analytics';
+import { geoFromHeaders } from '@/lib/geo';
 
 export const runtime = 'nodejs';
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     isAdmin: client.isAdmin,
   });
 
-  if (!client.isAdmin) await recordLogin(client.branding.id);
+  if (!client.isAdmin) await recordLogin(client.branding.id, geoFromHeaders(req.headers));
 
   const res = NextResponse.json({ ok: true, displayName: client.branding.displayName, isAdmin: !!client.isAdmin });
   res.cookies.set(SESSION_COOKIE, token, {

@@ -23,6 +23,7 @@ export interface ClientEvent {
   type: 'login' | 'download' | 'ai';
   ts: number;        // epoch ms
   title?: string;    // workbook title for downloads
+  loc?: string;      // approximate location "City, REGION, COUNTRY" (from edge geo headers)
 }
 
 export interface ClientStats {
@@ -56,16 +57,16 @@ async function record(clientId: string, ev: ClientEvent) {
   }
 }
 
-export function recordLogin(clientId: string) {
-  return record(clientId, { type: 'login', ts: Date.now() });
+export function recordLogin(clientId: string, loc?: string) {
+  return record(clientId, { type: 'login', ts: Date.now(), loc });
 }
 
-export function recordDownload(clientId: string, title?: string) {
-  return record(clientId, { type: 'download', ts: Date.now(), title });
+export function recordDownload(clientId: string, title?: string, loc?: string) {
+  return record(clientId, { type: 'download', ts: Date.now(), title, loc });
 }
 
-export function recordAiUse(clientId: string) {
-  return record(clientId, { type: 'ai', ts: Date.now() });
+export function recordAiUse(clientId: string, loc?: string) {
+  return record(clientId, { type: 'ai', ts: Date.now(), loc });
 }
 
 // Current calendar-month usage for one client (for the download cap + reporting).

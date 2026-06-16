@@ -63,8 +63,19 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
   const [justUpgraded, setJustUpgraded] = useState(false);
+  const [wipSaved, setWipSaved] = useState(false);
+  // Save the in-progress workbook before navigating out to Stripe, so the user's work
+  // survives the redirect — they can reopen it from Saved when they come back.
+  async function preserveWip() {
+    if (!doc) return;
+    try {
+      await saveCurrent();
+      if (typeof window !== 'undefined') sessionStorage.setItem('wb_wip_saved', '1');
+    } catch { /* never block the upgrade on a save hiccup */ }
+  }
   async function startCheckout(plan: 'starter' | 'pro' | 'agency') {
     setCheckoutBusy(plan);
+    await preserveWip();
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -80,6 +91,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   // flow='update' deep-links straight to the plan-picker; no flow opens the portal home.
   async function startPortal(flow?: 'update') {
     setCheckoutBusy('portal');
+    await preserveWip();
     try {
       const res = await fetch('/api/portal', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -98,6 +110,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded')) {
       setJustUpgraded(true);
+      if (sessionStorage.getItem('wb_wip_saved')) { setWipSaved(true); sessionStorage.removeItem('wb_wip_saved'); }
       refreshUsage();
       window.history.replaceState({}, '', '/');
     }
@@ -398,9 +411,13 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
       )}
 
       {justUpgraded && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white border rounded-xl shadow-lg px-4 py-2 text-sm flex items-center gap-2" style={{ borderColor: branding.colors.accent }}>
-          <span style={{ color: branding.colors.accent }}>✓</span> You’re on the {branding.plan?.name} plan now.
-          <button onClick={() => setJustUpgraded(false)} className="text-gray-400 hover:text-gray-700 ml-1">×</button>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white border rounded-xl shadow-lg px-4 py-2.5 text-sm flex items-center gap-2 max-w-md" style={{ borderColor: branding.colors.accent }}>
+          <span style={{ color: branding.colors.accent }}>✓</span>
+          <span>
+            You’re on the {branding.plan?.name} plan now.
+            {wipSaved && <> The workbook you were editing is saved in <button onClick={() => { setView('saved'); setJustUpgraded(false); }} className="font-semibold underline" style={{ color: branding.colors.title }}>📁 Saved</button>.</>}
+          </span>
+          <button onClick={() => setJustUpgraded(false)} className="text-gray-400 hover:text-gray-700 ml-1 shrink-0">×</button>
         </div>
       )}
 

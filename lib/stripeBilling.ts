@@ -78,11 +78,28 @@ export async function confirmCheckoutSession(sessionId: string): Promise<{ clien
 
 // Open the Stripe Customer Portal so an existing subscriber can change/cancel their plan
 // (edits the existing subscription — no double charge). Returns null if not configured.
-export async function createPortalUrl(customerId: string, origin: string): Promise<string | null> {
+// opts.flow === 'update' deep-links straight to the plan-picker for their active
+// subscription, so "Change" lands on the Update-subscription page (not the portal home).
+export async function createPortalUrl(
+  customerId: string,
+  origin: string,
+  opts?: { flow?: 'update' },
+): Promise<string | null> {
   const s = getStripe();
   if (!s) return null;
   try {
-    const portal = await s.billingPortal.sessions.create({ customer: customerId, return_url: origin });
+    const params: Stripe.BillingPortal.SessionCreateParams = { customer: customerId, return_url: origin };
+    if (opts?.flow === 'update') {
+      const subs = await s.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
+      const subId = subs.data[0]?.id;
+      if (subId) {
+        params.flow_data = {
+          type: 'subscription_update',
+          subscription_update: { subscription: subId },
+        };
+      }
+    }
+    const portal = await s.billingPortal.sessions.create(params);
     return portal.url;
   } catch {
     return null;

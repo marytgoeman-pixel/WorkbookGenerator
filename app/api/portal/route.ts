@@ -16,8 +16,11 @@ export async function POST(req: NextRequest) {
   const customerId = await getStoredCustomer(s.clientId);
   if (!customerId) return NextResponse.json({ error: 'no_customer' }, { status: 404 });
 
+  const body = await req.json().catch(() => ({}));
+  const flow = body?.flow === 'update' ? ('update' as const) : undefined;
+
   try {
-    const url = await createPortalUrl(customerId, req.nextUrl.origin);
+    const url = await createPortalUrl(customerId, req.nextUrl.origin, flow ? { flow } : undefined);
     if (!url) return NextResponse.json({ error: 'failed' }, { status: 500 });
     return NextResponse.json({ url });
   } catch (e) {

@@ -77,10 +77,14 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
     setCheckoutBusy(null);
   }
   // Existing subscribers change/cancel via the Stripe Customer Portal (no duplicate charge).
-  async function startPortal() {
+  // flow='update' deep-links straight to the plan-picker; no flow opens the portal home.
+  async function startPortal(flow?: 'update') {
     setCheckoutBusy('portal');
     try {
-      const res = await fetch('/api/portal', { method: 'POST' });
+      const res = await fetch('/api/portal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(flow ? { flow } : {}),
+      });
       if (res.ok) { const d = await res.json(); if (d.url) { window.location.href = d.url; return; } }
     } catch { /* fall through to email */ }
     window.location.href = `mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Manage subscription — ' + branding.displayName)}&body=${encodeURIComponent('Hi Mary, I would like to change my subscription. Account: ' + branding.displayName + '.')}`;
@@ -429,7 +433,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
                   {t.id === currentPlanId ? (
                     <span className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 bg-gray-100">Current plan</span>
                   ) : manageable ? (
-                    <button onClick={startPortal} disabled={checkoutBusy === 'portal'}
+                    <button onClick={() => startPortal('update')} disabled={checkoutBusy === 'portal'}
                       className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-60"
                       style={{ color: branding.colors.title, borderColor: branding.colors.title }}>
                       {checkoutBusy === 'portal' ? '…' : 'Change'}
@@ -449,7 +453,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
               </div>
             </div>
             {manageable && (
-              <button onClick={startPortal} disabled={checkoutBusy === 'portal'}
+              <button onClick={() => startPortal()} disabled={checkoutBusy === 'portal'}
                 className="mt-4 w-full px-3 py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
                 style={{ backgroundColor: branding.colors.title }}>
                 {checkoutBusy === 'portal' ? '…' : 'Manage subscription'}

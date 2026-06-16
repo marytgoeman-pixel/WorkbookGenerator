@@ -190,27 +190,58 @@ function mapToDocument(ai: AiDoc): DocumentModel {
   return { title: ai.title || 'Untitled Document', author: '', sections };
 }
 
+// Stream a structuring call and return the model's JSON text, retrying transient
+// failures (rate limits, 5xx, dropped streams). The SDK doesn't auto-retry a stream
+// that breaks mid-flight, so we retry the whole call — this is what makes a second
+// upload reliable when the first happened to hit a busy moment.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function runStructuringStream(makeStream: () => any, label: string): Promise<string> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await makeStream().finalMessage();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const textBlock = (response.content as any[]).find((b) => b.type === 'text');
+      if (!textBlock) throw new Error(`No ${label} returned`);
+      return textBlock.text as string;
+    } catch (e) {
+      lastErr = e;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const status = (e as any)?.status;
+      // Retry only transient problems: network/stream drops (no status), timeouts,
+      // rate limits, and server errors. Don't retry auth/bad-request (4xx).
+      const retriable = status == null || status === 408 || status === 409 || status === 429 || status >= 500;
+      if (!retriable || attempt === 3) break;
+      await new Promise((r) => setTimeout(r, attempt * 1500)); // 1.5s then 3s backoff
+    }
+  }
+  throw lastErr;
+}
+
+function parseAiJson(text: string): AiDoc {
+  try {
+    return JSON.parse(text) as AiDoc;
+  } catch {
+    // Truncated/!JSON output — usually a document too long/complex to fit the response.
+    throw new Error('AI output was incomplete — the document may be too long or complex. Try trimming it.');
+  }
+}
+
 export async function structureWithAI(html: string): Promise<DocumentModel> {
   const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
   // Stream the request: it's a long (~30s) generation, and streaming keeps the
   // connection alive so serverless platforms don't drop it as idle.
-  const stream = client.messages.stream({
+  const text = await runStructuringStream(() => client.messages.stream({
     model: 'claude-sonnet-4-6',
     max_tokens: 16000,
     system: SYSTEM,
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: `Worksheet HTML:\n\n${html}` }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
+  } as any), 'structured output');
 
-  const response = await stream.finalMessage();
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const textBlock = (response.content as any[]).find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('No structured output returned');
-  const ai = JSON.parse(textBlock.text) as AiDoc;
-  return mapToDocument(ai);
+  return mapToDocument(parseAiJson(text));
 }
 
 // Convert our DocumentModel back into the AI's flat shape, so the model can read
@@ -264,18 +295,14 @@ export async function refineWithAI(doc: DocumentModel, instruction: string): Pro
   const client = new Anthropic();
   const current = JSON.stringify(docToAi(doc));
 
-  const stream = client.messages.stream({
+  const text = await runStructuringStream(() => client.messages.stream({
     model: 'claude-sonnet-4-6',
     max_tokens: 16000,
     system: REFINE_SYSTEM,
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: `Current workbook JSON:\n\n${current}\n\nInstruction:\n${instruction}` }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
+  } as any), 'revised output');
 
-  const response = await stream.finalMessage();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const textBlock = (response.content as any[]).find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('No revised output returned');
-  return mapToDocument(JSON.parse(textBlock.text) as AiDoc);
+  return mapToDocument(parseAiJson(text));
 }

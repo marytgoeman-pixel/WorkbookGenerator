@@ -166,8 +166,11 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   }
 
   // Clear the current workbook and return to the upload step, without signing out.
+  // Only warn when there's genuinely unsaved work — a workbook already in the Saved
+  // folder (savedId set, e.g. after a download) starts fresh without nagging.
   function startNew() {
-    if (doc && !confirm('Start a new workbook? Any unsaved changes to the current one will be lost.')) return;
+    const unsaved = !!doc && !savedId;
+    if (unsaved && !confirm('Start a new workbook? Your current one hasn’t been saved yet and will be lost.')) return;
     setDoc(null);
     setSavedId(null);
     setPast([]); setFuture([]);

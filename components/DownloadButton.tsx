@@ -12,9 +12,10 @@ interface Props {
   atLimit?: boolean;         // when true, downloading is gated → prompt to upgrade instead
   onBlocked?: () => void;    // fired when a download is attempted at the monthly cap
   watermark?: string;        // demo mode: stamp a watermark and skip server-side tracking
+  variant?: 'full' | 'compact'; // compact = small inline button (no helper text), e.g. in a top bar
 }
 
-export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded, atLimit, onBlocked, watermark }: Props) {
+export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded, atLimit, onBlocked, watermark, variant = 'full' }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleDownload() {
@@ -59,6 +60,30 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
 
   const buttonColor = !doc ? '#9ca3af' : atLimit ? (branding?.colors.accent || '#009346') : (branding?.colors.title || colorTheme.primary || '#2563eb');
 
+  const label = loading ? (
+    <>
+      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      {variant === 'compact' ? 'Generating…' : 'Generating PDF…'}
+    </>
+  ) : atLimit ? (
+    <>⬆ {variant === 'compact' ? 'Upgrade' : 'Upgrade to download more'}</>
+  ) : (
+    <>⬇ Download PDF</>
+  );
+
+  if (variant === 'compact') {
+    return (
+      <button
+        onClick={handleDownload}
+        disabled={!doc || loading}
+        className="px-3 py-1.5 rounded-full text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-sm"
+        style={{ backgroundColor: buttonColor }}
+      >
+        {label}
+      </button>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <button
@@ -67,16 +92,7 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
         className="w-full py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
         style={{ backgroundColor: buttonColor }}
       >
-        {loading ? (
-          <>
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Generating PDF…
-          </>
-        ) : atLimit ? (
-          <>⬆ Upgrade to download more</>
-        ) : (
-          <>⬇ Download PDF</>
-        )}
+        {label}
       </button>
       <p className="text-xs text-center text-gray-400">
         Fields are fillable in Adobe Reader, Preview, and Chrome

@@ -54,6 +54,23 @@ export default function TryMeApp({ branding }: Props) {
 
   const requestAccessHref = '/login#inquiry';
 
+  // Shared download props — used in three spots (top bar, under the editor, beside the preview).
+  const dlProps = {
+    doc,
+    templateId: branding.templateId,
+    colorTheme,
+    branding,
+    watermark: WATERMARK,
+    atLimit,
+    onBlocked: () => setShowCta(true),
+    onDownloaded,
+  };
+  const watermarkNote = (
+    <p className="text-xs text-center text-gray-400">
+      Demo PDFs include a watermark. <a href={requestAccessHref} className="underline" style={{ color: branding.colors.subtitle }}>Request access</a> for the clean, fully-branded version.
+    </p>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Top bar */}
@@ -66,10 +83,11 @@ export default function TryMeApp({ branding }: Props) {
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {doc && <DownloadButton {...dlProps} variant="compact" />}
           <a href={requestAccessHref} className="px-3 py-1.5 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: branding.colors.title }}>
             Request access →
           </a>
-          <a href="/login" className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5">Sign in</a>
+          <a href="/login" className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hidden sm:inline-block">Sign in</a>
         </div>
       </header>
 
@@ -125,6 +143,11 @@ export default function TryMeApp({ branding }: Props) {
                 lockElements={false}
                 onUpgrade={() => { window.location.href = requestAccessHref; }}
               />
+              {/* Download under the editor — same spot as the real software */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+                <DownloadButton {...dlProps} />
+                {watermarkNote}
+              </div>
             </div>
 
             {/* Right: live preview + download */}
@@ -142,19 +165,8 @@ export default function TryMeApp({ branding }: Props) {
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-                  <DownloadButton
-                    doc={doc}
-                    templateId={branding.templateId}
-                    colorTheme={colorTheme}
-                    branding={branding}
-                    watermark={WATERMARK}
-                    atLimit={atLimit}
-                    onBlocked={() => setShowCta(true)}
-                    onDownloaded={onDownloaded}
-                  />
-                  <p className="text-xs text-center text-gray-400">
-                    Demo PDFs include a watermark. <a href={requestAccessHref} className="underline" style={{ color: branding.colors.subtitle }}>Request access</a> for the clean, fully-branded version.
-                  </p>
+                  <DownloadButton {...dlProps} />
+                  {watermarkNote}
                 </div>
 
                 {(showCta || atLimit) && (

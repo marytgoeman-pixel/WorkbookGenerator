@@ -10,17 +10,21 @@ interface Props {
   branding?: ClientBranding;
   watermark?: string; // demo mode: stamp a diagonal watermark on the preview/PDF
   onSelectSection?: (sectionId: string) => void; // click a spot in the preview → edit that section
+  scrollTo?: { id: string; n: number } | null;  // edit a section → scroll the preview to it
 }
 
-export default function PDFPreview({ doc, templateId, colorTheme, branding, watermark, onSelectSection }: Props) {
+export default function PDFPreview({ doc, templateId, colorTheme, branding, watermark, onSelectSection, scrollTo }: Props) {
   const [pageImages, setPageImages] = useState<string[]>([]);
   const [anchors, setAnchors] = useState<SectionAnchor[]>([]);
   // Native-PDF fallback (used if pdf.js can't render — e.g. older Safari): a blob URL in an <iframe>
   const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [highlightPage, setHighlightPage] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     if (!doc) return;
@@ -101,6 +105,31 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding, wate
   // Revoke any outstanding blob URL on unmount
   useEffect(() => () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); }, []);
 
+  // Editing a section in the editor → scroll the preview to that section (mirror of the
+  // preview→editor click). Uses the same anchors that power click-to-edit.
+  useEffect(() => {
+    if (!scrollTo) return;
+    const a = anchors.find((x) => x.sectionId === scrollTo.id);
+    const container = scrollRef.current;
+    if (!a || !container) return;
+    const el = pageRefs.current[a.page];
+    if (!el) return;
+    // If the preview has its own scroll area, scroll it precisely (to the section's spot on
+    // the page); otherwise fall back to scrolling whatever ancestor scrolls (window).
+    if (container.scrollHeight > container.clientHeight + 4) {
+      const cRect = container.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      const top = (eRect.top - cRect.top) + container.scrollTop + a.topFrac * el.offsetHeight - 48;
+      container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    } else {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setHighlightPage(a.page);
+    const t = setTimeout(() => setHighlightPage((p) => (p === a.page ? null : p)), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollTo]);
+
   // Map a click on page `pageIdx` (at vertical fraction `frac`) to the section whose
   // heading is at or above that point — i.e. the part of the workbook shown there.
   function handlePageClick(e: React.MouseEvent<HTMLDivElement>, pageIdx: number) {
@@ -143,7 +172,7 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding, wate
       {fallbackUrl ? (
         <iframe src={fallbackUrl} title="PDF preview" className="w-full h-full border-0" />
       ) : (
-        <div className="h-full overflow-y-auto">
+        <div ref={scrollRef} className="h-full overflow-y-auto">
           {clickable && (
             <div className="sticky top-0 z-10 bg-blue-50/95 backdrop-blur-sm text-blue-700 text-[11px] text-center py-1.5 border-b border-blue-100">
               💡 Click anywhere in the preview to jump to that part in the editor
@@ -153,15 +182,14 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding, wate
             {pageImages.map((src, i) => (
               <div
                 key={i}
+                ref={(el) => { pageRefs.current[i] = el; }}
                 className={`relative w-full max-w-2xl group ${clickable ? 'cursor-pointer' : ''}`}
                 onClick={(e) => handlePageClick(e, i)}
                 title={clickable ? 'Click to edit this part of the workbook' : undefined}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={src} alt={`Page ${i + 1}`} className="w-full shadow-md rounded bg-white block" />
-                {clickable && (
-                  <div className="absolute inset-0 rounded ring-2 ring-transparent group-hover:ring-blue-400/50 transition-all pointer-events-none" />
-                )}
+                <div className={`absolute inset-0 rounded ring-2 transition-all pointer-events-none ${highlightPage === i ? 'ring-blue-400' : clickable ? 'ring-transparent group-hover:ring-blue-400/50' : 'ring-transparent'}`} />
               </div>
             ))}
           </div>

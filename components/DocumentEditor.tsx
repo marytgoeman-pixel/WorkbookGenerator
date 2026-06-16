@@ -18,6 +18,7 @@ interface Props {
   canRedo?: boolean;
   lockElements?: boolean;     // Starter plan: grey out the add-element palette
   onUpgrade?: () => void;     // open the upgrade / manage-subscription modal
+  onActiveSection?: (id: string) => void; // user clicked/focused this section → scroll the preview to it
 }
 
 function uid(prefix: string) {
@@ -27,7 +28,7 @@ function uid(prefix: string) {
 // Clear, friendly names: a single-line write-in vs a multi-line box
 const fieldTypeLabel: Record<FieldType, string> = { text: 'Short answer', textarea: 'Paragraph', checkbox: 'Checkbox', dropdown: 'Dropdown' };
 
-export default function DocumentEditor({ doc, onChange, branding, focus, onUndo, onRedo, canUndo, canRedo, lockElements, onUpgrade }: Props) {
+export default function DocumentEditor({ doc, onChange, branding, focus, onUndo, onRedo, canUndo, canRedo, lockElements, onUpgrade, onActiveSection }: Props) {
   const isJo = branding?.id === 'jomangum';
   const isSellit = branding?.id === 'sellit';
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -421,6 +422,8 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
       {/* Sections */}
       {doc.sections.map((section, idx) => (
         <div key={section.id} id={`wb-sec-${section.id}`}
+          onMouseDownCapture={() => onActiveSection?.(section.id)}
+          onFocusCapture={() => onActiveSection?.(section.id)}
           className={`border rounded-xl overflow-hidden transition-all ${highlightId === section.id ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
           {/* Header row */}
           <div className="bg-white px-4 py-3 flex items-center gap-2">

@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, degrees, StandardFonts, RGB, PDFString, PDFName, PDFPage, PDFImage } from 'pdf-lib';
-import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable } from '@/types/document';
+import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable, ContentItem } from '@/types/document';
 import { classicTemplate } from './templates/classic';
 import { modernTemplate } from './templates/modern';
 import { workbookTemplate } from './templates/workbook';
@@ -412,6 +412,18 @@ export async function generatePDF(
       return lineH;
     };
 
+    // Rough height a content item will consume — used to reserve space below a full-page
+    // element so anything added after it stays on the same page.
+    const estimateItemHeight = (it: ContentItem): number => {
+      if (it.kind === 'text' || it.kind === 'bullet')
+        return wrapText(it.text, mainColWidth, font, tmpl.bodySize).length * lineH + tmpl.paragraphSpacing * sp;
+      if (it.kind === 'field')
+        return (it.field.type === 'checkbox' ? 22 : it.field.type === 'textarea' ? tmpl.textareaHeight : tmpl.fieldHeight) + 16;
+      if (it.kind === 'lines') return 120;
+      if (it.kind === 'table') return 60;
+      return lineH;
+    };
+
     // A small, consistent gap before a heading (level-2 sits closer to its parent)
     if (branded && y < tmpl.pageHeight - tmpl.marginTop - 2) {
       y -= section.level === 1 ? 6 : 2;
@@ -587,7 +599,7 @@ export async function generatePDF(
       }
     };
 
-    const renderTable = (table: DocTable) => {
+    const renderTable = (table: DocTable, reserveBelow = 0) => {
       const cols = table.headers.length || (table.rows[0]?.length ?? 0);
       if (cols === 0) return;
       const colW = mainColWidth / cols;
@@ -636,7 +648,8 @@ export async function generatePDF(
       if (table.fullPage) {
         // Fill the page from the current y down to the bottom margin, split evenly across
         // rows — so the whole grid always stays on ONE page (rows shrink to fit if needed).
-        const avail = y - tmpl.marginBottom - headerH - 4;
+        // reserveBelow leaves room for any items added AFTER the table in this section.
+        const avail = y - tmpl.marginBottom - headerH - 4 - reserveBelow;
         const per = Math.max(28, Math.floor(avail / Math.max(1, table.rows.length)));
         rowHeights = table.rows.map(() => per);
       }
@@ -780,7 +793,7 @@ export async function generatePDF(
       // from a "box" (textarea/dropdown/table) above it — and from a bullet list above it.
       let lastWasBox = false;
       let lastWasBullet = false;
-      for (const item of section.content) {
+      section.content.forEach((item, idx) => {
         if (item.kind === 'text') {
           if (lastWasBox) y -= 12 * sp;
           else if (lastWasBullet) y -= 8 * sp; // breathing room between a bullet list and the text that follows it
@@ -796,7 +809,12 @@ export async function generatePDF(
           lastWasBox = item.field.type === 'textarea' || item.field.type === 'dropdown' || item.field.type === 'text';
           lastWasBullet = false;
         } else if (item.kind === 'table') {
-          renderTable(item.table);
+          // A full-page table reserves room for items AFTER it too, so the whole element
+          // (table + anything added below it) stays on a single page.
+          const reserveBelow = item.table.fullPage
+            ? section.content.slice(idx + 1).reduce((h, it) => h + estimateItemHeight(it) + 12 * sp, 0)
+            : 0;
+          renderTable(item.table, reserveBelow);
           lastWasBox = true;
           lastWasBullet = false;
         } else if (item.kind === 'lines') {
@@ -804,7 +822,7 @@ export async function generatePDF(
           lastWasBox = true;
           lastWasBullet = false;
         }
-      }
+      });
     }
 
     y -= tmpl.sectionSpacing * sp;

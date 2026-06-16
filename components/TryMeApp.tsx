@@ -20,6 +20,7 @@ export default function TryMeApp({ branding }: Props) {
   const [doc, setDoc] = useState<DocumentModel | null>(null);
   const [formatting, setFormatting] = useState(false);
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
+  const [previewFocus, setPreviewFocus] = useState<{ id: string; n: number } | null>(null);
   const [downloads, setDownloads] = useState(0);
   const [showCta, setShowCta] = useState(false);
 
@@ -142,6 +143,7 @@ export default function TryMeApp({ branding }: Props) {
                 focus={focus}
                 lockElements={false}
                 onUpgrade={() => { window.location.href = requestAccessHref; }}
+                onActiveSection={(id) => setPreviewFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }))}
               />
               {/* Download under the editor — same spot as the real software */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
@@ -153,7 +155,7 @@ export default function TryMeApp({ branding }: Props) {
             {/* Right: live preview + download */}
             <div className="flex-1 min-w-0">
               <div className="lg:sticky lg:top-6 space-y-4">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 h-[78vh]">
                   <PDFPreview
                     doc={doc}
                     templateId={branding.templateId}
@@ -161,6 +163,7 @@ export default function TryMeApp({ branding }: Props) {
                     branding={branding}
                     watermark={WATERMARK}
                     onSelectSection={(id) => setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }))}
+                    scrollTo={previewFocus}
                   />
                 </div>
 

@@ -37,6 +37,8 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   // Which section to scroll to in the editor (set by clicking the preview). `n` bumps each
   // click so re-clicking the same section re-triggers the scroll.
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
+  // Which section to scroll to in the PREVIEW (set by clicking/editing in the left editor).
+  const [previewFocus, setPreviewFocus] = useState<{ id: string; n: number } | null>(null);
 
   const [savedCount, setSavedCount] = useState(0);
   useEffect(() => {
@@ -378,7 +380,8 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
                 <div className="p-5 space-y-4">
                   <DocumentEditor doc={doc} onChange={setDocTracked} branding={branding} focus={focus}
                     onUndo={undo} onRedo={redo} canUndo={past.length > 0} canRedo={future.length > 0}
-                    lockElements={elementsLocked} onUpgrade={() => setShowUpgrade(true)} />
+                    lockElements={elementsLocked} onUpgrade={() => setShowUpgrade(true)}
+                    onActiveSection={(id) => setPreviewFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }))} />
                   <div className="flex gap-2">
                     <button
                       onClick={saveCurrent}
@@ -428,7 +431,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
 
         {/* Right panel: Preview */}
         <div className="flex-1 min-h-0 min-w-0">
-          <PDFPreview doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} onSelectSection={selectSection} />
+          <PDFPreview doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} onSelectSection={selectSection} scrollTo={previewFocus} />
         </div>
       </div>
       )}

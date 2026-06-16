@@ -11,23 +11,34 @@ const MONTHS = [
 const DAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // A full-page month calendar for the given year/month (month is 0-based).
-// Cells carry the date number + a fillable note area; blank leading/trailing days stay empty.
-export function calendarElement(year: number, month: number): Section[] {
-  const first = new Date(year, month, 1).getDay();        // 0 = Sunday
-  const days = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < first; i++) cells.push(null);
-  for (let d = 1; d <= days; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
+// workWeek = true gives a Mon–Fri (5-column) calendar; otherwise a full Sun–Sat week.
+// Cells carry the date number + a fillable note area; blank days stay empty.
+export function calendarElement(year: number, month: number, workWeek = false): Section[] {
+  const dim = new Date(year, month + 1, 0).getDate();
+  const headers = workWeek ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] : DAY_HEADERS;
+  const cols = headers.length;
+  const weekStartDow = workWeek ? 1 : 0;                   // Monday vs Sunday
+  const colOf = (dow: number) => (workWeek ? dow - 1 : dow);
+  const toCell = (c: number | null): TableCell =>
+    c == null ? { text: '' } : { text: String(c), field: { id: `d${c}`, label: '', type: 'textarea', required: false } };
+
   const rows: TableCell[][] = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    rows.push(cells.slice(i, i + 7).map((c) =>
-      c == null
-        ? { text: '' }
-        : { text: String(c), field: { id: `d${c}`, label: '', type: 'textarea', required: false } }
-    ));
+  let week: (number | null)[] = new Array(cols).fill(null);
+  let anyInWeek = false;
+  for (let d = 1; d <= dim; d++) {
+    const dow = new Date(year, month, d).getDay();         // 0=Sun .. 6=Sat
+    if (workWeek && (dow === 0 || dow === 6)) continue;     // skip weekends
+    if (dow === weekStartDow && anyInWeek) {
+      rows.push(week.map(toCell));
+      week = new Array(cols).fill(null);
+      anyInWeek = false;
+    }
+    week[colOf(dow)] = d;
+    anyInWeek = true;
   }
-  const table: DocTable = { id: sid('cal'), headers: DAY_HEADERS, rows, fullPage: true, labelSize: 9 };
+  if (anyInWeek) rows.push(week.map(toCell));
+
+  const table: DocTable = { id: sid('cal'), headers, rows, fullPage: true, labelSize: 9 };
   return [{
     id: sid('calendar'), level: 1, title: `${MONTHS[month]} ${year}`, headingStyle: 'accent', pageBreakBefore: true,
     content: [{ id: rid(), kind: 'table', table }],

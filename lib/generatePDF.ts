@@ -631,8 +631,10 @@ export async function generatePDF(
 
       // Full-page tables (calendars, SWOT, grids) expand their rows to fill the page.
       if (table.fullPage) {
+        // Fill the page from the current y down to the bottom margin, split evenly across
+        // rows — so the whole grid always stays on ONE page (rows shrink to fit if needed).
         const avail = y - tmpl.marginBottom - headerH - 4;
-        const per = Math.max(minRowH, Math.floor(avail / Math.max(1, table.rows.length)));
+        const per = Math.max(28, Math.floor(avail / Math.max(1, table.rows.length)));
         rowHeights = table.rows.map(() => per);
       }
 
@@ -689,24 +691,23 @@ export async function generatePDF(
       y -= tmpl.paragraphSpacing;
     };
 
-    // A ruled, typeable notes area: each line is a visible rule with a single-line fill
-    // field resting just ABOVE it (so the field never covers the rules), letting people
-    // type a line that sits right on the rule — or print it and write by hand.
-    const renderLines = (count?: number) => {
-      const pitch = 26;            // comfortable spacing between rules
-      const top = y - 4;
-      const bottomLimit = tmpl.marginBottom + 4;
-      const maxN = Math.max(1, Math.floor((top - bottomLimit) / pitch));
-      const n = count && count > 0 ? Math.min(count, maxN) : maxN;
-      const lineColor = branded ? hexToRgb(branding.colors.subtitle) : rgb(0.62, 0.66, 0.72);
-      for (let i = 1; i <= n; i++) {
-        const ruleY = top - i * pitch + 5;
-        page.drawLine({ start: { x: tmpl.marginLeft, y: ruleY }, end: { x: tmpl.marginLeft + mainColWidth, y: ruleY }, thickness: 0.6, color: lineColor, opacity: 0.4 });
-        const tf = form.createTextField(`${section.id}__line${i}`);
-        tf.addToPage(page, { x: tmpl.marginLeft + 2, y: ruleY + 2, width: mainColWidth - 4, height: pitch - 7, borderWidth: 0 });
-        tf.setFontSize(12);
-      }
-      y = top - n * pitch - tmpl.paragraphSpacing;
+    // A single full-page notes box: one multiline field that wraps as you type.
+    // (No background rules — typed text can't be aligned to drawn lines reliably.)
+    const renderLines = () => {
+      const top = y - 2;
+      const bottom = tmpl.marginBottom + 4;
+      const areaH = top - bottom;
+      if (areaH < 24) return;
+      const tf = form.createTextField(`${section.id}__notes`);
+      tf.enableMultiline();
+      tf.addToPage(page, {
+        x: tmpl.marginLeft, y: bottom, width: mainColWidth, height: areaH,
+        borderWidth: 1,
+        borderColor: branded ? accentColor : rgb(0.7, 0.73, 0.78),
+        backgroundColor: fieldBg,
+      });
+      tf.setFontSize(12);
+      y = bottom - tmpl.paragraphSpacing;
     };
 
     const renderCalloutBox = (lines: string[]) => {
@@ -796,7 +797,7 @@ export async function generatePDF(
           lastWasBox = true;
           lastWasBullet = false;
         } else if (item.kind === 'lines') {
-          renderLines(item.rows);
+          renderLines();
           lastWasBox = true;
           lastWasBullet = false;
         }

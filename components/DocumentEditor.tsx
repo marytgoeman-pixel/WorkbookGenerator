@@ -55,6 +55,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
   // Add-element palette state (calendar month/year picker)
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calWorkWeek, setCalWorkWeek] = useState(false);
   const [yearOptions] = useState(() => { const b = new Date().getFullYear(); return [b - 1, b, b + 1, b + 2, b + 3]; });
   const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -561,8 +562,8 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
 
                     {item.kind === 'lines' && (
                       <div className="flex items-center gap-2">
-                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-teal-700 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">Lines</span>
-                        <span className="flex-1 text-xs text-gray-600">Ruled notes area {item.rows ? `(${item.rows} lines)` : '(fills the page)'}</span>
+                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-teal-700 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">Notes</span>
+                        <span className="flex-1 text-xs text-gray-600">Full-page notes box — type-in, wraps</span>
                       </div>
                     )}
                   </div>
@@ -607,7 +608,10 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
           <select value={calYear} onChange={(e) => setCalYear(+e.target.value)} className="text-xs border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
             {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
-          <button onClick={() => addElement(calendarElement(calYear, calMonth))} className={elBtn}>📅 Add calendar</button>
+          <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={calWorkWeek} onChange={(e) => setCalWorkWeek(e.target.checked)} /> Work week (Mon–Fri)
+          </label>
+          <button onClick={() => addElement(calendarElement(calYear, calMonth, calWorkWeek))} className={elBtn}>📅 Add calendar</button>
         </div>
         <div className="flex flex-wrap gap-2">
           {ELEMENTS.filter((e) => e.key !== 'calendar').map((e) => (

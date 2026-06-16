@@ -4,7 +4,9 @@ import { coverImagesFor } from './covers';
 // A ready-to-show interactive sample. Loaded for the signed-in brand so the cover,
 // colors, and chrome all match that client. Every box below is fillable in the PDF.
 export function buildSampleWorkbook(brandId?: string): DocumentModel {
-  const coverImg = coverImagesFor(brandId)[0]?.id;
+  // TLC's showcase uses a hi-res (2000×2000) botanical so the cover stays crisp;
+  // other brands use the first cover in their set.
+  const coverImg = brandId === 'thelearningcreative' ? 'tlc-4' : coverImagesFor(brandId)[0]?.id;
   return {
     title: 'Designing Learning That Sticks',
     author: '',

@@ -220,17 +220,22 @@ export default function WorkbookApp({ branding }: Props) {
             {step === 1 ? (
               <div className="p-5 space-y-3">
                 <FileUpload onParsed={handleParsed} />
-                <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-300">
-                  <span className="flex-1 border-t border-gray-100" />or<span className="flex-1 border-t border-gray-100" />
-                </div>
-                <button
-                  onClick={() => handleParsed(buildSampleWorkbook(branding.id))}
-                  className="w-full py-2.5 rounded-xl font-medium text-sm border-2 transition-colors hover:bg-gray-50"
-                  style={{ borderColor: branding.colors.accent, color: branding.colors.title }}
-                  title="Load a ready-made interactive sample (calendar, checkboxes, answer boxes)"
-                >
-                  ✨ Load an interactive sample workbook
-                </button>
+                {/* The interactive demo sample is only for the TLC showcase account. */}
+                {branding.id === 'thelearningcreative' && (
+                  <>
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-300">
+                      <span className="flex-1 border-t border-gray-100" />or<span className="flex-1 border-t border-gray-100" />
+                    </div>
+                    <button
+                      onClick={() => handleParsed(buildSampleWorkbook(branding.id))}
+                      className="w-full py-2.5 rounded-xl font-medium text-sm border-2 transition-colors hover:bg-gray-50"
+                      style={{ borderColor: branding.colors.accent, color: branding.colors.title }}
+                      title="Load a ready-made interactive sample (calendar, checkboxes, answer boxes)"
+                    >
+                      ✨ Load an interactive sample workbook
+                    </button>
+                  </>
+                )}
               </div>
             ) : doc ? (
               <div className="px-5 py-3 text-sm text-gray-600">

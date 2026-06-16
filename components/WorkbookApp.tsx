@@ -116,6 +116,14 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
     }
   }, []);
 
+  // Trial users are proactively prompted to choose a plan on login (skip if we're
+  // returning from a successful checkout, where the success toast shows instead).
+  useEffect(() => {
+    if (trial && typeof window !== 'undefined' && !new URLSearchParams(window.location.search).get('upgraded')) {
+      setShowUpgrade(true);
+    }
+  }, []);
+
   // Undo/redo history for editor changes (rapid keystrokes within 700ms are coalesced)
   const [past, setPast] = useState<DocumentModel[]>([]);
   const [future, setFuture] = useState<DocumentModel[]>([]);

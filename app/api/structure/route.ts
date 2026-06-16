@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { structureWithAI } from '@/lib/aiStructure';
+import { recordAiUse } from '@/lib/analytics';
+
+// Cap the input so one oversized upload can't run up a large AI bill (~50k tokens).
+const MAX_INPUT_CHARS = 200_000;
 
 export const runtime = 'nodejs';
 // Vercel Pro/Premium allows up to 300s; large briefs can take >120s to structure.
@@ -19,9 +23,13 @@ export async function POST(req: NextRequest) {
   if (!html || typeof html !== 'string') {
     return NextResponse.json({ error: 'Missing document content.' }, { status: 400 });
   }
+  if (html.length > MAX_INPUT_CHARS) {
+    return NextResponse.json({ error: 'This document is too large for AI auto-format. Trim it or build it manually.' }, { status: 413 });
+  }
 
   try {
     const document = await structureWithAI(html);
+    recordAiUse(session.clientId).catch(() => {}); // count the AI credit (best-effort)
     return NextResponse.json({ document });
   } catch (e) {
     console.error('AI structuring failed:', e);

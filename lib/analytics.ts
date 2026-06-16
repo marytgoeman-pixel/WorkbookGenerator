@@ -20,7 +20,7 @@ export function analyticsConfigured(): boolean {
 }
 
 export interface ClientEvent {
-  type: 'login' | 'download';
+  type: 'login' | 'download' | 'ai';
   ts: number;        // epoch ms
   title?: string;    // workbook title for downloads
 }
@@ -29,20 +29,28 @@ export interface ClientStats {
   clientId: string;
   logins: number;
   downloads: number;
+  ais: number;        // AI auto-format calls ("AI credits used")
   lastSeen: number | null;
   recent: ClientEvent[];
+}
+
+function ym(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 async function record(clientId: string, ev: ClientEvent) {
   const r = getRedis();
   if (!r) return;
   try {
-    await Promise.all([
+    const ops: Promise<unknown>[] = [
       r.incr(`stats:${clientId}:${ev.type}s`),
       r.set(`stats:${clientId}:lastSeen`, ev.ts),
       r.lpush(`events:${clientId}`, JSON.stringify(ev)),
       r.ltrim(`events:${clientId}`, 0, 199),
-    ]);
+    ];
+    // Per-month usage counters power the download cap + monthly admin reporting
+    if (ev.type !== 'login') ops.push(r.incr(`usage:${clientId}:${ym(new Date(ev.ts))}:${ev.type}`));
+    await Promise.all(ops);
   } catch {
     // analytics must never break the user flow
   }
@@ -56,15 +64,36 @@ export function recordDownload(clientId: string, title?: string) {
   return record(clientId, { type: 'download', ts: Date.now(), title });
 }
 
+export function recordAiUse(clientId: string) {
+  return record(clientId, { type: 'ai', ts: Date.now() });
+}
+
+// Current calendar-month usage for one client (for the download cap + reporting)
+export async function getUsage(clientId: string): Promise<{ downloads: number; ai: number; month: string }> {
+  const r = getRedis();
+  const month = ym();
+  if (!r) return { downloads: 0, ai: 0, month };
+  try {
+    const [d, a] = await Promise.all([
+      r.get<number>(`usage:${clientId}:${month}:download`),
+      r.get<number>(`usage:${clientId}:${month}:ai`),
+    ]);
+    return { downloads: Number(d ?? 0), ai: Number(a ?? 0), month };
+  } catch {
+    return { downloads: 0, ai: 0, month };
+  }
+}
+
 export async function getStats(clientIds: string[]): Promise<ClientStats[]> {
   const r = getRedis();
   if (!r) return [];
   const out: ClientStats[] = [];
   for (const clientId of clientIds) {
     try {
-      const [logins, downloads, lastSeen, recentRaw] = await Promise.all([
+      const [logins, downloads, ais, lastSeen, recentRaw] = await Promise.all([
         r.get<number>(`stats:${clientId}:logins`),
         r.get<number>(`stats:${clientId}:downloads`),
+        r.get<number>(`stats:${clientId}:ais`),
         r.get<number>(`stats:${clientId}:lastSeen`),
         r.lrange(`events:${clientId}`, 0, 19),
       ]);
@@ -75,11 +104,12 @@ export async function getStats(clientIds: string[]): Promise<ClientStats[]> {
         clientId,
         logins: Number(logins ?? 0),
         downloads: Number(downloads ?? 0),
+        ais: Number(ais ?? 0),
         lastSeen: lastSeen ? Number(lastSeen) : null,
         recent,
       });
     } catch {
-      out.push({ clientId, logins: 0, downloads: 0, lastSeen: null, recent: [] });
+      out.push({ clientId, logins: 0, downloads: 0, ais: 0, lastSeen: null, recent: [] });
     }
   }
   return out;

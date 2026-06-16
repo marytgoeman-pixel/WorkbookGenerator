@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
-import { recordDownload } from '@/lib/analytics';
+import { recordDownload, getUsage } from '@/lib/analytics';
 
 export const runtime = 'nodejs';
 
@@ -10,5 +10,6 @@ export async function POST(req: NextRequest) {
 
   const { title } = await req.json().catch(() => ({}));
   await recordDownload(session.clientId, typeof title === 'string' ? title.slice(0, 120) : undefined);
-  return NextResponse.json({ ok: true });
+  const usage = await getUsage(session.clientId);
+  return NextResponse.json({ ok: true, downloads: usage.downloads });
 }

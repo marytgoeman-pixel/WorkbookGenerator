@@ -41,6 +41,19 @@ export default function WorkbookApp({ branding }: Props) {
     return () => { active = false; };
   }, [branding.id, savedRefresh, view]);
 
+  // Plan + this-month download usage → drives the upgrade prompt
+  const downloadLimit = branding.plan?.downloadsPerMonth ?? null;
+  const [usage, setUsage] = useState(0);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  function refreshUsage() {
+    fetch('/api/usage', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.downloads === 'number') setUsage(d.downloads); })
+      .catch(() => {});
+  }
+  useEffect(() => { refreshUsage(); }, [branding.id]);
+  const atLimit = downloadLimit != null && usage >= downloadLimit;
+
   // Undo/redo history for editor changes (rapid keystrokes within 700ms are coalesced)
   const [past, setPast] = useState<DocumentModel[]>([]);
   const [future, setFuture] = useState<DocumentModel[]>([]);
@@ -181,6 +194,14 @@ export default function WorkbookApp({ branding }: Props) {
             >
               📁 Saved{savedCount > 0 ? ` (${savedCount})` : ''}
             </button>
+            <button
+              onClick={() => setShowUpgrade(true)}
+              className="px-3 py-1.5 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"
+              style={{ backgroundColor: branding.colors.accent }}
+              title="See plans and upgrade"
+            >
+              ⬆ Upgrade
+            </button>
             <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5">
               Sign out
             </button>
@@ -191,6 +212,9 @@ export default function WorkbookApp({ branding }: Props) {
       {/* Saved Workbooks view */}
       {view === 'saved' && (
         <div className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-6 py-6 overflow-y-auto">
+          <button onClick={() => setView('work')} className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-1.5 bg-white hover:border-gray-300 transition-colors">
+            ← Back{doc ? ' to workbook' : ' to upload'}
+          </button>
           <h2 className="text-lg font-bold text-gray-900">Saved Workbooks</h2>
           <p className="text-xs text-gray-400 mt-0.5 mb-4">Reopen a past workbook to keep editing. Workbooks are saved automatically when you download — or hit <b>Save</b> in the Review step.</p>
           <SavedWorkbooks branding={branding} onEdit={openSaved} refreshKey={savedRefresh} />
@@ -283,8 +307,17 @@ export default function WorkbookApp({ branding }: Props) {
               <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
                 <h2 className="font-semibold text-gray-800 text-sm">Step 3 — Download</h2>
               </div>
-              <div className="p-5">
-                <DownloadButton doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} onDownloaded={saveCurrent} />
+              <div className="p-5 space-y-2">
+                <DownloadButton doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding}
+                  atLimit={atLimit}
+                  onBlocked={() => setShowUpgrade(true)}
+                  onDownloaded={() => { saveCurrent(); setUsage((u) => u + 1); }} />
+                {downloadLimit != null && (
+                  <p className="text-xs text-center text-gray-400">
+                    {usage}/{downloadLimit} downloads used this month on the {branding.plan?.name} plan
+                    {atLimit && <> · <button onClick={() => setShowUpgrade(true)} className="underline" style={{ color: branding.colors.accent }}>upgrade for more</button></>}
+                  </p>
+                )}
               </div>
             </section>
           )}
@@ -295,6 +328,33 @@ export default function WorkbookApp({ branding }: Props) {
           <PDFPreview doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding} onSelectSection={selectSection} />
         </div>
       </div>
+      )}
+
+      {showUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setShowUpgrade(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <h2 className="text-lg font-bold" style={{ color: branding.colors.title }}>Upgrade your plan</h2>
+              <button onClick={() => setShowUpgrade(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              You’re on the <b>{branding.plan?.name ?? 'current'}</b> plan{downloadLimit != null ? ` (${downloadLimit} downloads/month, ${usage} used)` : ''}.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-gray-700">
+              <li className="flex justify-between border-b border-gray-100 pb-2"><span><b>Pro</b> · 4 downloads/mo · all elements</span><span className="font-semibold">$79/mo</span></li>
+              <li className="flex justify-between border-b border-gray-100 pb-2"><span><b>Agency</b> · unlimited · up to 2 brands</span><span className="font-semibold">$149/mo</span></li>
+              <li className="flex justify-between"><span><b>Enterprise</b> · 3+ brands</span><span className="font-semibold">Let’s talk</span></li>
+            </ul>
+            <a
+              href={`mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Upgrade request from ' + branding.displayName)}&body=${encodeURIComponent('Hi Mary, I would like to upgrade my plan (currently ' + (branding.plan?.name || 'unknown') + '). Account: ' + branding.displayName + '.')}`}
+              className="mt-5 block text-center py-2.5 rounded-xl font-semibold text-white"
+              style={{ backgroundColor: branding.colors.accent }}
+            >
+              Request upgrade
+            </a>
+            <p className="text-[11px] text-center text-gray-400 mt-2">We’ll confirm by email and switch your plan over. Online checkout coming soon.</p>
+          </div>
+        </div>
       )}
     </div>
   );

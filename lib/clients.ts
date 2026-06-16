@@ -35,6 +35,7 @@ export const CLIENTS: ClientAccount[] = [
         calloutBorder: '#F8BC24',
         grayBox: '#F0F0F0',
       },
+      plan: { name: 'Agency', downloadsPerMonth: null },
     },
   },
   {
@@ -58,6 +59,7 @@ export const CLIENTS: ClientAccount[] = [
         calloutBorder: '#3F69FF',
         grayBox: '#E6EBFF',    // light periwinkle — fillable field background
       },
+      plan: { name: 'Agency', downloadsPerMonth: null },
     },
   },
   {
@@ -81,6 +83,7 @@ export const CLIENTS: ClientAccount[] = [
         calloutBorder: '#8DC63D', // light green — pops on the navy callout box
         grayBox: '#F0F7E6',    // pale lime tint for fillable-field backgrounds
       },
+      plan: { name: 'Starter', downloadsPerMonth: 2 },
     },
   },
   {

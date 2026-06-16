@@ -20,6 +20,7 @@ export default async function AdminPage() {
   const stats = configured ? await getStats(clientIds()) : [];
   const totalDownloads = stats.reduce((n, s) => n + s.downloads, 0);
   const totalLogins = stats.reduce((n, s) => n + s.logins, 0);
+  const totalAi = stats.reduce((n, s) => n + s.ais, 0);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -27,7 +28,7 @@ export default async function AdminPage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Logins &amp; downloads per client</p>
+            <p className="text-xs text-gray-400 mt-0.5">Logins, downloads &amp; AI credits per client</p>
           </div>
           <LogoutButton />
         </div>
@@ -43,10 +44,14 @@ export default async function AdminPage() {
         )}
 
         {/* Totals */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="text-3xl font-bold text-gray-900">{totalDownloads}</div>
             <div className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Total downloads</div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="text-3xl font-bold text-gray-900">{totalAi}</div>
+            <div className="text-xs text-gray-500 mt-1 uppercase tracking-wide">AI credits used</div>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="text-3xl font-bold text-gray-900">{totalLogins}</div>
@@ -65,17 +70,19 @@ export default async function AdminPage() {
               <tr>
                 <th className="text-left px-5 py-3">Client</th>
                 <th className="text-right px-5 py-3">Downloads</th>
+                <th className="text-right px-5 py-3">AI credits</th>
                 <th className="text-right px-5 py-3">Logins</th>
                 <th className="text-left px-5 py-3">Last seen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {stats.length === 0 ? (
-                <tr><td colSpan={4} className="px-5 py-6 text-center text-gray-400">No data yet.</td></tr>
+                <tr><td colSpan={5} className="px-5 py-6 text-center text-gray-400">No data yet.</td></tr>
               ) : stats.map((s) => (
                 <tr key={s.clientId}>
                   <td className="px-5 py-3 font-medium text-gray-800">{displayNameForId(s.clientId)}</td>
                   <td className="px-5 py-3 text-right font-semibold" style={{ color: '#E04927' }}>{s.downloads}</td>
+                  <td className="px-5 py-3 text-right font-semibold" style={{ color: '#009346' }}>{s.ais}</td>
                   <td className="px-5 py-3 text-right text-gray-700">{s.logins}</td>
                   <td className="px-5 py-3 text-gray-500">{fmt(s.lastSeen)}</td>
                 </tr>

@@ -9,13 +9,16 @@ interface Props {
   colorTheme: ColorTheme;
   branding?: ClientBranding;
   onDownloaded?: () => void; // fired after a successful download (used to save the workbook)
+  atLimit?: boolean;         // when true, downloading is gated → prompt to upgrade instead
+  onBlocked?: () => void;    // fired when a download is attempted at the monthly cap
 }
 
-export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded }: Props) {
+export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded, atLimit, onBlocked }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleDownload() {
     if (!doc) return;
+    if (atLimit) { onBlocked?.(); return; }
     setLoading(true);
     try {
       const bytes = await generatePDF(doc, templateId, colorTheme, branding);
@@ -39,7 +42,7 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
     }
   }
 
-  const buttonColor = !doc ? '#9ca3af' : branding?.colors.title || colorTheme.primary || '#2563eb';
+  const buttonColor = !doc ? '#9ca3af' : atLimit ? (branding?.colors.accent || '#009346') : (branding?.colors.title || colorTheme.primary || '#2563eb');
 
   return (
     <div className="space-y-3">
@@ -54,10 +57,10 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             Generating PDF…
           </>
+        ) : atLimit ? (
+          <>⬆ Upgrade to download more</>
         ) : (
-          <>
-            ⬇ Download PDF
-          </>
+          <>⬇ Download PDF</>
         )}
       </button>
       <p className="text-xs text-center text-gray-400">

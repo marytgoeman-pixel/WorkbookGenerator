@@ -100,6 +100,10 @@ export interface ClientBranding {
     calloutBorder: string;    // dashed border on callout
     grayBox: string;          // light gray answer box
   };
+  plan?: {
+    name: string;                       // 'Starter' | 'Pro' | 'Agency' | 'Enterprise'
+    downloadsPerMonth: number | null;   // monthly download cap (null = unlimited)
+  };
 }
 
 export interface ColorTheme {

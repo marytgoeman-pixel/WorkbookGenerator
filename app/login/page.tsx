@@ -18,7 +18,7 @@ const TIERS = [
   { name: 'Pro', price: '$79', annual: '$869 / yr', highlight: true, custom: false,
     features: ['1 brand', 'Up to 4 workbook downloads / month', 'All elements (calendars, SWOT, grids, notes)', 'Request custom elements anytime', 'Unlimited learners'] },
   { name: 'Agency', price: '$149', annual: '$1,639 / yr', highlight: false, custom: false,
-    features: ['2 brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
+    features: ['Up to 2 brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
   { name: 'Enterprise', price: 'Call', annual: 'for pricing', highlight: false, custom: true,
     features: ['3+ brands', 'Unlimited workbook downloads', 'All elements', 'Request custom elements anytime', 'Unlimited learners'] },
 ];

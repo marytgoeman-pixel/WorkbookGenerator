@@ -40,6 +40,30 @@ export async function setStoredPlan(clientId: string, planId: PlanId): Promise<v
   }
 }
 
+// --- Stripe customer id (so a subscriber can open the billing portal) ---
+const custKey = (clientId: string) => `customer:${clientId}`;
+
+export async function getStoredCustomer(clientId: string): Promise<string | null> {
+  const r = getRedis();
+  if (!r) return null;
+  try {
+    const v = await r.get<string>(custKey(clientId));
+    return v || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setStoredCustomer(clientId: string, customerId: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try {
+    await r.set(custKey(clientId), customerId);
+  } catch {
+    /* ignore */
+  }
+}
+
 // --- Trial tracking: records when a client's 7-day trial started (first login) ---
 const trialKey = (clientId: string) => `trial:${clientId}`;
 

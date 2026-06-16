@@ -60,7 +60,7 @@ export async function createCheckoutUrl(opts: {
 
 // Verify a completed Checkout Session on return (uses the same key that created it,
 // so it works regardless of webhook timing/environment). Returns who to upgrade.
-export async function confirmCheckoutSession(sessionId: string): Promise<{ clientId: string; plan: PlanId } | null> {
+export async function confirmCheckoutSession(sessionId: string): Promise<{ clientId: string; plan: PlanId; customerId: string | null } | null> {
   const s = getStripe();
   if (!s || !sessionId.startsWith('cs_')) return null;
   try {
@@ -68,9 +68,23 @@ export async function confirmCheckoutSession(sessionId: string): Promise<{ clien
     const paid = session.payment_status === 'paid' || session.status === 'complete';
     const clientId = session.metadata?.clientId;
     const plan = session.metadata?.plan;
-    if (paid && clientId && isPlanId(plan)) return { clientId, plan };
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null;
+    if (paid && clientId && isPlanId(plan)) return { clientId, plan, customerId };
   } catch {
     /* ignore */
   }
   return null;
+}
+
+// Open the Stripe Customer Portal so an existing subscriber can change/cancel their plan
+// (edits the existing subscription — no double charge). Returns null if not configured.
+export async function createPortalUrl(customerId: string, origin: string): Promise<string | null> {
+  const s = getStripe();
+  if (!s) return null;
+  try {
+    const portal = await s.billingPortal.sessions.create({ customer: customerId, return_url: origin });
+    return portal.url;
+  } catch {
+    return null;
+  }
 }

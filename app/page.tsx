@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { getBrandingById } from '@/lib/clients';
-import { getStoredPlan, setStoredPlan, ensureTrialStart } from '@/lib/planStore';
+import { getStoredPlan, setStoredPlan, ensureTrialStart, getStoredCustomer, setStoredCustomer } from '@/lib/planStore';
 import { confirmCheckoutSession } from '@/lib/stripeBilling';
 import WorkbookApp, { TrialInfo } from '@/components/WorkbookApp';
 
@@ -24,6 +24,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
     const confirmed = await confirmCheckoutSession(sp.upgraded);
     if (confirmed && confirmed.clientId === session.clientId) {
       await setStoredPlan(confirmed.clientId, confirmed.plan);
+      if (confirmed.customerId) await setStoredCustomer(confirmed.clientId, confirmed.customerId);
     }
   }
 
@@ -41,5 +42,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
     trial = { state: msLeft > 0 ? 'active' : 'expired', daysLeft };
   }
 
-  return <WorkbookApp branding={branding} trial={trial} />;
+  // A subscriber (has a stored Stripe customer) manages their plan via the Customer Portal
+  // instead of buying again through Checkout — prevents creating a duplicate subscription.
+  const manageable = !!(await getStoredCustomer(session.clientId));
+
+  return <WorkbookApp branding={branding} trial={trial} manageable={manageable} />;
 }

@@ -16,6 +16,7 @@ export type TrialInfo = { state: 'active' | 'expired'; daysLeft: number } | null
 interface Props {
   branding: ClientBranding;
   trial?: TrialInfo;
+  manageable?: boolean; // true when the client has an active Stripe subscription (manage via portal, not re-checkout)
 }
 
 type Step = 1 | 2 | 3;
@@ -26,7 +27,7 @@ const STEPS = [
   { num: 3 as Step, label: 'Download' },
 ];
 
-export default function WorkbookApp({ branding, trial }: Props) {
+export default function WorkbookApp({ branding, trial, manageable }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [doc, setDoc] = useState<DocumentModel | null>(null);
@@ -75,6 +76,18 @@ export default function WorkbookApp({ branding, trial }: Props) {
     window.location.href = `mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Upgrade request from ' + branding.displayName)}&body=${encodeURIComponent('Hi Mary, I would like to upgrade to ' + plan + ' (' + billingInterval + '). Account: ' + branding.displayName + '.')}`;
     setCheckoutBusy(null);
   }
+  // Existing subscribers change/cancel via the Stripe Customer Portal (no duplicate charge).
+  async function startPortal() {
+    setCheckoutBusy('portal');
+    try {
+      const res = await fetch('/api/portal', { method: 'POST' });
+      if (res.ok) { const d = await res.json(); if (d.url) { window.location.href = d.url; return; } }
+    } catch { /* fall through to email */ }
+    window.location.href = `mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Manage subscription — ' + branding.displayName)}&body=${encodeURIComponent('Hi Mary, I would like to change my subscription. Account: ' + branding.displayName + '.')}`;
+    setCheckoutBusy(null);
+  }
+  // The client's current plan id (matches a tier row), so we badge it instead of offering it.
+  const currentPlanId = (branding.plan?.name ?? '').toLowerCase();
   // Returning from a successful Stripe Checkout
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded')) {
@@ -228,9 +241,9 @@ export default function WorkbookApp({ branding, trial }: Props) {
               onClick={() => setShowUpgrade(true)}
               className="px-3 py-1.5 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"
               style={{ backgroundColor: branding.colors.accent }}
-              title="See plans and upgrade"
+              title={manageable ? 'Manage your plan' : 'See plans and upgrade'}
             >
-              ⬆ Upgrade
+              {manageable ? '⚙ Manage plan' : '⬆ Upgrade'}
             </button>
             <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5">
               Sign out
@@ -385,7 +398,7 @@ export default function WorkbookApp({ branding, trial }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setShowUpgrade(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
-              <h2 className="text-lg font-bold" style={{ color: branding.colors.title }}>{trial ? 'Choose a plan' : 'Upgrade your plan'}</h2>
+              <h2 className="text-lg font-bold" style={{ color: branding.colors.title }}>{manageable ? 'Manage your plan' : trial ? 'Choose a plan' : 'Upgrade your plan'}</h2>
               <button onClick={() => setShowUpgrade(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
             <p className="text-sm text-gray-500 mt-1">
@@ -408,16 +421,26 @@ export default function WorkbookApp({ branding, trial }: Props) {
                 { id: 'pro' as const, name: 'Pro', blurb: '4 downloads/mo · all elements', monthly: '$79/mo', annual: '$869/yr' },
                 { id: 'agency' as const, name: 'Agency', blurb: 'Unlimited downloads · up to 2 brands', monthly: '$149/mo', annual: '$1,639/yr' },
               ]).map((t) => (
-                <div key={t.id} className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl p-3">
+                <div key={t.id} className={`flex items-center justify-between gap-3 border rounded-xl p-3 ${t.id === currentPlanId ? 'border-gray-300 bg-gray-50' : 'border-gray-100'}`}>
                   <div className="min-w-0">
                     <div className="font-semibold text-gray-800">{t.name} <span className="text-gray-400 font-normal">· {billingInterval === 'monthly' ? t.monthly : t.annual}</span></div>
                     <div className="text-xs text-gray-500">{t.blurb}</div>
                   </div>
-                  <button onClick={() => startCheckout(t.id)} disabled={checkoutBusy === t.id}
-                    className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
-                    style={{ backgroundColor: branding.colors.accent }}>
-                    {checkoutBusy === t.id ? '…' : 'Upgrade'}
-                  </button>
+                  {t.id === currentPlanId ? (
+                    <span className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 bg-gray-100">Current plan</span>
+                  ) : manageable ? (
+                    <button onClick={startPortal} disabled={checkoutBusy === 'portal'}
+                      className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-60"
+                      style={{ color: branding.colors.title, borderColor: branding.colors.title }}>
+                      {checkoutBusy === 'portal' ? '…' : 'Change'}
+                    </button>
+                  ) : (
+                    <button onClick={() => startCheckout(t.id)} disabled={checkoutBusy === t.id}
+                      className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                      style={{ backgroundColor: branding.colors.accent }}>
+                      {checkoutBusy === t.id ? '…' : 'Upgrade'}
+                    </button>
+                  )}
                 </div>
               ))}
               <div className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl p-3">
@@ -425,7 +448,18 @@ export default function WorkbookApp({ branding, trial }: Props) {
                 <a href={`mailto:mary@thelearningcreative.com?subject=${encodeURIComponent('Enterprise inquiry from ' + branding.displayName)}`} className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border" style={{ color: branding.colors.title, borderColor: branding.colors.title }}>Contact</a>
               </div>
             </div>
-            <p className="text-[11px] text-center text-gray-400 mt-3">Secure checkout via Stripe · your plan updates automatically after payment.</p>
+            {manageable && (
+              <button onClick={startPortal} disabled={checkoutBusy === 'portal'}
+                className="mt-4 w-full px-3 py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                style={{ backgroundColor: branding.colors.title }}>
+                {checkoutBusy === 'portal' ? '…' : 'Manage subscription'}
+              </button>
+            )}
+            <p className="text-[11px] text-center text-gray-400 mt-3">
+              {manageable
+                ? 'Change or cancel your plan in the Stripe billing portal · no duplicate charge.'
+                : 'Secure checkout via Stripe · your plan updates automatically after payment.'}
+            </p>
           </div>
         </div>
       )}

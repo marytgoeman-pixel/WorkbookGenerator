@@ -87,14 +87,21 @@ export async function findActiveSubscription(
   try {
     const res = await s.subscriptions.search({
       query: `status:'active' AND metadata['clientId']:'${clientId}'`,
-      limit: 1,
+      limit: 10,
     });
-    const sub = res.data[0];
-    if (!sub) return null;
-    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null;
-    if (!customerId) return null;
-    const planMeta = sub.metadata?.plan;
-    return { subscriptionId: sub.id, customerId, plan: isPlanId(planMeta) ? planMeta : null };
+    if (!res.data.length) return null;
+    // If more than one is active (e.g. a not-yet-cancelled duplicate), prefer the highest tier.
+    const rank = (p: string | null | undefined) =>
+      ({ enterprise: 4, agency: 3, pro: 2, starter: 1 } as Record<string, number>)[p ?? ''] ?? 0;
+    let best: { subscriptionId: string; customerId: string; plan: PlanId | null } | null = null;
+    for (const sub of res.data) {
+      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null;
+      if (!customerId) continue;
+      const planMeta = sub.metadata?.plan;
+      const plan = isPlanId(planMeta) ? planMeta : null;
+      if (!best || rank(plan) > rank(best.plan)) best = { subscriptionId: sub.id, customerId, plan };
+    }
+    return best;
   } catch {
     return null;
   }

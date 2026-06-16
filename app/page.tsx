@@ -4,6 +4,7 @@ import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { getBrandingById } from '@/lib/clients';
 import { getStoredPlan, setStoredPlan, ensureTrialStart, getStoredCustomer, setStoredCustomer } from '@/lib/planStore';
 import { confirmCheckoutSession, findActiveSubscription } from '@/lib/stripeBilling';
+import { PLANS } from '@/lib/plans';
 import WorkbookApp, { TrialInfo } from '@/components/WorkbookApp';
 
 const TRIAL_DAYS = 7;
@@ -28,11 +29,29 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
     }
   }
 
-  // A paid upgrade (confirmed above or recorded by the webhook) overrides everything, incl. the trial.
-  const stored = await getStoredPlan(session.clientId);
+  // The permanent demo account is ALWAYS a trial (ignore any stale override) so it always
+  // shows the trial → "Choose a plan" experience for prospects.
+  const isDemo = session.clientId === 'trialdemo';
+
+  let stored = isDemo ? null : await getStoredPlan(session.clientId);
+  let storedCustomer = isDemo ? null : await getStoredCustomer(session.clientId);
+
+  // SELF-HEAL: the live Stripe subscription is the source of truth. If the client has a
+  // subscription (or a stored override that might be stale), reconcile the plan + customer
+  // id against Stripe so a stale value can't strand them on the wrong plan/screen. We only
+  // CORRECT when an active sub is actually found — never downgrade on a (lagging) empty
+  // result, which would wrongly revert someone who just subscribed.
+  if (!isDemo && (stored || storedCustomer)) {
+    const active = await findActiveSubscription(session.clientId);
+    if (active?.plan) {
+      if (active.plan !== stored?.id) { await setStoredPlan(session.clientId, active.plan); stored = PLANS[active.plan]; }
+      if (active.customerId !== storedCustomer) { await setStoredCustomer(session.clientId, active.customerId); storedCustomer = active.customerId; }
+    }
+  }
+
+  // A paid plan (stored override, self-healed above) overrides the trial.
   let branding = base;
   let trial: TrialInfo = null;
-
   if (stored) {
     branding = { ...base, plan: { name: stored.name, downloadsPerMonth: stored.downloadsPerMonth } };
   } else if (base.plan?.trial) {
@@ -44,16 +63,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
 
   // A subscriber (has a stored Stripe customer) manages their plan via the Customer Portal
   // instead of buying again through Checkout — prevents creating a duplicate subscription.
-  let storedCustomer = await getStoredCustomer(session.clientId);
-  // Backfill the customer id for subscribers who paid before we tracked it, so they get
-  // the "Manage" (portal) experience instead of being offered Checkout again.
-  if (!storedCustomer && stored) {
-    const active = await findActiveSubscription(session.clientId);
-    if (active) {
-      await setStoredCustomer(session.clientId, active.customerId);
-      storedCustomer = active.customerId;
-    }
-  }
   const manageable = !!storedCustomer;
 
   return <WorkbookApp branding={branding} trial={trial} manageable={manageable} />;

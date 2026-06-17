@@ -205,6 +205,19 @@ export async function generatePDF(
     } catch { /* fall back to Helvetica on any embed error */ }
   }
 
+  // Self-serve template font choice (sans is the Helvetica default already set above).
+  if (branded && !sellit && (branding!.font === 'serif' || branding!.font === 'mono')) {
+    if (branding!.font === 'serif') {
+      font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+      boldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+      italicFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+    } else {
+      font = await pdfDoc.embedFont(StandardFonts.Courier);
+      boldFont = await pdfDoc.embedFont(StandardFonts.CourierBold);
+      italicFont = await pdfDoc.embedFont(StandardFonts.CourierOblique);
+    }
+  }
+
   // Copy the template so we can apply document-level spacing without mutating the shared constant
   const tmpl = { ...getTemplate(templateId) };
   const spacingScale = doc.bodySpacing === 'compact' ? 0.5 : doc.bodySpacing === 'relaxed' ? 2 : 1;

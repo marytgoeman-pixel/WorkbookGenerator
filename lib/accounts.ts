@@ -22,6 +22,7 @@ export interface Account {
   verified: boolean;    // email confirmed
   boutique: boolean;    // requested done-for-you setup
   selfServe: true;      // marks the self-serve trial (watermarked) vs managed trial (clean)
+  configured: boolean;  // finished the template builder at least once
   createdAt: number;
   branding: ClientBranding;
 }
@@ -81,6 +82,7 @@ export async function createAccount(opts: {
     verified: false,
     boutique: opts.boutique,
     selfServe: true,
+    configured: false,
     createdAt: Date.now(),
     branding: { ...opts.branding, id: clientId },
   };

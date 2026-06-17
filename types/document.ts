@@ -105,6 +105,10 @@ export interface ClientBranding {
     downloadsPerMonth: number | null;   // monthly download cap (null = unlimited)
     trial?: boolean;                    // true = 7-day free trial; downloads lock after it expires
   };
+  // Self-serve template-builder choices (optional; managed brands use their template code).
+  font?: 'sans' | 'serif' | 'mono';     // base typeface family
+  coverStyle?: 'band' | 'minimal' | 'photo'; // cover layout
+  footerStyle?: 'standard' | 'minimal' | 'none'; // footer treatment
 }
 
 export interface ColorTheme {

@@ -17,8 +17,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
   if (session.isAdmin) redirect('/admin');
 
   // Managed clients are hardcoded; self-serve accounts resolve from the account store.
-  const base = getBrandingById(session.clientId) ?? (await getAccountById(session.clientId))?.branding;
-  if (!base) redirect('/login');
+  let base = getBrandingById(session.clientId);
+  if (!base) {
+    const acct = await getAccountById(session.clientId);
+    if (!acct) redirect('/login');
+    if (!acct.configured) redirect('/setup'); // self-serve: finish the template builder first
+    base = acct.branding;
+  }
 
   // Internal / comp accounts: always full access (their base plan, e.g. Enterprise) with
   // no trial or billing resolution. These are our own working logins.

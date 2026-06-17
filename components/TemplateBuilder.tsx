@@ -60,7 +60,7 @@ function extractColors(dataUrl: string): Promise<{ primary: string; accent: stri
 
 const FONTS: Record<string, string> = { sans: 'system-ui, sans-serif', serif: 'Georgia, serif', mono: 'ui-monospace, monospace' };
 
-export default function TemplateBuilder({ initial }: { initial: ClientBranding }) {
+export default function TemplateBuilder({ initial, managed }: { initial: ClientBranding; managed?: boolean }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState(initial.displayName || '');
@@ -89,6 +89,16 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
     } catch {
       setError('Could not read that image. Try a PNG or JPG.');
     }
+  }
+
+  async function resetToOriginal() {
+    if (!confirm('Reset to your original template? This removes your custom changes.')) return;
+    setSaving(true); setError('');
+    try {
+      const res = await fetch('/api/template', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reset: true }) });
+      if (res.ok) { router.push('/'); router.refresh(); return; }
+      setError('Could not reset.');
+    } catch { setError('Could not reset.'); } finally { setSaving(false); }
   }
 
   async function save() {
@@ -121,8 +131,8 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
       <div className="max-w-5xl mx-auto">
         <div className="mb-5">
           <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: GREEN }}>The Learning Creative</span>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Build your template</h1>
-          <p className="text-sm text-gray-500 mt-1">Set it once — every workbook you make comes out on-brand. You can change this anytime.</p>
+          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>{managed ? 'Edit your template' : 'Build your template'}</h1>
+          <p className="text-sm text-gray-500 mt-1">Set it once, every workbook comes out on-brand. You can change this anytime.</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -250,6 +260,11 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
             <button onClick={save} disabled={saving} className="w-full mt-3 py-3 rounded-xl font-semibold text-white disabled:opacity-60" style={{ backgroundColor: primary }}>
               {saving ? 'Saving…' : 'Save template & continue →'}
             </button>
+            {managed && (
+              <button onClick={resetToOriginal} disabled={saving} className="w-full mt-2 py-2 rounded-xl text-sm border border-gray-200 text-gray-500 hover:border-gray-300 disabled:opacity-60">
+                Reset to my original template
+              </button>
+            )}
           </div>
         </div>
       </div>

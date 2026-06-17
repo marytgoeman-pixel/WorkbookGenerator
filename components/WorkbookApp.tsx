@@ -283,11 +283,9 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
             >
               📁 Saved{savedCount > 0 ? ` (${savedCount})` : ''}
             </button>
-            {branding.id.startsWith('u_') && (
-              <a href="/setup" className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all" title="Edit your branded template">
-                🎨 Template
-              </a>
-            )}
+            <a href="/setup" className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all" title="Edit your branded template">
+              🎨 Template
+            </a>
             <button
               onClick={() => setShowUpgrade(true)}
               className="px-3 py-1.5 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"

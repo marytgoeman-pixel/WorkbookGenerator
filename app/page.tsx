@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { getBrandingById } from '@/lib/clients';
 import { getAccountById } from '@/lib/accounts';
+import { getBrandingOverride, mergeBranding } from '@/lib/brandStore';
 import { getStoredPlan, setStoredPlan, ensureTrialStart, getStoredCustomer, setStoredCustomer } from '@/lib/planStore';
 import { confirmCheckoutSession, findActiveSubscription } from '@/lib/stripeBilling';
 import { PLANS } from '@/lib/plans';
@@ -23,6 +24,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
     if (!acct) redirect('/login');
     if (!acct.configured) redirect('/setup'); // self-serve: finish the template builder first
     base = acct.branding;
+  } else {
+    // Managed client — merge any template tweaks they saved in the builder.
+    const ov = await getBrandingOverride(session.clientId);
+    if (ov) base = mergeBranding(base, ov);
   }
 
   // Internal / comp accounts: always full access (their base plan, e.g. Enterprise) with

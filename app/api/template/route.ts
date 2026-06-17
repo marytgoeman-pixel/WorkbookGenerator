@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
+import { getBrandingById } from '@/lib/clients';
 import { getAccountById, saveAccount } from '@/lib/accounts';
+import { getBrandingOverride, setBrandingOverride, clearBrandingOverride, mergeBranding } from '@/lib/brandStore';
 import { ICON_KEYS } from '@/lib/icons';
 
 export const runtime = 'nodejs';
@@ -8,36 +10,40 @@ export const runtime = 'nodejs';
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const hex = (v: unknown, fallback: string) => (typeof v === 'string' && HEX.test(v) ? v : fallback);
 
-// Save the self-serve template builder choices to the account's branding.
+// Save template-builder choices. Managed clients save a branding OVERRIDE; self-serve
+// accounts save to their account. { reset: true } (managed only) restores the original.
 export async function POST(req: NextRequest) {
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
-  if (!session || !session.clientId.startsWith('u_')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const acct = await getAccountById(session.clientId);
-  if (!acct) return NextResponse.json({ error: 'No account' }, { status: 404 });
+  if (!session || session.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const isManaged = !session.clientId.startsWith('u_');
   const b = await req.json().catch(() => ({}));
-  const c = b?.colors ?? {};
-  const cur = acct.branding;
 
-  // Logo: accept a data URL up to ~1.5 MB (keeps the Redis record small); else keep current.
-  let logoUrl = cur.logoUrl;
-  if (typeof b?.logoUrl === 'string' && b.logoUrl.startsWith('data:image/') && b.logoUrl.length < 1_600_000) {
-    logoUrl = b.logoUrl;
-  } else if (b?.logoUrl === '') {
-    logoUrl = '';
+  if (isManaged && b?.reset) {
+    await clearBrandingOverride(session.clientId);
+    return NextResponse.json({ ok: true, reset: true });
   }
 
-  const font = ['sans', 'serif', 'mono'].includes(b?.font) ? b.font : (cur.font ?? 'sans');
-  const coverStyle = ['band', 'minimal', 'photo'].includes(b?.coverStyle) ? b.coverStyle : (cur.coverStyle ?? 'band');
-  const footerStyle = ['standard', 'minimal', 'none'].includes(b?.footerStyle) ? b.footerStyle : (cur.footerStyle ?? 'standard');
-  const logoPosition = ['top', 'bottom'].includes(b?.logoPosition) ? b.logoPosition : (cur.logoPosition ?? 'bottom');
-  const calloutStyle = ['bar', 'plain', 'solid'].includes(b?.calloutStyle) ? b.calloutStyle : (cur.calloutStyle ?? 'bar');
-  const calloutIcon = b?.calloutIcon === '' ? '' : (ICON_KEYS.includes(b?.calloutIcon) ? b.calloutIcon : (cur.calloutIcon ?? ''));
+  // The branding we merge edits onto.
+  let cur;
+  let acct = null;
+  if (isManaged) {
+    const base = getBrandingById(session.clientId);
+    if (!base) return NextResponse.json({ error: 'No template' }, { status: 404 });
+    cur = mergeBranding(base, await getBrandingOverride(session.clientId));
+  } else {
+    acct = await getAccountById(session.clientId);
+    if (!acct) return NextResponse.json({ error: 'No account' }, { status: 404 });
+    cur = acct.branding;
+  }
 
-  const branding = {
-    ...cur,
+  const c = b?.colors ?? {};
+  let logoUrl = cur.logoUrl;
+  if (typeof b?.logoUrl === 'string' && b.logoUrl.startsWith('data:image/') && b.logoUrl.length < 1_600_000) logoUrl = b.logoUrl;
+  else if (b?.logoUrl === '') logoUrl = '';
+
+  const pick = <T extends string>(opts: readonly T[], v: unknown, fb: T): T => (opts.includes(v as T) ? (v as T) : fb);
+  const fields = {
     displayName: (typeof b?.displayName === 'string' && b.displayName.trim()) ? b.displayName.trim().slice(0, 80) : cur.displayName,
     tagline: typeof b?.tagline === 'string' ? b.tagline.slice(0, 120) : cur.tagline,
     logoUrl,
@@ -50,14 +56,18 @@ export async function POST(req: NextRequest) {
       calloutBorder: hex(c.calloutBorder, cur.colors.calloutBorder),
       grayBox: hex(c.grayBox, cur.colors.grayBox),
     },
-    font,
-    coverStyle,
-    footerStyle,
-    logoPosition,
-    calloutStyle,
-    calloutIcon,
+    font: pick(['sans', 'serif', 'mono'] as const, b?.font, cur.font ?? 'sans'),
+    coverStyle: pick(['band', 'minimal', 'photo'] as const, b?.coverStyle, cur.coverStyle ?? 'band'),
+    footerStyle: pick(['standard', 'minimal', 'none'] as const, b?.footerStyle, cur.footerStyle ?? 'standard'),
+    logoPosition: pick(['top', 'bottom'] as const, b?.logoPosition, cur.logoPosition ?? 'bottom'),
+    calloutStyle: pick(['bar', 'plain', 'solid'] as const, b?.calloutStyle, cur.calloutStyle ?? 'bar'),
+    calloutIcon: b?.calloutIcon === '' ? '' : (ICON_KEYS.includes(b?.calloutIcon) ? b.calloutIcon : (cur.calloutIcon ?? '')),
   };
 
-  await saveAccount({ ...acct, configured: true, branding });
+  if (isManaged) {
+    await setBrandingOverride(session.clientId, fields);
+  } else {
+    await saveAccount({ ...acct!, configured: true, branding: { ...cur, ...fields } });
+  }
   return NextResponse.json({ ok: true });
 }

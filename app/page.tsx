@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { getBrandingById } from '@/lib/clients';
+import { getAccountById } from '@/lib/accounts';
 import { getStoredPlan, setStoredPlan, ensureTrialStart, getStoredCustomer, setStoredCustomer } from '@/lib/planStore';
 import { confirmCheckoutSession, findActiveSubscription } from '@/lib/stripeBilling';
 import { PLANS } from '@/lib/plans';
@@ -15,7 +16,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
   if (!session) redirect('/login');
   if (session.isAdmin) redirect('/admin');
 
-  const base = getBrandingById(session.clientId);
+  // Managed clients are hardcoded; self-serve accounts resolve from the account store.
+  const base = getBrandingById(session.clientId) ?? (await getAccountById(session.clientId))?.branding;
   if (!base) redirect('/login');
 
   // Internal / comp accounts: always full access (their base plan, e.g. Enterprise) with

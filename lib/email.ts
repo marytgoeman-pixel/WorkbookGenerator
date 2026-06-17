@@ -18,6 +18,28 @@ export function emailConfigured(): boolean {
 const esc = (s: string) =>
   (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// Sends an email-confirmation link to a new self-serve registrant.
+export async function sendVerifyEmail(to: string, link: string): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return false;
+  const from = process.env.INQUIRY_FROM || 'The Learning Creative <onboarding@resend.dev>';
+  const html =
+    `<h2>Confirm your email</h2>` +
+    `<p>Welcome! Confirm your email to start building your branded, fillable workbook template.</p>` +
+    `<p><a href="${esc(link)}" style="background:#163446;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Confirm my email</a></p>` +
+    `<p style="color:#6b7280;font-size:13px">Or paste this link into your browser:<br>${esc(link)}</p>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: [to], subject: 'Confirm your email — The Learning Creative', html }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendInquiryEmail(i: Inquiry): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;

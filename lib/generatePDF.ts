@@ -726,7 +726,10 @@ export async function generatePDF(
       y = bottom - tmpl.paragraphSpacing;
     };
 
-    const renderCalloutBox = (lines: string[]) => {
+    // Callout content: read-only text + bullets, rendered together INSIDE the panel
+    // (bullets used to spill out below the box).
+    const renderCalloutBox = (items: Array<{ text: string; bullet?: boolean }>) => {
+      const bulletIndent = 14;
       // The Learning Creative: a light, leaf-accented panel (matches the website) —
       // pale-green background, a solid green left accent bar, the leaf mark top-left,
       // and navy body text. No dark fill, no dashed border.
@@ -734,17 +737,19 @@ export async function generatePDF(
         const pad = 14;
         const accentW = 4;                                   // green left accent bar
         const cLineH = tmpl.lineHeight * ls;
-        const paraGap = cLineH * 0.5;
+        const itemGap = cLineH * 0.4;
         const panelBg = hexToRgb(branding!.colors.grayBox);  // pale lime tint
         const barColor = hexToRgb(branding!.colors.subtitle);// dark green
         const textColor = hexToRgb(branding!.colors.header); // navy
         const textX = tmpl.marginLeft + accentW + pad;
         const innerW = mainColWidth - accentW - pad * 2;
-        const paras = lines.map((l) => wrapText(l, innerW, font, tmpl.bodySize)).filter((p) => p.join('').trim());
+        const wrapped = items
+          .map((it) => ({ bullet: !!it.bullet, lines: wrapText(it.text, innerW - (it.bullet ? bulletIndent : 0), font, tmpl.bodySize) }))
+          .filter((w) => w.lines.join('').trim());
         const leafW = leafMark ? 30 : 0;
         const leafH = leafMark ? leafW * (leafMark.height / leafMark.width) : 0;
         const leafGap = leafMark ? 9 : 0;
-        const textH = paras.reduce((h, p) => h + p.length * cLineH, 0) + Math.max(0, paras.length - 1) * paraGap;
+        const textH = wrapped.reduce((h, w) => h + w.lines.length * cLineH, 0) + Math.max(0, wrapped.length - 1) * itemGap;
         const boxH = pad + leafH + leafGap + textH + pad;
         ensureSpace(boxH + 8);
         const boxTop = y + tmpl.bodySize;
@@ -754,9 +759,11 @@ export async function generatePDF(
           page.drawImage(leafMark, { x: textX, y: boxTop - pad - leafH, width: leafW, height: leafH });
         }
         let cy = boxTop - pad - leafH - leafGap - tmpl.bodySize + 2;
-        paras.forEach((p, i) => {
-          for (const wline of p) { page.drawText(wline, { x: textX, y: cy, size: tmpl.bodySize, font, color: textColor }); cy -= cLineH; }
-          if (i < paras.length - 1) cy -= paraGap;
+        wrapped.forEach((w, i) => {
+          const lineX = textX + (w.bullet ? bulletIndent : 0);
+          if (w.bullet) page.drawText('•', { x: textX, y: cy, size: tmpl.bodySize, font: boldFont, color: barColor });
+          for (const wline of w.lines) { page.drawText(wline, { x: lineX, y: cy, size: tmpl.bodySize, font, color: textColor }); cy -= cLineH; }
+          if (i < wrapped.length - 1) cy -= itemGap;
         });
         y = boxTop - boxH - tmpl.paragraphSpacing;
         return;
@@ -765,27 +772,33 @@ export async function generatePDF(
       const pad = 12;
       const innerW = mainColWidth - pad * 2;
       const cLineH = tmpl.lineHeight * ls;          // line spacing controls how tight lines are
-      const paraGap = cLineH * 0.5;                 // modest gap between paragraphs (was a full blank line)
-      const paras = lines.map((l) => wrapText(l, innerW, font, tmpl.bodySize)).filter((p) => p.join('').trim());
-      const boxH = paras.reduce((h, p) => h + p.length * cLineH, 0) + Math.max(0, paras.length - 1) * paraGap + pad * 2;
+      const itemGap = cLineH * 0.4;
+      const wrapped = items
+        .map((it) => ({ bullet: !!it.bullet, lines: wrapText(it.text, innerW - (it.bullet ? bulletIndent : 0), font, tmpl.bodySize) }))
+        .filter((w) => w.lines.join('').trim());
+      const boxH = wrapped.reduce((h, w) => h + w.lines.length * cLineH, 0) + Math.max(0, wrapped.length - 1) * itemGap + pad * 2;
       ensureSpace(boxH + 8);
       const boxTop = y + tmpl.bodySize;
       page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: calloutBg });
       page.drawRectangle({ x: tmpl.marginLeft + 5, y: boxTop - boxH + 5, width: mainColWidth - 10, height: boxH - 10, borderColor: hexToRgb(branding!.colors.calloutBorder), borderWidth: 1, borderDashArray: [3, 3], color: calloutBg });
       let cy = boxTop - pad - tmpl.bodySize + 2;
-      paras.forEach((p, i) => {
-        for (const wline of p) { page.drawText(wline, { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) }); cy -= cLineH; }
-        if (i < paras.length - 1) cy -= paraGap;
+      wrapped.forEach((w, i) => {
+        const lineX = tmpl.marginLeft + pad + (w.bullet ? bulletIndent : 0);
+        if (w.bullet) page.drawText('•', { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font: boldFont, color: rgb(1, 1, 1) });
+        for (const wline of w.lines) { page.drawText(wline, { x: lineX, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) }); cy -= cLineH; }
+        if (i < wrapped.length - 1) cy -= itemGap;
       });
       y = boxTop - boxH - tmpl.paragraphSpacing;
     };
 
     if (branded && section.callout) {
-      const texts = section.content.filter((i) => i.kind === 'text').map((i) => i.text);
-      if (texts.length) renderCalloutBox(texts);
+      // Text + bullets go INSIDE the callout panel (in document order); fields/tables below.
+      const boxed = section.content
+        .filter((i) => i.kind === 'text' || i.kind === 'bullet')
+        .map((i) => ({ text: (i as { text: string }).text, bullet: i.kind === 'bullet' }));
+      if (boxed.length) renderCalloutBox(boxed);
       for (const item of section.content) {
-        if (item.kind === 'bullet') renderBullet(item.text, item.color);
-        else if (item.kind === 'field') renderField(item.field);
+        if (item.kind === 'field') renderField(item.field);
         else if (item.kind === 'table') renderTable(item.table);
       }
     } else {

@@ -107,11 +107,13 @@ export interface ClientBranding {
   };
   // Self-serve template-builder choices (optional; managed brands use their template code).
   font?: 'sans' | 'serif' | 'mono';     // base typeface family
-  coverStyle?: 'band' | 'minimal' | 'photo'; // cover layout
+  coverStyle?: 'band' | 'minimal' | 'photo' | 'bold' | 'sidebar'; // cover layout
   footerStyle?: 'standard' | 'minimal' | 'none'; // footer treatment
   logoPosition?: 'top' | 'bottom';      // brand logo in the top bar vs the footer (interior pages)
   calloutStyle?: 'bar' | 'plain' | 'solid'; // callout panel look
   calloutIcon?: string;                 // optional icon key (see lib/icons.ts) for callout panels
+  coverLogoScale?: number;              // cover logo size multiplier (0.5–2.5)
+  coverLogoAlign?: 'left' | 'center' | 'right'; // cover logo horizontal placement
 }
 
 export interface ColorTheme {

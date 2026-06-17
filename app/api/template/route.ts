@@ -57,11 +57,14 @@ export async function POST(req: NextRequest) {
       grayBox: hex(c.grayBox, cur.colors.grayBox),
     },
     font: pick(['sans', 'serif', 'mono'] as const, b?.font, cur.font ?? 'sans'),
-    coverStyle: pick(['band', 'minimal', 'photo'] as const, b?.coverStyle, cur.coverStyle ?? 'band'),
+    coverStyle: pick(['band', 'minimal', 'photo', 'bold', 'sidebar'] as const, b?.coverStyle, cur.coverStyle ?? 'band'),
     footerStyle: pick(['standard', 'minimal', 'none'] as const, b?.footerStyle, cur.footerStyle ?? 'standard'),
     logoPosition: pick(['top', 'bottom'] as const, b?.logoPosition, cur.logoPosition ?? 'bottom'),
     calloutStyle: pick(['bar', 'plain', 'solid'] as const, b?.calloutStyle, cur.calloutStyle ?? 'bar'),
     calloutIcon: b?.calloutIcon === '' ? '' : (ICON_KEYS.includes(b?.calloutIcon) ? b.calloutIcon : (cur.calloutIcon ?? '')),
+    coverLogoScale: (typeof b?.coverLogoScale === 'number' && isFinite(b.coverLogoScale))
+      ? Math.max(0.5, Math.min(2.5, b.coverLogoScale)) : (cur.coverLogoScale ?? 1),
+    coverLogoAlign: pick(['left', 'center', 'right'] as const, b?.coverLogoAlign, cur.coverLogoAlign ?? 'right'),
   };
 
   if (isManaged) {

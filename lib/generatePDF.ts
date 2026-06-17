@@ -1081,6 +1081,11 @@ async function drawCoverPage(
   const pad = tmpl.marginLeft;
   const innerW = W - pad * 2;
   const coverStyle = branding.coverStyle ?? 'band';
+  // Cover-logo size/placement controls (self-serve builder). Clamp scale to a sane range.
+  const logoScale = Math.max(0.5, Math.min(2.5, branding.coverLogoScale ?? 1));
+  const logoAlign = branding.coverLogoAlign ?? (coverStyle === 'minimal' ? 'left' : 'right');
+  // Given a drawn logo width, return its left x for the chosen alignment.
+  const logoX = (w: number) => logoAlign === 'left' ? pad : logoAlign === 'center' ? (W - w) / 2 : W - pad - w;
 
   // MINIMAL cover: clean white, logo top, big title in the brand color, accent rule —
   // no background photo. Good for logo-only brands.
@@ -1088,7 +1093,7 @@ async function drawCoverPage(
     const primary = hexToRgb(branding.colors.title);
     const accentC = hexToRgb(branding.colors.accent);
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(1, 1, 1) });
-    if (logo) { const th = 46; const sc = th / logo.height; page.drawImage(logo, { x: pad, y: H - 60 - th, width: logo.width * sc, height: th }); }
+    if (logo) { const th = 46 * logoScale; const sc = th / logo.height; const lw = logo.width * sc; page.drawImage(logo, { x: logoX(lw), y: H - 60 - th, width: lw, height: th }); }
     const titleCase = doc.titleCase ?? 'upper';
     const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
     let tSize = 34;
@@ -1104,6 +1109,83 @@ async function drawCoverPage(
     if (sub) page.drawText(sanitize(sub), { x: pad, y: ty, size: 14, font, color: hexToRgb(branding.colors.subtitle) });
     page.drawText(sanitize(doc.author?.trim() || branding.displayName), { x: pad, y: 70, size: 13, font: boldFont, color: primary });
     page.drawText(sanitize(branding.tagline), { x: pad, y: 52, size: 10, font: italicFont, color: rgb(0.5, 0.5, 0.5) });
+    return;
+  }
+
+  // BOLD cover: the whole page is the brand color, with a big centered title in white,
+  // logo near the top, and the author + tagline at the foot. No photo. Strong & simple.
+  if (coverStyle === 'bold') {
+    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
+    if (logo) {
+      const th = 54 * logoScale; const sc = th / logo.height; const lw = logo.width * sc;
+      const lx = logoAlign === 'left' ? pad : logoAlign === 'right' ? W - pad - lw : (W - lw) / 2;
+      page.drawImage(logo, { x: lx, y: H - 80 - th, width: lw, height: th });
+    }
+    const titleCase = doc.titleCase ?? 'upper';
+    const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
+    let tSize = 38;
+    let lines = wrapText(rawTitle, innerW, boldFont, tSize);
+    while (lines.length > 5 && tSize > 24) { tSize -= 2; lines = wrapText(rawTitle, innerW, boldFont, tSize); }
+    const lh = tSize + 10;
+    let ty = H * 0.56 + (lines.length * lh) / 2;
+    for (const ln of lines) {
+      const lw = boldFont.widthOfTextAtSize(ln, tSize);
+      page.drawText(ln, { x: (W - lw) / 2, y: ty, size: tSize, font: boldFont, color: rgb(1, 1, 1) });
+      ty -= lh;
+    }
+    ty -= 6;
+    page.drawRectangle({ x: (W - 90) / 2, y: ty, width: 90, height: 4, color: gold });
+    ty -= 26;
+    const sub = doc.cover?.subtitle?.trim();
+    if (sub) { const sw = font.widthOfTextAtSize(sanitize(sub), 14); page.drawText(sanitize(sub), { x: (W - sw) / 2, y: ty, size: 14, font, color: rgb(0.85, 0.9, 0.94) }); }
+    const an = sanitize(doc.author?.trim() || branding.displayName);
+    const anW = boldFont.widthOfTextAtSize(an, 13);
+    page.drawText(an, { x: (W - anW) / 2, y: 74, size: 13, font: boldFont, color: rgb(1, 1, 1) });
+    const tg = sanitize(branding.tagline);
+    const tgW = italicFont.widthOfTextAtSize(tg, 10);
+    page.drawText(tg, { x: (W - tgW) / 2, y: 56, size: 10, font: italicFont, color: rgb(0.75, 0.82, 0.88) });
+    return;
+  }
+
+  // SIDEBAR cover: a vertical brand band down one side holds the logo + tagline; the title
+  // sits on the white field. Side follows coverLogoAlign (left/right; center → left).
+  if (coverStyle === 'sidebar') {
+    const onLeft = logoAlign !== 'right';
+    const barW = W * 0.36;
+    const barX = onLeft ? 0 : W - barW;
+    const fieldX = onLeft ? barX + barW + pad : pad;
+    const fieldW = W - barW - pad * 2;
+    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(1, 1, 1) });
+    page.drawRectangle({ x: barX, y: 0, width: barW, height: H, color: navy });
+    // gold seam
+    page.drawRectangle({ x: onLeft ? barW : W - barW - 3, y: 0, width: 3, height: H, color: gold });
+    if (logo) {
+      let th = 50 * logoScale; let lw = logo.width * (th / logo.height);
+      const maxW = barW - 24;
+      if (lw > maxW) { th *= maxW / lw; lw = maxW; } // keep it inside the band
+      page.drawImage(logo, { x: barX + (barW - lw) / 2, y: H - 70 - th, width: lw, height: th });
+    }
+    // tagline runs along the bottom of the band
+    const tg = sanitize(branding.tagline);
+    const tgLines = wrapText(tg, barW - 28, italicFont, 9);
+    let tgy = 40 + (tgLines.length - 1) * 12;
+    for (const ln of tgLines) { const w = italicFont.widthOfTextAtSize(ln, 9); page.drawText(ln, { x: barX + (barW - w) / 2, y: tgy, size: 9, font: italicFont, color: rgb(0.85, 0.9, 0.94) }); tgy -= 12; }
+    // title block on the white field
+    const titleCase = doc.titleCase ?? 'upper';
+    const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
+    let tSize = 30;
+    let lines = wrapText(rawTitle, fieldW, boldFont, tSize);
+    while (lines.length > 6 && tSize > 20) { tSize -= 2; lines = wrapText(rawTitle, fieldW, boldFont, tSize); }
+    const lh = tSize + 8;
+    const primary = hexToRgb(branding.colors.title);
+    let ty = H * 0.58 + (lines.length * lh) / 2;
+    for (const ln of lines) { page.drawText(ln, { x: fieldX, y: ty, size: tSize, font: boldFont, color: primary }); ty -= lh; }
+    ty -= 4;
+    page.drawRectangle({ x: fieldX, y: ty, width: 80, height: 4, color: hexToRgb(branding.colors.accent) });
+    ty -= 24;
+    const sub = doc.cover?.subtitle?.trim();
+    if (sub) page.drawText(sanitize(sub), { x: fieldX, y: ty, size: 13, font, color: hexToRgb(branding.colors.subtitle) });
+    page.drawText(sanitize(doc.author?.trim() || branding.displayName), { x: fieldX, y: 70, size: 13, font: boldFont, color: primary });
     return;
   }
 
@@ -1178,12 +1260,13 @@ async function drawCoverPage(
   ty -= byGap + 2;
   page.drawText(tagline, { x: pad, y: ty, size: 9, font: italicFont, color: rgb(0.85, 0.9, 0.94) });
 
-  // Logo bottom-right within the band, if available (white wordmark + green leaf reads on navy)
+  // Logo within the band, if available (white wordmark reads on navy). Size + side are
+  // builder-controlled (coverLogoScale / coverLogoAlign); default bottom-right.
   if (logo) {
-    const targetH = 50;
+    const targetH = 50 * logoScale;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
-    page.drawImage(logo, { x: W - pad - w, y: 22, width: w, height: targetH });
+    page.drawImage(logo, { x: logoX(w), y: 22, width: w, height: targetH });
   }
 }
 

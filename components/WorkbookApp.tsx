@@ -77,6 +77,12 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   const [wipSaved, setWipSaved] = useState(false);
   // Save the in-progress workbook before navigating out to Stripe, so the user's work
   // survives the redirect — they can reopen it from Saved when they come back.
+  // Going to the template builder navigates away — save the current workbook first so
+  // in-progress edits aren't lost (it lands in Saved).
+  async function goToTemplate() {
+    if (doc) { try { await saveCurrent(); } catch { /* don't block navigation on a save hiccup */ } }
+    window.location.href = '/setup';
+  }
   async function preserveWip() {
     if (!doc) return;
     try {
@@ -283,9 +289,9 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
             >
               📁 Saved{savedCount > 0 ? ` (${savedCount})` : ''}
             </button>
-            <a href="/setup" className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all" title="Edit your branded template">
+            <button onClick={goToTemplate} className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all" title="Edit your branded template (your workbook is saved first)">
               🎨 Template
-            </a>
+            </button>
             <button
               onClick={() => setShowUpgrade(true)}
               className="px-3 py-1.5 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"

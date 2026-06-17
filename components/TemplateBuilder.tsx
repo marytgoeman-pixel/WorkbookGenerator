@@ -70,7 +70,9 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
   const [accent, setAccent] = useState(initial.colors.accent || '#0EA5E9');
   const [box, setBox] = useState(initial.colors.grayBox || '#F1F5F9');
   const [font, setFont] = useState<'sans' | 'serif' | 'mono'>(initial.font || 'sans');
-  const [coverStyle, setCoverStyle] = useState<'band' | 'minimal' | 'photo'>(initial.coverStyle || 'band');
+  const [coverStyle, setCoverStyle] = useState<'band' | 'minimal' | 'photo' | 'bold' | 'sidebar'>(initial.coverStyle || 'band');
+  const [coverLogoScale, setCoverLogoScale] = useState<number>(initial.coverLogoScale ?? 1);
+  const [coverLogoAlign, setCoverLogoAlign] = useState<'left' | 'center' | 'right'>(initial.coverLogoAlign || 'right');
   const [footerStyle, setFooterStyle] = useState<'standard' | 'minimal' | 'none'>(initial.footerStyle || 'standard');
   const [logoPosition, setLogoPosition] = useState<'top' | 'bottom'>(initial.logoPosition || 'bottom');
   const [calloutStyle, setCalloutStyle] = useState<'bar' | 'plain' | 'solid'>(initial.calloutStyle || 'bar');
@@ -110,7 +112,7 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
     try {
       const res = await fetch('/api/template', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName, tagline, logoUrl: logo, colors, font, coverStyle, footerStyle, logoPosition, calloutStyle, calloutIcon }),
+        body: JSON.stringify({ displayName, tagline, logoUrl: logo, colors, font, coverStyle, coverLogoScale, coverLogoAlign, footerStyle, logoPosition, calloutStyle, calloutIcon }),
       });
       if (res.ok) { router.push('/'); router.refresh(); return; }
       const d = await res.json().catch(() => ({}));
@@ -125,6 +127,14 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
   const label = 'block text-xs font-semibold text-gray-500 mb-1';
   const card = 'bg-white rounded-2xl border border-gray-100 shadow-sm p-5';
   const seg = (active: boolean) => `px-3 py-1.5 rounded-lg text-sm border ${active ? 'text-white' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`;
+
+  // Cover-preview logo: scales with the size slider; falls back to the brand name when no
+  // logo is uploaded. onDark picks a readable color for that text fallback.
+  const coverLogoH = Math.round(24 * coverLogoScale);
+  const logoSlot = (onDark: boolean) => logo
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={logo} alt="" style={{ height: coverLogoH }} className="object-contain max-w-[70%]" />
+    : <span className="font-bold text-[11px]" style={{ color: onDark ? '#fff' : primary }}>{displayName || 'Your Brand'}</span>;
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
@@ -185,10 +195,23 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
               </div>
               <label className={`${label} mt-3`}>Cover style</label>
               <div className="flex gap-2 flex-wrap">
-                {(['band', 'minimal', 'photo'] as const).map((c) => (
-                  <button key={c} onClick={() => setCoverStyle(c)} className={seg(coverStyle === c)} style={coverStyle === c ? { backgroundColor: primary, borderColor: primary } : undefined}>{c[0].toUpperCase() + c.slice(1)}</button>
+                {([['band', 'Band'], ['photo', 'Photo'], ['minimal', 'Minimal'], ['bold', 'Bold color'], ['sidebar', 'Sidebar']] as const).map(([c, lbl]) => (
+                  <button key={c} onClick={() => setCoverStyle(c)} className={seg(coverStyle === c)} style={coverStyle === c ? { backgroundColor: primary, borderColor: primary } : undefined}>{lbl}</button>
                 ))}
               </div>
+
+              <label className={`${label} mt-3`}>Cover logo size</label>
+              <div className="flex items-center gap-3">
+                <input type="range" min={0.5} max={2.5} step={0.1} value={coverLogoScale} onChange={(e) => setCoverLogoScale(parseFloat(e.target.value))} className="flex-1" />
+                <span className="text-xs text-gray-500 w-10 text-right">{Math.round(coverLogoScale * 100)}%</span>
+              </div>
+              <label className={`${label} mt-3`}>Cover logo position</label>
+              <div className="flex gap-2 flex-wrap">
+                {([['left', 'Left'], ['center', 'Center'], ['right', 'Right']] as const).map(([v, lbl]) => (
+                  <button key={v} onClick={() => setCoverLogoAlign(v)} className={seg(coverLogoAlign === v)} style={coverLogoAlign === v ? { backgroundColor: primary, borderColor: primary } : undefined}>{lbl}</button>
+                ))}
+              </div>
+
               <label className={`${label} mt-3`}>Footer style</label>
               <div className="flex gap-2 flex-wrap">
                 {(['standard', 'minimal', 'none'] as const).map((c) => (
@@ -230,32 +253,112 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
             </div>
           </div>
 
-          {/* Live mock preview */}
-          <div className="md:sticky md:top-8 self-start">
+          {/* Live mock previews — cover first, then an interior page */}
+          <div className="md:sticky md:top-8 self-start space-y-4">
+            {/* COVER preview */}
             <div className={card}>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Preview</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Cover preview</p>
               <div className="rounded-xl overflow-hidden border border-gray-200" style={{ fontFamily: FONTS[font] }}>
-                {/* cover mock */}
+                <div className="relative" style={{ aspectRatio: '8.5 / 11', backgroundColor: '#fff' }}>
+                  {(() => {
+                    const justify = coverLogoAlign === 'left' ? 'flex-start' : coverLogoAlign === 'right' ? 'flex-end' : 'center';
+
+                    // BAND — photo area on top, brand band along the bottom with the title + logo.
+                    if (coverStyle === 'band' || coverStyle === 'photo') {
+                      const bandPct = coverStyle === 'photo' ? 34 : 46;
+                      return (<>
+                        <div className="absolute inset-x-0 top-0 flex items-center justify-center text-[9px] text-gray-300"
+                          style={{ height: `${100 - bandPct}%`, background: 'repeating-linear-gradient(135deg,#eef1f4,#eef1f4 8px,#e7ebef 8px,#e7ebef 16px)' }}>Cover photo</div>
+                        <div className="absolute inset-x-0 bottom-0 px-5 pt-3 pb-4 flex flex-col justify-end" style={{ height: `${bandPct}%`, backgroundColor: primary }}>
+                          <div className="text-[9px] uppercase tracking-wide" style={{ color: accent }}>A hands-on guide</div>
+                          <div className="text-lg font-bold leading-tight text-white">Sample Workbook</div>
+                          <div className="inline-block self-start text-[10px] text-white px-1.5 py-0.5 mt-1" style={{ backgroundColor: accent }}>{displayName || 'Your Brand'}</div>
+                          <div className="flex items-end mt-2" style={{ justifyContent: justify }}>{logoSlot(true)}</div>
+                        </div>
+                      </>);
+                    }
+
+                    // BOLD — full brand color, everything centered.
+                    if (coverStyle === 'bold') {
+                      return (<div className="absolute inset-0 flex flex-col items-center justify-between py-8 px-5" style={{ backgroundColor: primary }}>
+                        <div className="w-full flex" style={{ justifyContent: justify }}>{logoSlot(true)}</div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-white leading-tight">Sample Workbook</div>
+                          <div className="h-1 w-12 mx-auto my-2" style={{ backgroundColor: accent }} />
+                          <div className="text-[11px]" style={{ color: '#dbe4ea' }}>A hands-on guide</div>
+                        </div>
+                        <div className="text-[10px] text-white/80">{displayName || 'Your Brand'} · {tagline || ''}</div>
+                      </div>);
+                    }
+
+                    // SIDEBAR — vertical brand band on one side, title on the white field.
+                    if (coverStyle === 'sidebar') {
+                      const onLeft = coverLogoAlign !== 'right';
+                      const bar = (<div className="absolute inset-y-0 flex flex-col items-center justify-between py-6 px-2" style={{ width: '36%', backgroundColor: primary, left: onLeft ? 0 : undefined, right: onLeft ? undefined : 0 }}>
+                        <div>{logoSlot(true)}</div>
+                        <div className="text-[8px] text-center" style={{ color: '#dbe4ea' }}>{tagline || ''}</div>
+                      </div>);
+                      return (<>
+                        {bar}
+                        <div className="absolute inset-y-0 flex flex-col justify-center px-4" style={{ width: '60%', left: onLeft ? undefined : 0, right: onLeft ? 0 : undefined }}>
+                          <div className="text-lg font-bold leading-tight" style={{ color: primary }}>Sample Workbook</div>
+                          <div className="h-1 w-10 my-2" style={{ backgroundColor: accent }} />
+                          <div className="text-[11px]" style={{ color: accent }}>A hands-on guide</div>
+                        </div>
+                      </>);
+                    }
+
+                    // MINIMAL — clean white, logo on top, title below.
+                    return (<div className="absolute inset-0 flex flex-col px-6 pt-8 pb-6">
+                      <div className="flex" style={{ justifyContent: justify }}>{logoSlot(false)}</div>
+                      <div className="mt-auto">
+                        <div className="text-xl font-bold leading-tight" style={{ color: primary }}>Sample Workbook</div>
+                        <div className="h-1 w-12 my-2" style={{ backgroundColor: accent }} />
+                        <div className="text-[11px]" style={{ color: accent }}>A hands-on guide</div>
+                        <div className="text-[10px] text-gray-400 mt-3">{displayName || 'Your Brand'}</div>
+                      </div>
+                    </div>);
+                  })()}
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2">Photo styles use your uploaded cover image when you build a workbook; the stripe is a placeholder.</p>
+            </div>
+
+            {/* PAGE preview */}
+            <div className={card}>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Page preview</p>
+              <div className="rounded-xl overflow-hidden border border-gray-200" style={{ fontFamily: FONTS[font] }}>
                 <div className="relative bg-white" style={{ aspectRatio: '8.5 / 11' }}>
-                  {coverStyle === 'band' && <div className="absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-4" style={{ backgroundColor: primary }}>
+                  {logoPosition === 'top' && <div className="absolute top-0 left-0 right-0 h-9 flex items-center justify-between px-4" style={{ backgroundColor: primary }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {logo ? <img src={logo} alt="" className="h-6 object-contain" /> : <span className="text-white text-xs font-bold">{displayName || 'Your Brand'}</span>}
-                    <span className="text-white/80 text-[9px] uppercase">{tagline || ''}</span>
+                    {logo ? <img src={logo} alt="" className="h-5 object-contain" /> : <span className="text-white text-[10px] font-bold">{displayName || 'Your Brand'}</span>}
                   </div>}
-                  <div className="px-6" style={{ paddingTop: coverStyle === 'band' ? 70 : 48 }}>
-                    {coverStyle !== 'band' && logo && (/* eslint-disable-next-line @next/next/no-img-element */ <img src={logo} alt="" className="h-8 object-contain mb-4" />)}
-                    <div className="text-2xl font-bold leading-tight" style={{ color: primary }}>Sample Workbook</div>
-                    <div className="text-sm mt-1" style={{ color: accent }}>A hands-on guide</div>
-                    <div className="mt-5 rounded-md border p-3 text-[10px] text-gray-400" style={{ backgroundColor: box, borderColor: accent }}>Your fillable answer box</div>
-                    <div className="mt-3 flex items-start gap-1 text-[11px]" style={{ color: '#1f2937' }}><span style={{ color: accent }}>■</span> A sample bullet point</div>
+                  <div className="px-6" style={{ paddingTop: logoPosition === 'top' ? 52 : 28 }}>
+                    <div className="text-lg font-bold" style={{ color: primary }}>Section heading</div>
+                    <div className="text-[11px] text-gray-600 mt-1">A short prompt that introduces the exercise below.</div>
+                    <div className="mt-3 rounded-md border p-3 text-[10px] text-gray-400" style={{ backgroundColor: box, borderColor: accent }}>Your fillable answer box</div>
+                    <div className="mt-3 flex items-start gap-1.5 text-[11px]" style={{ color: '#1f2937' }}><span style={{ color: accent }}>■</span> A sample bullet point</div>
+                    {/* callout sample reflecting calloutStyle + icon */}
+                    <div className="mt-3 flex items-start gap-2 p-2.5 text-[10px]"
+                      style={calloutStyle === 'solid'
+                        ? { backgroundColor: primary, color: '#fff', borderRadius: 6 }
+                        : { backgroundColor: box, color: '#1f2937', borderRadius: 6, borderLeft: calloutStyle === 'plain' ? undefined : `4px solid ${accent}` }}>
+                      {calloutIcon && CALLOUT_ICONS[calloutIcon] && (
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill={calloutStyle === 'solid' ? '#fff' : accent} className="mt-0.5 shrink-0"><path d={CALLOUT_ICONS[calloutIcon].path} /></svg>
+                      )}
+                      <span>A highlighted callout or tip box.</span>
+                    </div>
                   </div>
                   {footerStyle !== 'none' && <div className="absolute bottom-0 left-0 right-0 px-4 py-1.5 flex items-center justify-between text-[8px] text-gray-400 border-t" style={{ borderColor: '#eee' }}>
-                    <span>{footerStyle === 'standard' ? (displayName || 'Your Brand') : ''}</span>
+                    {logoPosition === 'bottom' && logo
+                      ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={logo} alt="" className="h-3.5 object-contain" />)
+                      : <span>{footerStyle === 'standard' ? (displayName || 'Your Brand') : ''}</span>}
                     <span>Page 1</span>
                   </div>}
                 </div>
               </div>
             </div>
+
             {error && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mt-3">{error}</p>}
             <button onClick={save} disabled={saving} className="w-full mt-3 py-3 rounded-xl font-semibold text-white disabled:opacity-60" style={{ backgroundColor: primary }}>
               {saving ? 'Saving…' : 'Save template & continue →'}

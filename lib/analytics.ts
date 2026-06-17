@@ -103,6 +103,45 @@ export async function resetDownloadCounts(clientId: string): Promise<void> {
   }
 }
 
+// --- Public "Try Me" sandbox tracking (anonymous: time + approximate location only) ---
+export interface TryEvent {
+  event: 'open' | 'download';
+  ts: number;
+  loc?: string;   // approximate location from edge geo headers
+  title?: string; // workbook title for downloads
+}
+
+export async function recordTry(event: 'open' | 'download', loc?: string, title?: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try {
+    const ev: TryEvent = { event, ts: Date.now(), loc, title };
+    await Promise.all([
+      r.incr(`tryme:${event}s`),
+      r.lpush('tryme:events', JSON.stringify(ev)),
+      r.ltrim('tryme:events', 0, 199),
+    ]);
+  } catch {
+    /* never break the public demo */
+  }
+}
+
+export async function getTryStats(): Promise<{ opens: number; downloads: number; recent: TryEvent[] }> {
+  const r = getRedis();
+  if (!r) return { opens: 0, downloads: 0, recent: [] };
+  try {
+    const [opens, downloads, recentRaw] = await Promise.all([
+      r.get<number>('tryme:opens'),
+      r.get<number>('tryme:downloads'),
+      r.lrange('tryme:events', 0, 49),
+    ]);
+    const recent: TryEvent[] = (recentRaw ?? []).map((e) => (typeof e === 'string' ? JSON.parse(e) : e) as TryEvent);
+    return { opens: Number(opens ?? 0), downloads: Number(downloads ?? 0), recent };
+  } catch {
+    return { opens: 0, downloads: 0, recent: [] };
+  }
+}
+
 export async function getStats(clientIds: string[]): Promise<ClientStats[]> {
   const r = getRedis();
   if (!r) return [];

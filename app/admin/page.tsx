@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { clientIds, displayNameForId } from '@/lib/clients';
-import { getStats, analyticsConfigured } from '@/lib/analytics';
+import { getStats, getTryStats, analyticsConfigured } from '@/lib/analytics';
 import LogoutButton from '@/components/LogoutButton';
 import ResetTrialButton from '@/components/ResetTrialButton';
 
@@ -24,6 +24,7 @@ export default async function AdminPage() {
 
   const configured = analyticsConfigured();
   const stats = configured ? await getStats(clientIds()) : [];
+  const tryStats = configured ? await getTryStats() : { opens: 0, downloads: 0, recent: [] };
   const totalDownloads = stats.reduce((n, s) => n + s.downloads, 0);
   const totalLogins = stats.reduce((n, s) => n + s.logins, 0);
   const totalAi = stats.reduce((n, s) => n + s.ais, 0);
@@ -97,6 +98,34 @@ export default async function AdminPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Try Me — public demo (anonymous: time + approximate location only) */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-semibold text-gray-800">Try Me — public demo</h2>
+            <div className="text-sm text-gray-500">
+              <span className="font-semibold text-gray-800">{tryStats.opens}</span> opens ·{' '}
+              <span className="font-semibold" style={{ color: '#E04927' }}>{tryStats.downloads}</span> downloads
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mb-3">Anonymous (no login) — shown by time and approximate location.</p>
+          {tryStats.recent.length === 0 ? (
+            <p className="text-sm text-gray-400">No demo activity yet.</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {tryStats.recent.map((e, i) => (
+                <li key={i} className="flex items-center gap-3 flex-wrap">
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${e.event === 'download' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                    {e.event === 'download' ? 'download' : 'opened'}
+                  </span>
+                  <span className="text-gray-500">{fmt(e.ts)}</span>
+                  {e.title && <span className="text-gray-700 truncate">· {e.title}</span>}
+                  <span className="text-gray-400 truncate">· 📍 {e.loc || 'unknown location'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Recent activity */}

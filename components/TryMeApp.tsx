@@ -36,9 +36,18 @@ export default function TryMeApp({ branding }: Props) {
 
   const atLimit = downloads >= TRY_DOWNLOAD_LIMIT;
 
+  // Anonymous demo analytics (time + approximate location) for the admin view.
+  function track(event: 'open' | 'download', title?: string) {
+    fetch('/api/track-try', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, title }),
+    }).catch(() => {});
+  }
+
   // "Upload" → load the curated sample with a brief formatting beat so it feels real.
   function startSample() {
     if (formatting) return;
+    track('open');
     setFormatting(true);
     setTimeout(() => {
       setDoc(buildSampleWorkbook(branding.id));
@@ -47,6 +56,7 @@ export default function TryMeApp({ branding }: Props) {
   }
 
   function onDownloaded() {
+    track('download', doc?.title);
     const n = downloads + 1;
     setDownloads(n);
     try { localStorage.setItem('tryme_downloads', String(n)); } catch { /* ignore */ }

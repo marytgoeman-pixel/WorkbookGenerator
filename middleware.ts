@@ -18,5 +18,5 @@ export async function middleware(req: NextRequest) {
 // .mjs, .ico, …) so public assets — like the login logo and background — are served
 // WITHOUT a session.
 export const config = {
-  matcher: ['/((?!login|try|api/login|api/logout|api/inquiry|api/track-try|api/stripe/webhook|_next/static|_next/image|favicon.ico|.*\\..*).*)'],
+  matcher: ['/((?!login|try|api/login|api/logout|api/inquiry|api/track-try|api/track-session|api/stripe/webhook|_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 };

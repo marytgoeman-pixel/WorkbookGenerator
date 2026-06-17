@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { clientIds, displayNameForId } from '@/lib/clients';
-import { getStats, getTryStats, analyticsConfigured } from '@/lib/analytics';
+import { getStats, getTryStats, getSessions, analyticsConfigured } from '@/lib/analytics';
 import LogoutButton from '@/components/LogoutButton';
 import ResetTrialButton from '@/components/ResetTrialButton';
 
@@ -16,6 +16,16 @@ function fmt(ts: number | null): string {
   }) + ' CT';
 }
 
+// Human-readable session length.
+function dur(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), rs = s % 60;
+  if (m < 60) return `${m}m ${rs}s`;
+  const h = Math.floor(m / 60), rm = m % 60;
+  return `${h}h ${rm}m`;
+}
+
 export default async function AdminPage() {
   const cookieStore = await cookies();
   const session = await verifySession(cookieStore.get(SESSION_COOKIE)?.value);
@@ -25,6 +35,9 @@ export default async function AdminPage() {
   const configured = analyticsConfigured();
   const stats = configured ? await getStats(clientIds()) : [];
   const tryStats = configured ? await getTryStats() : { opens: 0, downloads: 0, recent: [] };
+  const trySessions = configured ? await getSessions('tryme') : [];
+  const clientSessions: Record<string, Awaited<ReturnType<typeof getSessions>>> = {};
+  if (configured) await Promise.all(clientIds().map(async (id) => { clientSessions[id] = await getSessions(id); }));
   const totalDownloads = stats.reduce((n, s) => n + s.downloads, 0);
   const totalLogins = stats.reduce((n, s) => n + s.logins, 0);
   const totalAi = stats.reduce((n, s) => n + s.ais, 0);
@@ -126,12 +139,43 @@ export default async function AdminPage() {
               ))}
             </ul>
           )}
+          {trySessions.length > 0 && (
+            <div className="mt-4 border-t border-gray-100 pt-3">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Visits (time in demo)</div>
+              <ul className="space-y-1 text-sm">
+                {trySessions.map((v, i) => (
+                  <li key={i} className="flex items-center gap-3 flex-wrap text-gray-600">
+                    <span>🕒 {fmt(v.start)}</span>
+                    <span className="font-semibold text-gray-800">· {dur(v.last - v.start)}</span>
+                    <span className="text-gray-400 truncate">· 📍 {v.loc || 'unknown location'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Recent activity */}
-        {stats.map((s) => s.recent.length > 0 && (
+        {stats.map((s) => {
+          const sess = clientSessions[s.clientId] || [];
+          if (s.recent.length === 0 && sess.length === 0) return null;
+          return (
           <div key={s.clientId} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-3">{displayNameForId(s.clientId)} — recent activity</h2>
+            {sess.length > 0 && (
+              <div className="mb-3">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sessions (time logged in)</div>
+                <ul className="space-y-1 text-sm">
+                  {sess.map((v, i) => (
+                    <li key={i} className="flex items-center gap-3 flex-wrap text-gray-600">
+                      <span>🕒 {fmt(v.start)}</span>
+                      <span className="font-semibold text-gray-800">· {dur(v.last - v.start)}</span>
+                      <span className="text-gray-400 truncate">· 📍 {v.loc || 'unknown location'}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <ul className="space-y-1 text-sm">
               {s.recent.map((e, i) => (
                 <li key={i} className="flex items-center gap-3">
@@ -145,7 +189,8 @@ export default async function AdminPage() {
               ))}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </main>
     </div>
   );

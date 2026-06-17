@@ -9,6 +9,7 @@ import DownloadButton from '@/components/DownloadButton';
 import SavedWorkbooks from '@/components/SavedWorkbooks';
 import { saveWorkbook, listSaved, SavedWorkbook } from '@/lib/savedWorkbooks';
 import { buildSampleWorkbook } from '@/lib/sampleWorkbook';
+import { useSessionHeartbeat } from '@/components/useSessionHeartbeat';
 import { APP_VERSION } from '@/lib/version';
 
 export type TrialInfo = { state: 'active' | 'expired'; daysLeft: number } | null;
@@ -29,6 +30,7 @@ const STEPS = [
 
 export default function WorkbookApp({ branding, trial, manageable }: Props) {
   const router = useRouter();
+  useSessionHeartbeat(); // track session length for the admin dashboard
   const [step, setStep] = useState<Step>(1);
   const [doc, setDoc] = useState<DocumentModel | null>(null);
   const [view, setView] = useState<'work' | 'saved'>('work');

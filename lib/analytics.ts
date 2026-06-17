@@ -142,6 +142,46 @@ export async function getTryStats(): Promise<{ opens: number; downloads: number;
   }
 }
 
+// --- Session duration ("how long they stayed"), measured by a client heartbeat ---
+export interface SessionRec { start: number; last: number; loc?: string; }
+
+// Upsert a session: first ping records the start; later pings extend `last`. Scope is a
+// clientId for logged-in accounts, or 'tryme' for the public demo. 14-day TTL.
+export async function touchSession(scope: string, id: string, loc?: string): Promise<void> {
+  const r = getRedis();
+  if (!r || !id) return;
+  try {
+    const key = `wbs:${scope}:${id}`;
+    const raw = await r.get(key);
+    const existing = (typeof raw === 'string' ? JSON.parse(raw) : raw) as SessionRec | null;
+    const now = Date.now();
+    if (!existing) {
+      await r.lpush(`wbslist:${scope}`, id);
+      await r.ltrim(`wbslist:${scope}`, 0, 49);
+    }
+    const rec: SessionRec = { start: existing?.start ?? now, last: now, loc: loc || existing?.loc };
+    await r.set(key, JSON.stringify(rec), { ex: 60 * 60 * 24 * 14 });
+  } catch {
+    /* never break the app over analytics */
+  }
+}
+
+export async function getSessions(scope: string): Promise<SessionRec[]> {
+  const r = getRedis();
+  if (!r) return [];
+  try {
+    const ids = await r.lrange<string>(`wbslist:${scope}`, 0, 49);
+    if (!ids || ids.length === 0) return [];
+    const raw = (await r.mget(...ids.map((id) => `wbs:${scope}:${id}`))) as unknown[];
+    return (raw || [])
+      .map((v) => (typeof v === 'string' ? JSON.parse(v) : v) as SessionRec | null)
+      .filter((v): v is SessionRec => !!v && typeof v.start === 'number')
+      .sort((a, b) => b.start - a.start);
+  } catch {
+    return [];
+  }
+}
+
 export async function getStats(clientIds: string[]): Promise<ClientStats[]> {
   const r = getRedis();
   if (!r) return [];

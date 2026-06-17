@@ -5,6 +5,7 @@ import DocumentEditor from '@/components/DocumentEditor';
 import PDFPreview from '@/components/PDFPreview';
 import DownloadButton from '@/components/DownloadButton';
 import { buildSampleWorkbook } from '@/lib/sampleWorkbook';
+import { useSessionHeartbeat } from '@/components/useSessionHeartbeat';
 
 const WATERMARK = 'Demo · The Learning Creative';
 const TRY_DOWNLOAD_LIMIT = 3; // watermarked sample downloads per visitor before the CTA takes over
@@ -17,6 +18,7 @@ interface Props {
 // edit / add elements, preview live, and download a watermarked PDF — then nudges them
 // to request access for the clean, branded version.
 export default function TryMeApp({ branding }: Props) {
+  useSessionHeartbeat(); // track how long a visitor stays in the demo
   const [doc, setDoc] = useState<DocumentModel | null>(null);
   const [formatting, setFormatting] = useState(false);
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);

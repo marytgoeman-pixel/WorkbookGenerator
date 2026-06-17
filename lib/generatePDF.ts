@@ -7,6 +7,7 @@ import { jomangumTemplate } from './templates/jomangum';
 import { sellitTemplate } from './templates/sellit';
 import { tlcTemplate } from './templates/tlc';
 import { coverById } from './covers';
+import { CALLOUT_ICONS } from './icons';
 import fontkit from '@pdf-lib/fontkit';
 
 type Template = {
@@ -763,19 +764,23 @@ export async function generatePDF(
         const wrapped = items
           .map((it) => ({ bullet: !!it.bullet, lines: wrapText(it.text, innerW - (it.bullet ? bulletIndent : 0), font, tmpl.bodySize) }))
           .filter((w) => w.lines.join('').trim());
+        // Panel mark: TLC's leaf, or a self-serve account's chosen icon, or none.
         const leafW = leafMark ? 30 : 0;
-        const leafH = leafMark ? leafW * (leafMark.height / leafMark.width) : 0;
-        const leafGap = leafMark ? 9 : 0;
+        const iconPath = !leafMark && branding!.calloutIcon ? CALLOUT_ICONS[branding!.calloutIcon]?.path : undefined;
+        const markH = leafMark ? leafW * (leafMark.height / leafMark.width) : (iconPath ? 18 : 0);
+        const markGap = (leafMark || iconPath) ? 9 : 0;
         const textH = wrapped.reduce((h, w) => h + w.lines.length * cLineH, 0) + Math.max(0, wrapped.length - 1) * itemGap;
-        const boxH = pad + leafH + leafGap + textH + pad;
+        const boxH = pad + markH + markGap + textH + pad;
         ensureSpace(boxH + 8);
         const boxTop = y + tmpl.bodySize;
         page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: panelBg });
-        page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: accentW, height: boxH, color: barColor });
+        if (accentW > 0) page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: accentW, height: boxH, color: barColor });
         if (leafMark) {
-          page.drawImage(leafMark, { x: textX, y: boxTop - pad - leafH, width: leafW, height: leafH });
+          page.drawImage(leafMark, { x: textX, y: boxTop - pad - markH, width: leafW, height: markH });
+        } else if (iconPath) {
+          try { page.drawSvgPath(iconPath, { x: textX, y: boxTop - pad, scale: markH / 24, color: barColor }); } catch { /* skip a bad icon path */ }
         }
-        let cy = boxTop - pad - leafH - leafGap - tmpl.bodySize + 2;
+        let cy = boxTop - pad - markH - markGap - tmpl.bodySize + 2;
         wrapped.forEach((w, i) => {
           const lineX = textX + (w.bullet ? bulletIndent : 0);
           if (w.bullet) page.drawText('•', { x: textX, y: cy, size: tmpl.bodySize, font: boldFont, color: barColor });

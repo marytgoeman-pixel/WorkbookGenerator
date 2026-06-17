@@ -122,6 +122,39 @@ export function caseStudyElement(): Section[] {
   }];
 }
 
+// A short highlighted "big idea" / takeaway — renders as a brand callout panel.
+export function tipBoxElement(): Section[] {
+  return [{
+    id: sid('tip'), level: 1, title: 'Key Takeaway', headingStyle: 'accent', callout: true,
+    content: [{ id: rid(), kind: 'text', text: 'Add the one idea you want readers to remember from this section.' }],
+  }];
+}
+
+// A checklist of action items the reader ticks off.
+export function checklistElement(): Section[] {
+  const item = (label: string): ContentItem => ({ id: rid(), kind: 'field', field: { id: rid(), label, type: 'checkbox', required: false } });
+  return [{
+    id: sid('checklist'), level: 1, title: 'Checklist', headingStyle: 'accent',
+    content: [
+      { id: rid(), kind: 'text', text: 'Tick each item as you complete it.' },
+      item('First action item'), item('Second action item'), item('Third action item'), item('Fourth action item'),
+    ],
+  }];
+}
+
+// Pros & Cons: a two-column fillable table that fills the page.
+export function prosConsElement(): Section[] {
+  const cell = (id: string): TableCell => ({ field: { id, label: '', type: 'textarea', required: false } });
+  const table: DocTable = {
+    id: sid('proscons'), headers: ['Pros', 'Cons'], fullPage: true,
+    rows: [[cell('pros'), cell('cons')]],
+  };
+  return [{
+    id: sid('prosconssec'), level: 1, title: 'Pros & Cons', headingStyle: 'accent', pageBreakBefore: true,
+    content: [{ id: rid(), kind: 'table', table }],
+  }];
+}
+
 export interface ElementDef {
   key: string;
   label: string;
@@ -137,4 +170,7 @@ export const ELEMENTS: ElementDef[] = [
   { key: 'swot', label: 'SWOT grid', icon: '🔲', make: () => swotElement() },
   { key: 'ssc', label: 'Stop / Start / Continue', icon: '🔁', make: () => stopStartContinueElement() },
   { key: 'casestudy', label: 'Case study', icon: '📁', make: () => caseStudyElement() },
+  { key: 'tip', label: 'Tip / takeaway', icon: '💡', make: () => tipBoxElement() },
+  { key: 'checklist', label: 'Checklist', icon: '☑️', make: () => checklistElement() },
+  { key: 'proscons', label: 'Pros & Cons', icon: '⚖️', make: () => prosConsElement() },
 ];

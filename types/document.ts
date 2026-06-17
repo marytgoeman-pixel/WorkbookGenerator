@@ -111,6 +111,7 @@ export interface ClientBranding {
   footerStyle?: 'standard' | 'minimal' | 'none'; // footer treatment
   logoPosition?: 'top' | 'bottom';      // brand logo in the top bar vs the footer (interior pages)
   calloutStyle?: 'bar' | 'plain' | 'solid'; // callout panel look
+  calloutIcon?: string;                 // optional icon key (see lib/icons.ts) for callout panels
 }
 
 export interface ColorTheme {

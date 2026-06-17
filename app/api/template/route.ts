@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { getAccountById, saveAccount } from '@/lib/accounts';
+import { ICON_KEYS } from '@/lib/icons';
 
 export const runtime = 'nodejs';
 
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
   const footerStyle = ['standard', 'minimal', 'none'].includes(b?.footerStyle) ? b.footerStyle : (cur.footerStyle ?? 'standard');
   const logoPosition = ['top', 'bottom'].includes(b?.logoPosition) ? b.logoPosition : (cur.logoPosition ?? 'bottom');
   const calloutStyle = ['bar', 'plain', 'solid'].includes(b?.calloutStyle) ? b.calloutStyle : (cur.calloutStyle ?? 'bar');
+  const calloutIcon = b?.calloutIcon === '' ? '' : (ICON_KEYS.includes(b?.calloutIcon) ? b.calloutIcon : (cur.calloutIcon ?? ''));
 
   const branding = {
     ...cur,
@@ -53,6 +55,7 @@ export async function POST(req: NextRequest) {
     footerStyle,
     logoPosition,
     calloutStyle,
+    calloutIcon,
   };
 
   await saveAccount({ ...acct, configured: true, branding });

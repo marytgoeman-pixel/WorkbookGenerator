@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClientBranding } from '@/types/document';
+import { CALLOUT_ICONS, ICON_KEYS } from '@/lib/icons';
 
 const NAVY = '#163446', GREEN = '#009346';
 
@@ -73,6 +74,8 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
   const [footerStyle, setFooterStyle] = useState<'standard' | 'minimal' | 'none'>(initial.footerStyle || 'standard');
   const [logoPosition, setLogoPosition] = useState<'top' | 'bottom'>(initial.logoPosition || 'bottom');
   const [calloutStyle, setCalloutStyle] = useState<'bar' | 'plain' | 'solid'>(initial.calloutStyle || 'bar');
+  const [calloutIcon, setCalloutIcon] = useState<string>(initial.calloutIcon || '');
+  const [iconQuery, setIconQuery] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -97,7 +100,7 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
     try {
       const res = await fetch('/api/template', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName, tagline, logoUrl: logo, colors, font, coverStyle, footerStyle, logoPosition, calloutStyle }),
+        body: JSON.stringify({ displayName, tagline, logoUrl: logo, colors, font, coverStyle, footerStyle, logoPosition, calloutStyle, calloutIcon }),
       });
       if (res.ok) { router.push('/'); router.refresh(); return; }
       const d = await res.json().catch(() => ({}));
@@ -192,6 +195,26 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
               <div className="flex gap-2 flex-wrap">
                 {([['bar', 'Accent bar'], ['plain', 'Plain'], ['solid', 'Solid']] as const).map(([v, lbl]) => (
                   <button key={v} onClick={() => setCalloutStyle(v)} className={seg(calloutStyle === v)} style={calloutStyle === v ? { backgroundColor: primary, borderColor: primary } : undefined}>{lbl}</button>
+                ))}
+              </div>
+
+              <label className={`${label} mt-3`}>Callout icon (optional)</label>
+              <input value={iconQuery} onChange={(e) => setIconQuery(e.target.value)} placeholder="Search icons (star, idea, goal…)" className="w-full border rounded-lg px-2 py-1.5 text-sm mb-2" />
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setCalloutIcon('')} title="No icon"
+                  className={`w-9 h-9 rounded-lg border flex items-center justify-center text-xs ${calloutIcon === '' ? 'text-white' : 'bg-white text-gray-500 border-gray-200'}`}
+                  style={calloutIcon === '' ? { backgroundColor: primary, borderColor: primary } : undefined}>None</button>
+                {ICON_KEYS.filter((k) => {
+                  const q = iconQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  const ic = CALLOUT_ICONS[k];
+                  return k.includes(q) || ic.label.toLowerCase().includes(q) || ic.keywords.includes(q);
+                }).map((k) => (
+                  <button key={k} onClick={() => setCalloutIcon(k)} title={CALLOUT_ICONS[k].label}
+                    className={`w-9 h-9 rounded-lg border flex items-center justify-center ${calloutIcon === k ? 'border-2' : 'border-gray-200 hover:border-gray-300'}`}
+                    style={{ borderColor: calloutIcon === k ? accent : undefined, color: accent }}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d={CALLOUT_ICONS[k].path} /></svg>
+                  </button>
                 ))}
               </div>
             </div>

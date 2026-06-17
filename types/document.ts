@@ -114,6 +114,8 @@ export interface ClientBranding {
   calloutIcon?: string;                 // optional icon key (see lib/icons.ts) for callout panels
   coverLogoScale?: number;              // cover logo size multiplier (0.5–2.5)
   coverLogoAlign?: 'left' | 'center' | 'right'; // cover logo horizontal placement
+  coverLogoWhite?: boolean;             // draw the logo in white on dark cover areas (band/bold/sidebar)
+  logoUrlWhite?: string;                // a white-silhouette version of the logo (data URL), used when coverLogoWhite is on
 }
 
 export interface ColorTheme {

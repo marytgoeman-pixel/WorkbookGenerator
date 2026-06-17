@@ -19,6 +19,9 @@ function starterBranding(displayName: string): ClientBranding {
       header: '#163446', title: '#163446', subtitle: '#334155', accent: '#0EA5E9',
       calloutBg: '#163446', calloutBorder: '#0EA5E9', grayBox: '#F1F5F9',
     },
+    // White logo on dark covers by default — the builder auto-generates the white variant on
+    // upload, so a dark logo stays visible on the Band/Bold/Sidebar covers out of the box.
+    coverLogoWhite: true,
     // Self-serve trial: 2 downloads (watermarked — applied in Stage 3).
     plan: { name: 'Trial', downloadsPerMonth: 2, trial: true },
   };

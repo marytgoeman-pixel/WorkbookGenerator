@@ -17,7 +17,7 @@ function getRedis(): Redis | null {
 }
 
 export type BrandingOverride = Partial<Pick<ClientBranding,
-  'displayName' | 'tagline' | 'logoUrl' | 'colors' | 'font' | 'coverStyle' | 'footerStyle' | 'logoPosition' | 'calloutStyle' | 'calloutIcon' | 'coverLogoScale' | 'coverLogoAlign'>>;
+  'displayName' | 'tagline' | 'logoUrl' | 'colors' | 'font' | 'coverStyle' | 'footerStyle' | 'logoPosition' | 'calloutStyle' | 'calloutIcon' | 'coverLogoScale' | 'coverLogoAlign' | 'coverLogoWhite' | 'logoUrlWhite'>>;
 
 const key = (clientId: string) => `brandover:${clientId}`;
 

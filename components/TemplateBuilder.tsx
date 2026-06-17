@@ -28,6 +28,26 @@ function resizeLogo(file: File): Promise<string> {
   });
 }
 
+// Make a white-silhouette version of a logo: every non-transparent pixel becomes white,
+// alpha (and anti-aliased edges) preserved. Used for placing the logo on dark cover bands.
+function whitenLogo(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+      const ctx = cv.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const id = ctx.getImageData(0, 0, cv.width, cv.height);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) { if (d[i + 3] > 0) { d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; } }
+      ctx.putImageData(id, 0, 0);
+      resolve(cv.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('bad image'));
+    img.src = dataUrl;
+  });
+}
+
 // Pull a dark "primary" and a saturated "accent" color out of the logo.
 function extractColors(dataUrl: string): Promise<{ primary: string; accent: string }> {
   return new Promise((resolve) => {
@@ -73,6 +93,8 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
   const [coverStyle, setCoverStyle] = useState<'band' | 'minimal' | 'photo' | 'bold' | 'sidebar'>(initial.coverStyle || 'band');
   const [coverLogoScale, setCoverLogoScale] = useState<number>(initial.coverLogoScale ?? 1);
   const [coverLogoAlign, setCoverLogoAlign] = useState<'left' | 'center' | 'right'>(initial.coverLogoAlign || 'right');
+  const [coverLogoWhite, setCoverLogoWhite] = useState<boolean>(initial.coverLogoWhite ?? true);
+  const [logoWhite, setLogoWhite] = useState(initial.logoUrlWhite || '');
   const [footerStyle, setFooterStyle] = useState<'standard' | 'minimal' | 'none'>(initial.footerStyle || 'standard');
   const [logoPosition, setLogoPosition] = useState<'top' | 'bottom'>(initial.logoPosition || 'bottom');
   const [calloutStyle, setCalloutStyle] = useState<'bar' | 'plain' | 'solid'>(initial.calloutStyle || 'bar');
@@ -86,11 +108,19 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
     try {
       const dataUrl = await resizeLogo(file);
       setLogo(dataUrl);
+      setLogoWhite(await whitenLogo(dataUrl).catch(() => '')); // keep the white variant in sync
       const { primary: p, accent: a } = await extractColors(dataUrl);
       setPrimary(p); setAccent(a);
     } catch {
       setError('Could not read that image. Try a PNG or JPG.');
     }
+  }
+
+  // Turning the white-logo option on generates the white variant if we don't have one yet.
+  async function toggleWhiteLogo() {
+    const next = !coverLogoWhite;
+    setCoverLogoWhite(next);
+    if (next && logo && !logoWhite) setLogoWhite(await whitenLogo(logo).catch(() => ''));
   }
 
   async function resetToOriginal() {
@@ -112,7 +142,7 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
     try {
       const res = await fetch('/api/template', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName, tagline, logoUrl: logo, colors, font, coverStyle, coverLogoScale, coverLogoAlign, footerStyle, logoPosition, calloutStyle, calloutIcon }),
+        body: JSON.stringify({ displayName, tagline, logoUrl: logo, logoUrlWhite: logoWhite, colors, font, coverStyle, coverLogoScale, coverLogoAlign, coverLogoWhite, footerStyle, logoPosition, calloutStyle, calloutIcon }),
       });
       if (res.ok) { router.push('/'); router.refresh(); return; }
       const d = await res.json().catch(() => ({}));
@@ -133,7 +163,7 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
   const coverLogoH = Math.round(24 * coverLogoScale);
   const logoSlot = (onDark: boolean) => logo
     // eslint-disable-next-line @next/next/no-img-element
-    ? <img src={logo} alt="" style={{ height: coverLogoH }} className="object-contain max-w-[70%]" />
+    ? <img src={logo} alt="" style={{ height: coverLogoH, filter: coverLogoWhite && onDark ? 'brightness(0) invert(1)' : undefined }} className="object-contain max-w-[70%]" />
     : <span className="font-bold text-[11px]" style={{ color: onDark ? '#fff' : primary }}>{displayName || 'Your Brand'}</span>;
 
   return (
@@ -164,7 +194,7 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
                 </div>
                 <div className="space-y-1">
                   <button onClick={() => fileRef.current?.click()} className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:border-blue-400">{logo ? 'Replace logo' : 'Upload logo'}</button>
-                  {logo && <button onClick={() => setLogo('')} className="block text-xs text-gray-400 hover:text-red-600">Remove</button>}
+                  {logo && <button onClick={() => { setLogo(''); setLogoWhite(''); }} className="block text-xs text-gray-400 hover:text-red-600">Remove</button>}
                   <input ref={fileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onLogo(f); }} />
                 </div>
               </div>
@@ -211,6 +241,14 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
                   <button key={v} onClick={() => setCoverLogoAlign(v)} className={seg(coverLogoAlign === v)} style={coverLogoAlign === v ? { backgroundColor: primary, borderColor: primary } : undefined}>{lbl}</button>
                 ))}
               </div>
+
+              <button onClick={toggleWhiteLogo} className="flex items-center gap-2 mt-3 text-left">
+                <span className={`w-9 h-5 rounded-full relative transition-colors ${coverLogoWhite ? '' : 'bg-gray-200'}`} style={coverLogoWhite ? { backgroundColor: primary } : undefined}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${coverLogoWhite ? 'left-[18px]' : 'left-0.5'}`} />
+                </span>
+                <span className="text-sm text-gray-600">Use a white logo on dark covers</span>
+              </button>
+              <p className="text-[11px] text-gray-400 mt-1">Recolors your logo white so it shows up on the Band, Bold color &amp; Sidebar covers. Leave off if your logo is already light.</p>
 
               <label className={`${label} mt-3`}>Footer style</label>
               <div className="flex gap-2 flex-wrap">
@@ -267,8 +305,11 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
                     if (coverStyle === 'band' || coverStyle === 'photo') {
                       const bandPct = coverStyle === 'photo' ? 34 : 46;
                       return (<>
-                        <div className="absolute inset-x-0 top-0 flex items-center justify-center text-[9px] text-gray-300"
-                          style={{ height: `${100 - bandPct}%`, background: 'repeating-linear-gradient(135deg,#eef1f4,#eef1f4 8px,#e7ebef 8px,#e7ebef 16px)' }}>Cover photo</div>
+                        <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: `${100 - bandPct}%` }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/covers/thumb-3.jpg" alt="Sample cover photo" className="w-full h-full object-cover" />
+                          <span className="absolute top-1 left-1 text-[8px] text-white bg-black/45 rounded px-1 py-0.5">Sample image</span>
+                        </div>
                         <div className="absolute inset-x-0 bottom-0 px-5 pt-3 pb-4 flex flex-col justify-end" style={{ height: `${bandPct}%`, backgroundColor: primary }}>
                           <div className="text-[9px] uppercase tracking-wide" style={{ color: accent }}>A hands-on guide</div>
                           <div className="text-lg font-bold leading-tight text-white">Sample Workbook</div>
@@ -321,7 +362,7 @@ export default function TemplateBuilder({ initial, managed }: { initial: ClientB
                   })()}
                 </div>
               </div>
-              <p className="text-[11px] text-gray-400 mt-2">Photo styles use your uploaded cover image when you build a workbook; the stripe is a placeholder.</p>
+              <p className="text-[11px] text-gray-400 mt-2">The photo on the Band &amp; Photo covers is a sample — you choose the real cover image when you build each workbook.</p>
             </div>
 
             {/* PAGE preview */}

@@ -42,6 +42,11 @@ export async function POST(req: NextRequest) {
   if (typeof b?.logoUrl === 'string' && b.logoUrl.startsWith('data:image/') && b.logoUrl.length < 1_600_000) logoUrl = b.logoUrl;
   else if (b?.logoUrl === '') logoUrl = '';
 
+  // White-silhouette logo (generated client-side) for dark cover areas.
+  let logoUrlWhite = cur.logoUrlWhite ?? '';
+  if (typeof b?.logoUrlWhite === 'string' && b.logoUrlWhite.startsWith('data:image/') && b.logoUrlWhite.length < 1_600_000) logoUrlWhite = b.logoUrlWhite;
+  else if (b?.logoUrlWhite === '') logoUrlWhite = '';
+
   const pick = <T extends string>(opts: readonly T[], v: unknown, fb: T): T => (opts.includes(v as T) ? (v as T) : fb);
   const fields = {
     displayName: (typeof b?.displayName === 'string' && b.displayName.trim()) ? b.displayName.trim().slice(0, 80) : cur.displayName,
@@ -65,6 +70,8 @@ export async function POST(req: NextRequest) {
     coverLogoScale: (typeof b?.coverLogoScale === 'number' && isFinite(b.coverLogoScale))
       ? Math.max(0.5, Math.min(2.5, b.coverLogoScale)) : (cur.coverLogoScale ?? 1),
     coverLogoAlign: pick(['left', 'center', 'right'] as const, b?.coverLogoAlign, cur.coverLogoAlign ?? 'right'),
+    coverLogoWhite: typeof b?.coverLogoWhite === 'boolean' ? b.coverLogoWhite : (cur.coverLogoWhite ?? true),
+    logoUrlWhite,
   };
 
   if (isManaged) {

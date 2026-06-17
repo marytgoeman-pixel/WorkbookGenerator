@@ -238,6 +238,11 @@ export async function generatePDF(
   const whiteLogo = branded
     ? (await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, whiteName))) ?? brandLogo
     : null;
+  // Self-serve "white logo on dark covers" option: a white-silhouette PNG generated in the
+  // builder. When present + enabled it's the logo drawn on dark cover areas (band/bold/sidebar).
+  const coverWhiteLogo = (branded && branding!.coverLogoWhite && branding!.logoUrlWhite)
+    ? (await tryEmbedImage(pdfDoc, branding!.logoUrlWhite)) ?? whiteLogo
+    : whiteLogo;
   // Sell It's icon mark (the converging-arrows symbol) in brand blue, drawn beside page titles
   const sellitMark = sellit ? await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'sellitmark-blue.png')) : null;
   // The Learning Creative leaf mark — accents callout panels (website-style, not a dark box)
@@ -332,7 +337,7 @@ export async function generatePDF(
     if (sellit) {
       await drawSellItCover(pdfDoc, page, tmpl, doc, branding!, boldFont, font, brandLogo, whiteLogo);
     } else {
-      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, whiteLogo);
+      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, coverWhiteLogo, brandLogo);
     }
     hasCover = true;
     newPage();
@@ -1073,7 +1078,8 @@ async function drawCoverPage(
   boldFont: PDFFontT,
   font: PDFFontT,
   italicFont: PDFFontT,
-  logo: PDFImage | null
+  logo: PDFImage | null,        // logo for dark cover areas (white variant when enabled)
+  darkLogo?: PDFImage | null    // original logo, used on light areas (the minimal cover)
 ) {
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
   const navy = hexToRgb(branding.colors.header);
@@ -1093,7 +1099,8 @@ async function drawCoverPage(
     const primary = hexToRgb(branding.colors.title);
     const accentC = hexToRgb(branding.colors.accent);
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(1, 1, 1) });
-    if (logo) { const th = 46 * logoScale; const sc = th / logo.height; const lw = logo.width * sc; page.drawImage(logo, { x: logoX(lw), y: H - 60 - th, width: lw, height: th }); }
+    const mLogo = darkLogo; // minimal cover is white — use the original (dark) logo; never the white variant (it would vanish)
+    if (mLogo) { const th = 46 * logoScale; const sc = th / mLogo.height; const lw = mLogo.width * sc; page.drawImage(mLogo, { x: logoX(lw), y: H - 60 - th, width: lw, height: th }); }
     const titleCase = doc.titleCase ?? 'upper';
     const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
     let tSize = 34;
@@ -1118,8 +1125,7 @@ async function drawCoverPage(
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
     if (logo) {
       const th = 54 * logoScale; const sc = th / logo.height; const lw = logo.width * sc;
-      const lx = logoAlign === 'left' ? pad : logoAlign === 'right' ? W - pad - lw : (W - lw) / 2;
-      page.drawImage(logo, { x: lx, y: H - 80 - th, width: lw, height: th });
+      page.drawImage(logo, { x: logoX(lw), y: H - 80 - th, width: lw, height: th });
     }
     const titleCase = doc.titleCase ?? 'upper';
     const rawTitle = applyCase(doc.title || 'Untitled', titleCase);

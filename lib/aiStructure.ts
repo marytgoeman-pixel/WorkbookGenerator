@@ -244,6 +244,37 @@ export async function structureWithAI(html: string): Promise<DocumentModel> {
   return mapToDocument(parseAiJson(text));
 }
 
+const BUILD_SYSTEM = `You are an expert instructional designer. From the creator's requirements (and any source material), DESIGN a complete, ready-to-use, genuinely FILLABLE workbook. Produce JSON matching the schema.
+
+Approach:
+- Read the brief: topic/context, workbook type, target audience, the goal (what the learner should be able to DO), desired length, and any source material.
+- If source material is provided, base the workbook on it (use its real content, structure, and terminology). If not, generate strong, specific, original content for the topic — never placeholder text like "Lorem ipsum" or "[insert here]".
+- Design a logical flow of sections (honor the requested length). Most working sections should mix: a short read-to-learn intro ("text"), then interactive elements the learner fills in.
+- Item kinds (same rules as a normal workbook):
+  - "text": a paragraph or instruction to read. fieldType "", options [].
+  - "bullet": a list entry. fieldType "", options [].
+  - "field": an interactive element — "textarea" for open reflection/answers, "text" for a short single value, "checkbox" for an action item or option to tick, "dropdown" for a 1–N rating (put choices in options).
+  - "table": any grid (e.g. a tracker, a SWOT-style 2x2, a weekly plan) with headers + rows of cells (each cell static text or a fillable field).
+- Tailor tone and vocabulary to the target audience. Make prompts concrete and specific to the topic, not generic.
+- Every section that asks the learner to think should give them a place to write (a textarea) or check. Aim for a genuinely useful, do-able workbook.
+- Set "callout": true only for short read-only insight/principle sections; false for working sections with fields. Headings are never bulleted.
+- Output ONLY the JSON.`;
+
+// Build a brand-new workbook from a structured brief (CRAFT-style answers + optional
+// source material). A real AI design pass, not a template.
+export async function buildWorkbookFromBrief(brief: string): Promise<DocumentModel> {
+  const client = new Anthropic();
+  const text = await runStructuringStream(() => client.messages.stream({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 16000,
+    system: BUILD_SYSTEM,
+    output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+    messages: [{ role: 'user', content: brief }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any), 'workbook');
+  return mapToDocument(parseAiJson(text));
+}
+
 // Convert our DocumentModel back into the AI's flat shape, so the model can read
 // the current workbook and revise it.
 function docToAi(doc: DocumentModel): AiDoc {

@@ -1019,10 +1019,10 @@ async function drawSellItCover(
         page.drawRectangle({ x: pad, y: (s / strips) * frameTop, width: innerW, height: frameTop / strips + 0.8, color: blue, opacity: 0.9 * Math.pow(1 - s / strips, 1.25) });
       }
     }
-    // White Sell It logo, bottom-right, over the fade — nudged a bit further right than the margin
+    // White Sell It logo, bottom-right, over the fade — kept inside the image frame.
     if (whiteLogo) {
       const lh = 40, lw = lh * (whiteLogo.width / whiteLogo.height);
-      page.drawImage(whiteLogo, { x: W - pad - lw + 20, y: 28, width: lw, height: lh });
+      page.drawImage(whiteLogo, { x: W - pad - lw - 10, y: 28, width: lw, height: lh });
     }
   }
 }

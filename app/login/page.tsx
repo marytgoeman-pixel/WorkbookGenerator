@@ -163,7 +163,7 @@ export default function LandingPage() {
       <section id="features" className="max-w-6xl mx-auto px-5 py-16 md:py-20">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Everything a course creator needs, in one tool</h2>
-          <p className="text-gray-500 mt-3">Design tools make flat PDFs. Online tools lock workbooks behind a login. This does the thing neither does: a downloadable, truly fillable, on-brand workbook.</p>
+          <p className="text-gray-500 mt-3">Design tools make flat PDFs. Online tools lock workbooks behind a login. This does the thing neither does: a downloadable, truly fillable PDF.</p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-10">
           {FEATURES.map((f) => (

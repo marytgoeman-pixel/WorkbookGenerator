@@ -87,11 +87,58 @@ export default function FileUpload({ onParsed }: Props) {
   const [fallback, setFallback] = useState<{ doc: DocumentModel; name: string; reason: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // CRAFT "build with AI" panel — for people who don't have an outline to upload.
+  const [buildMode, setBuildMode] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [bTopic, setBTopic] = useState('');
+  const [bType, setBType] = useState('Course companion');
+  const [bAudience, setBAudience] = useState('General audience');
+  const [bGoal, setBGoal] = useState('');
+  const [bLength, setBLength] = useState('Standard (5–7 sections)');
+  const [bSourceText, setBSourceText] = useState('');
+  const [bSourceName, setBSourceName] = useState('');
+  const buildFileRef = useRef<HTMLInputElement>(null);
+
   function deliver(doc: DocumentModel, name: string) {
     setFileName(name);
     setError('');
     setFallback(null);
     onParsed(doc);
+  }
+
+  // Pull text from an optional source file (PDF / Word / text) to ground the AI build.
+  async function loadBuildSource(file: File) {
+    setError('');
+    try {
+      let text = '';
+      if (/\.docx$/i.test(file.name)) text = (await docxToHtml(file)).replace(/<[^>]+>/g, ' ');
+      else if (/\.pdf$/i.test(file.name)) text = await pdfToText(file);
+      else if (/\.(txt|md)$/i.test(file.name)) text = await file.text();
+      else { setError('For source material use a PDF, Word doc, or text file. (Export a PowerPoint to PDF first.)'); return; }
+      setBSourceText(text.slice(0, 200000));
+      setBSourceName(file.name);
+    } catch {
+      setError('Could not read that file. Try a PDF, Word doc, or text file.');
+    }
+  }
+
+  async function buildWithAi() {
+    if (!bTopic.trim() && !bSourceText.trim()) { setError('Tell us what the workbook is about, or add some source material.'); return; }
+    setBuilding(true);
+    setError('');
+    try {
+      const res = await fetch('/api/build', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: bTopic, type: bType, audience: bAudience, goal: bGoal, length: bLength, sourceText: bSourceText }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.document) { deliver(data.document, bTopic.trim().slice(0, 60) || 'AI-built workbook'); return; }
+      setError(data.error || 'Could not build the workbook. Please try again.');
+    } catch {
+      setError('Could not reach the AI service. Please try again.');
+    } finally {
+      setBuilding(false);
+    }
   }
 
   // Run AI formatting (with local fallback), given source HTML and the local parse result
@@ -168,12 +215,72 @@ export default function FileUpload({ onParsed }: Props) {
   return (
     <div className="space-y-4">
       {/* AI toggle */}
-      <label className="flex items-center gap-2 text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 cursor-pointer">
-        <input type="checkbox" checked={useAI} onChange={(e) => setUseAI(e.target.checked)} />
-        <span><strong>✨ Auto-format with AI</strong> — structures headings, checkboxes, answer boxes & rating dropdowns</span>
-      </label>
+      {!buildMode && (
+        <label className="flex items-center gap-2 text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 cursor-pointer">
+          <input type="checkbox" checked={useAI} onChange={(e) => setUseAI(e.target.checked)} />
+          <span><strong>✨ Auto-format with AI</strong> — structures headings, checkboxes, answer boxes & rating dropdowns</span>
+        </label>
+      )}
 
-      {!pasteMode ? (
+      {buildMode ? (
+        <div className="space-y-3 border-2 border-dashed border-blue-200 rounded-xl p-4 bg-blue-50/30">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-gray-800 text-sm">✨ Build my workbook with AI</p>
+            <button onClick={() => { setBuildMode(false); setError(''); }} className="text-xs text-blue-600 hover:underline">← Back</button>
+          </div>
+          <p className="text-xs text-gray-500 -mt-1">Answer a few questions (the CRAFT framework) and AI drafts a fillable workbook you can edit.</p>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">What&apos;s it about? <span className="text-gray-400">(topic &amp; key ideas)</span></label>
+            <textarea value={bTopic} onChange={(e) => setBTopic(e.target.value)} rows={3}
+              className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="e.g. A 30-day system for real estate agents to nurture past clients and earn referrals." />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <select value={bType} onChange={(e) => setBType(e.target.value)} className="w-full border rounded-lg p-2 text-sm bg-white">
+                <option>Course companion</option><option>Coaching / program workbook</option><option>Lead magnet</option><option>Onboarding guide</option><option>Self-assessment</option><option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Audience</label>
+              <select value={bAudience} onChange={(e) => setBAudience(e.target.value)} className="w-full border rounded-lg p-2 text-sm bg-white">
+                <option>General audience</option><option>Beginners</option><option>Professionals</option><option>Executives / leaders</option><option>Students</option><option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">What should they be able to do after? <span className="text-gray-400">(goal)</span></label>
+            <textarea value={bGoal} onChange={(e) => setBGoal(e.target.value)} rows={2}
+              className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="e.g. Build a repeatable weekly outreach habit and a 90-day referral plan." />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Length</label>
+            <select value={bLength} onChange={(e) => setBLength(e.target.value)} className="w-full border rounded-lg p-2 text-sm bg-white">
+              <option>Short (3–4 sections)</option><option>Standard (5–7 sections)</option><option>In-depth (8–10 sections)</option>
+            </select>
+          </div>
+
+          <div>
+            <button type="button" onClick={() => buildFileRef.current?.click()} className="text-sm text-blue-600 hover:underline">
+              {bSourceName ? `✓ ${bSourceName} (change)` : '+ Optional: add course material (PDF, Word, or text) to base it on'}
+            </button>
+            <input ref={buildFileRef} type="file" accept=".pdf,.docx,.txt,.md" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadBuildSource(f); }} />
+          </div>
+
+          <button onClick={buildWithAi} disabled={building}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+            {building ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Building your workbook…</>) : '✨ Build my workbook'}
+          </button>
+          <p className="text-[11px] text-gray-400 text-center">Uses AI · you can edit everything afterward</p>
+        </div>
+      ) : !pasteMode ? (
         <div
           className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
             dragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
@@ -240,9 +347,18 @@ export default function FileUpload({ onParsed }: Props) {
         </div>
       )}
 
-      <button onClick={() => setPasteMode(!pasteMode)} className="text-sm text-blue-600 hover:underline">
-        {pasteMode ? '← Back to file upload' : 'Or paste text directly'}
-      </button>
+      {!buildMode && (
+        <div className="flex items-center gap-4 flex-wrap">
+          <button onClick={() => setPasteMode(!pasteMode)} className="text-sm text-blue-600 hover:underline">
+            {pasteMode ? '← Back to file upload' : 'Or paste text directly'}
+          </button>
+          {!pasteMode && (
+            <button onClick={() => { setBuildMode(true); setError(''); }} className="text-sm font-medium text-blue-600 hover:underline">
+              ✨ No outline? Build one with AI
+            </button>
+          )}
+        </div>
+      )}
 
       {error && (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">{error}</p>

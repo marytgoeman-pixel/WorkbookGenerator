@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
   const font = ['sans', 'serif', 'mono'].includes(b?.font) ? b.font : (cur.font ?? 'sans');
   const coverStyle = ['band', 'minimal', 'photo'].includes(b?.coverStyle) ? b.coverStyle : (cur.coverStyle ?? 'band');
   const footerStyle = ['standard', 'minimal', 'none'].includes(b?.footerStyle) ? b.footerStyle : (cur.footerStyle ?? 'standard');
+  const logoPosition = ['top', 'bottom'].includes(b?.logoPosition) ? b.logoPosition : (cur.logoPosition ?? 'bottom');
+  const calloutStyle = ['bar', 'plain', 'solid'].includes(b?.calloutStyle) ? b.calloutStyle : (cur.calloutStyle ?? 'bar');
 
   const branding = {
     ...cur,
@@ -49,6 +51,8 @@ export async function POST(req: NextRequest) {
     font,
     coverStyle,
     footerStyle,
+    logoPosition,
+    calloutStyle,
   };
 
   await saveAccount({ ...acct, configured: true, branding });

@@ -71,6 +71,8 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
   const [font, setFont] = useState<'sans' | 'serif' | 'mono'>(initial.font || 'sans');
   const [coverStyle, setCoverStyle] = useState<'band' | 'minimal' | 'photo'>(initial.coverStyle || 'band');
   const [footerStyle, setFooterStyle] = useState<'standard' | 'minimal' | 'none'>(initial.footerStyle || 'standard');
+  const [logoPosition, setLogoPosition] = useState<'top' | 'bottom'>(initial.logoPosition || 'bottom');
+  const [calloutStyle, setCalloutStyle] = useState<'bar' | 'plain' | 'solid'>(initial.calloutStyle || 'bar');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -95,7 +97,7 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
     try {
       const res = await fetch('/api/template', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName, tagline, logoUrl: logo, colors, font, coverStyle, footerStyle }),
+        body: JSON.stringify({ displayName, tagline, logoUrl: logo, colors, font, coverStyle, footerStyle, logoPosition, calloutStyle }),
       });
       if (res.ok) { router.push('/'); router.refresh(); return; }
       const d = await res.json().catch(() => ({}));
@@ -178,6 +180,18 @@ export default function TemplateBuilder({ initial }: { initial: ClientBranding }
               <div className="flex gap-2 flex-wrap">
                 {(['standard', 'minimal', 'none'] as const).map((c) => (
                   <button key={c} onClick={() => setFooterStyle(c)} className={seg(footerStyle === c)} style={footerStyle === c ? { backgroundColor: primary, borderColor: primary } : undefined}>{c[0].toUpperCase() + c.slice(1)}</button>
+                ))}
+              </div>
+              <label className={`${label} mt-3`}>Logo position (interior pages)</label>
+              <div className="flex gap-2 flex-wrap">
+                {([['top', 'Top bar'], ['bottom', 'Footer']] as const).map(([v, lbl]) => (
+                  <button key={v} onClick={() => setLogoPosition(v)} className={seg(logoPosition === v)} style={logoPosition === v ? { backgroundColor: primary, borderColor: primary } : undefined}>{lbl}</button>
+                ))}
+              </div>
+              <label className={`${label} mt-3`}>Callout style</label>
+              <div className="flex gap-2 flex-wrap">
+                {([['bar', 'Accent bar'], ['plain', 'Plain'], ['solid', 'Solid']] as const).map(([v, lbl]) => (
+                  <button key={v} onClick={() => setCalloutStyle(v)} className={seg(calloutStyle === v)} style={calloutStyle === v ? { backgroundColor: primary, borderColor: primary } : undefined}>{lbl}</button>
                 ))}
               </div>
             </div>

@@ -109,6 +109,8 @@ export interface ClientBranding {
   font?: 'sans' | 'serif' | 'mono';     // base typeface family
   coverStyle?: 'band' | 'minimal' | 'photo'; // cover layout
   footerStyle?: 'standard' | 'minimal' | 'none'; // footer treatment
+  logoPosition?: 'top' | 'bottom';      // brand logo in the top bar vs the footer (interior pages)
+  calloutStyle?: 'bar' | 'plain' | 'solid'; // callout panel look
 }
 
 export interface ColorTheme {

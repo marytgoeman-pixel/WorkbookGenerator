@@ -748,9 +748,11 @@ export async function generatePDF(
       // The Learning Creative: a light, leaf-accented panel (matches the website) —
       // pale-green background, a solid green left accent bar, the leaf mark top-left,
       // and navy body text. No dark fill, no dashed border.
-      if (tlc) {
+      // 'solid' callouts use the filled-box branch below; 'bar'/'plain' use this panel
+      // ('plain' drops the accent bar). Managed brands (no calloutStyle) keep the panel.
+      if (tlc && branding!.calloutStyle !== 'solid') {
         const pad = 14;
-        const accentW = 4;                                   // green left accent bar
+        const accentW = branding!.calloutStyle === 'plain' ? 0 : 4; // accent left bar
         const cLineH = tmpl.lineHeight * ls;
         const itemGap = cLineH * 0.4;
         const panelBg = hexToRgb(branding!.colors.grayBox);  // pale lime tint
@@ -1073,6 +1075,35 @@ async function drawCoverPage(
   const gold = hexToRgb(branding.colors.accent);
   const pad = tmpl.marginLeft;
   const innerW = W - pad * 2;
+  const coverStyle = branding.coverStyle ?? 'band';
+
+  // MINIMAL cover: clean white, logo top, big title in the brand color, accent rule —
+  // no background photo. Good for logo-only brands.
+  if (coverStyle === 'minimal') {
+    const primary = hexToRgb(branding.colors.title);
+    const accentC = hexToRgb(branding.colors.accent);
+    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(1, 1, 1) });
+    if (logo) { const th = 46; const sc = th / logo.height; page.drawImage(logo, { x: pad, y: H - 60 - th, width: logo.width * sc, height: th }); }
+    const titleCase = doc.titleCase ?? 'upper';
+    const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
+    let tSize = 34;
+    let lines = wrapText(rawTitle, innerW, boldFont, tSize);
+    while (lines.length > 4 && tSize > 22) { tSize -= 2; lines = wrapText(rawTitle, innerW, boldFont, tSize); }
+    const lh = tSize + 8;
+    let ty = H * 0.58 + (lines.length * lh) / 2;
+    for (const ln of lines) { page.drawText(ln, { x: pad, y: ty, size: tSize, font: boldFont, color: primary }); ty -= lh; }
+    ty -= 4;
+    page.drawRectangle({ x: pad, y: ty, width: 90, height: 4, color: accentC });
+    ty -= 24;
+    const sub = doc.cover?.subtitle?.trim();
+    if (sub) page.drawText(sanitize(sub), { x: pad, y: ty, size: 14, font, color: hexToRgb(branding.colors.subtitle) });
+    page.drawText(sanitize(doc.author?.trim() || branding.displayName), { x: pad, y: 70, size: 13, font: boldFont, color: primary });
+    page.drawText(sanitize(branding.tagline), { x: pad, y: 52, size: 10, font: italicFont, color: rgb(0.5, 0.5, 0.5) });
+    return;
+  }
+
+  // PHOTO emphasis: a slimmer bottom band so the image dominates more than 'band'.
+  const photoForward = coverStyle === 'photo';
 
   // Brand base so any area the photo doesn't cover (when zoomed out) reads as navy.
   page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: navy });
@@ -1119,7 +1150,7 @@ async function drawCoverPage(
   const eyebrowH = sub ? 22 : 0;
   const authorSize = 14;
   const contentH = eyebrowH + titleLines.length * titleLH + titleGap + authorSize + byGap + tagGap;
-  const bandH = Math.min(H * 0.5, Math.max(H * 0.34, contentH + topPad + botPad));
+  const bandH = Math.min(H * (photoForward ? 0.42 : 0.5), Math.max(H * (photoForward ? 0.28 : 0.34), contentH + topPad + botPad));
 
   page.drawRectangle({ x: 0, y: 0, width: W, height: bandH, color: navy, opacity: img ? 0.9 : 1 });
   page.drawRectangle({ x: 0, y: bandH - 4, width: W, height: 4, color: gold });
@@ -1255,50 +1286,56 @@ function drawBrandedChrome(
   const barH = tmpl.topBarHeight ?? 34;
   const footerH = tmpl.footerHeight ?? 56;
 
-  // Top bar
-  page.drawRectangle({ x: 0, y: W ? tmpl.pageHeight - barH : 0, width: W, height: barH, color: headerColor });
+  const footerStyle = branding.footerStyle ?? 'standard';
+  const logoTop = branding.logoPosition === 'top';
 
-  // --- Footer ---
-  const footerY = footerH; // baseline area
+  // Top bar (brand band). When the logo is positioned "top", it sits on the bar.
+  page.drawRectangle({ x: 0, y: tmpl.pageHeight - barH, width: W, height: barH, color: headerColor });
+  if (logoTop && logo) {
+    const th = Math.max(14, barH - 12);
+    const scale = th / logo.height;
+    page.drawImage(logo, { x: tmpl.marginLeft, y: tmpl.pageHeight - barH + (barH - th) / 2, width: logo.width * scale, height: th });
+  }
+
+  if (footerStyle === 'none') return; // clean, no footer chrome
+
+  const centerY = footerH / 2 - 2;
   // thin divider line above footer content
   page.drawLine({
-    start: { x: tmpl.marginLeft, y: footerY + 6 },
-    end: { x: W - tmpl.marginRight, y: footerY + 6 },
+    start: { x: tmpl.marginLeft, y: footerH + 6 },
+    end: { x: W - tmpl.marginRight, y: footerH + 6 },
     thickness: 0.5,
     color: rgb(0.8, 0.8, 0.8),
   });
 
-  const centerY = footerH / 2 - 2;
+  if (footerStyle === 'minimal') {
+    // Just a centered page number — nothing else.
+    page.drawText(`${pageNum}`, { x: W - tmpl.marginRight - 6, y: centerY, size: 9, font, color: rgb(0.5, 0.5, 0.5) });
+    return;
+  }
 
-  // Logo (left). If not yet uploaded, fall back to styled text.
-  // rowMid = the logo's vertical center; the tagline, social icons, and page
-  // number are all centered to it so they sit level with the wordmark.
+  // --- Standard footer ---
+  // rowMid = the row's vertical center; tagline, social icons, and page number
+  // are centered to it. The logo only appears here when it isn't on the top bar.
   let rowMid = centerY + 5;
-  if (logo) {
+  if (!logoTop && logo) {
     const targetH = 42;
     const scale = targetH / logo.height;
     const w = logo.width * scale;
-    // Raised off the page bottom so it isn't crammed against the edge
     const logoY = centerY - targetH / 2 + 12;
     page.drawImage(logo, { x: tmpl.marginLeft, y: logoY, width: w, height: targetH });
     rowMid = logoY + targetH / 2;
-  } else {
+  } else if (!logoTop) {
     page.drawText(sanitize(branding.displayName), { x: tmpl.marginLeft, y: centerY, size: 14, font: boldFont, color: hexToRgb(branding.colors.title) });
   }
 
-  // Tagline (center) — vertically centered to the logo. sanitize keeps the middot (·).
+  // Tagline (center) — vertically centered to the row. sanitize keeps the middot (·).
   const tagline = sanitize(branding.tagline);
   const tagSize = 8.5;
   const tagWidth = italicFont.widthOfTextAtSize(tagline, tagSize);
-  page.drawText(tagline, {
-    x: (W - tagWidth) / 2,
-    y: rowMid - tagSize * 0.34,
-    size: tagSize,
-    font: italicFont,
-    color: headerColor,
-  });
+  page.drawText(tagline, { x: (W - tagWidth) / 2, y: rowMid - tagSize * 0.34, size: tagSize, font: italicFont, color: headerColor });
 
-  // Social icons (right), clickable — vertically centered to the logo
+  // Social icons (right), clickable
   const iconSize = 16;
   const gap = 8;
   const count = branding.social.length;
@@ -1317,14 +1354,8 @@ function drawBrandedChrome(
     ix += iconSize + gap;
   }
 
-  // Page number (far right) — vertically centered to the logo
-  page.drawText(`${pageNum}`, {
-    x: W - tmpl.marginRight - 6,
-    y: rowMid - 9 * 0.34,
-    size: 9,
-    font,
-    color: rgb(0.5, 0.5, 0.5),
-  });
+  // Page number (far right)
+  page.drawText(`${pageNum}`, { x: W - tmpl.marginRight - 6, y: rowMid - 9 * 0.34, size: 9, font, color: rgb(0.5, 0.5, 0.5) });
 }
 
 // Simple recognizable social icons drawn with shapes (placeholder until brand PNGs are supplied)

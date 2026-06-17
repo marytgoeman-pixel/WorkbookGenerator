@@ -355,7 +355,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
             </div>
             {step === 1 ? (
               <div className="p-5 space-y-3">
-                <FileUpload onParsed={handleParsed} aiLocked={selfServeTrial} />
+                <FileUpload onParsed={handleParsed} aiLocked={selfServeTrial} onUpgrade={() => setShowUpgrade(true)} />
                 {/* The interactive demo sample is only for the TLC showcase account. */}
                 {branding.id === 'thelearningcreative' && (
                   <>

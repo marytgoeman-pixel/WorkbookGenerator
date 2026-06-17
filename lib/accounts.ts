@@ -105,6 +105,34 @@ export async function createVerifyToken(clientId: string): Promise<string | null
   return token;
 }
 
+// --- Password reset tokens (1h TTL) ---
+const resetKey = (token: string) => `acctReset:${token}`;
+
+export async function createResetToken(clientId: string): Promise<string | null> {
+  const r = getRedis();
+  if (!r) return null;
+  const token = `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+  await r.set(resetKey(token), clientId, { ex: 60 * 60 });
+  return token;
+}
+
+// Set a new password from a valid reset token. Returns true on success.
+export async function resetPassword(token: string, passwordHash: string): Promise<boolean> {
+  const r = getRedis();
+  if (!r || !token) return false;
+  try {
+    const clientId = await r.get<string>(resetKey(token));
+    if (!clientId) return false;
+    const acct = await getAccountById(clientId);
+    if (!acct) return false;
+    await saveAccount({ ...acct, passwordHash, verified: true }); // verifying via reset link also confirms the email
+    await r.del(resetKey(token));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Consume a token → mark the account verified. Returns the account id on success.
 export async function consumeVerifyToken(token: string): Promise<string | null> {
   const r = getRedis();

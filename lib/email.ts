@@ -40,6 +40,28 @@ export async function sendVerifyEmail(to: string, link: string): Promise<boolean
   }
 }
 
+// Sends a password-reset link.
+export async function sendResetEmail(to: string, link: string): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return false;
+  const from = process.env.INQUIRY_FROM || 'The Learning Creative <onboarding@resend.dev>';
+  const html =
+    `<h2>Reset your password</h2>` +
+    `<p>Click below to set a new password. This link expires in 1 hour.</p>` +
+    `<p><a href="${esc(link)}" style="background:#163446;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Set a new password</a></p>` +
+    `<p style="color:#6b7280;font-size:13px">If you didn't request this, you can ignore this email.<br>Or paste this link: ${esc(link)}</p>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: [to], subject: 'Reset your password — The Learning Creative', html }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendInquiryEmail(i: Inquiry): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;

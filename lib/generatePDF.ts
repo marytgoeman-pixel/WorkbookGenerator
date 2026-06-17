@@ -240,7 +240,9 @@ export async function generatePDF(
   // Sell It's icon mark (the converging-arrows symbol) in brand blue, drawn beside page titles
   const sellitMark = sellit ? await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'sellitmark-blue.png')) : null;
   // The Learning Creative leaf mark — accents callout panels (website-style, not a dark box)
-  const leafMark = tlc ? await tryEmbedImage(pdfDoc, '/leaf.png') : null;
+  // The leaf is The Learning Creative's own mark — only the real TLC brand uses it
+  // (self-serve accounts share the 'tlc' template chrome but must not get the leaf).
+  const leafMark = (tlc && branding!.id === 'thelearningcreative') ? await tryEmbedImage(pdfDoc, '/leaf.png') : null;
 
   // Pre-embed social icon PNGs from the same folder as the logo (e.g. /clients/jo/linkedin.png)
   const socialIcons: Record<string, PDFImage | null> = {};

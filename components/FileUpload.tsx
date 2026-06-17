@@ -72,10 +72,11 @@ async function aiStructure(html: string): Promise<AiResult> {
 
 interface Props {
   onParsed: (doc: DocumentModel) => void;
-  aiLocked?: boolean; // self-serve trial: AI auto-format + builder unlock after subscribing
+  aiLocked?: boolean;       // self-serve trial: AI auto-format + builder unlock after subscribing
+  onUpgrade?: () => void;   // open the subscribe modal when a locked AI feature is clicked
 }
 
-export default function FileUpload({ onParsed, aiLocked }: Props) {
+export default function FileUpload({ onParsed, aiLocked, onUpgrade }: Props) {
   const [dragging, setDragging] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
@@ -358,9 +359,9 @@ export default function FileUpload({ onParsed, aiLocked }: Props) {
           <button onClick={() => setPasteMode(!pasteMode)} className="text-sm text-blue-600 hover:underline">
             {pasteMode ? '← Back to file upload' : 'Or paste text directly'}
           </button>
-          {!pasteMode && !aiLocked && (
-            <button onClick={() => { setBuildMode(true); setError(''); }} className="text-sm font-medium text-blue-600 hover:underline">
-              ✨ No outline? Build one with AI
+          {!pasteMode && (
+            <button onClick={() => { if (aiLocked) { onUpgrade?.(); } else { setBuildMode(true); setError(''); } }} className="text-sm font-medium text-blue-600 hover:underline">
+              {aiLocked ? '✨ Build one with AI 🔒 (subscribe to unlock)' : '✨ No outline? Build one with AI'}
             </button>
           )}
         </div>

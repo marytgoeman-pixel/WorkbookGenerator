@@ -155,6 +155,10 @@ export default function LandingPage() {
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
             </form>
+            <div className="text-center mt-3">
+              <a href="/forgot" className="text-xs text-gray-400 hover:text-gray-700 underline">Forgot your password?</a>
+              <span className="text-xs text-gray-300"> · username is your email</span>
+            </div>
             <p className="text-xs text-center text-gray-400 mt-4 pt-4 border-t border-gray-100">
               New here? <a href="/register" className="font-semibold underline" style={{ color: GREEN }}>Create an account</a> and build your own template.
             </p>

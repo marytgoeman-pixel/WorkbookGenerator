@@ -72,9 +72,10 @@ async function aiStructure(html: string): Promise<AiResult> {
 
 interface Props {
   onParsed: (doc: DocumentModel) => void;
+  aiLocked?: boolean; // self-serve trial: AI auto-format + builder unlock after subscribing
 }
 
-export default function FileUpload({ onParsed }: Props) {
+export default function FileUpload({ onParsed, aiLocked }: Props) {
   const [dragging, setDragging] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
@@ -143,7 +144,7 @@ export default function FileUpload({ onParsed }: Props) {
 
   // Run AI formatting (with local fallback), given source HTML and the local parse result
   async function formatAndDeliver(html: string, localDoc: DocumentModel, name: string) {
-    if (!useAI) {
+    if (!useAI || aiLocked) { // AI off, or locked on a self-serve trial → basic parse
       deliver(localDoc, name);
       return;
     }
@@ -214,13 +215,18 @@ export default function FileUpload({ onParsed }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* AI toggle */}
-      {!buildMode && (
+      {/* AI toggle (or a locked note on a self-serve trial) */}
+      {!buildMode && (aiLocked ? (
+        <div className="flex items-start gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+          <span>🔒</span>
+          <span><strong>AI auto-format &amp; the workbook builder</strong> unlock when you subscribe. For now, upload or paste your outline and we&apos;ll structure it.</span>
+        </div>
+      ) : (
         <label className="flex items-center gap-2 text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 cursor-pointer">
           <input type="checkbox" checked={useAI} onChange={(e) => setUseAI(e.target.checked)} />
-          <span><strong>✨ Auto-format with AI</strong> — structures headings, checkboxes, answer boxes & rating dropdowns</span>
+          <span><strong>✨ Auto-format with AI</strong> — structures headings, checkboxes, answer boxes &amp; rating dropdowns</span>
         </label>
-      )}
+      ))}
 
       {buildMode ? (
         <div className="space-y-3 border-2 border-dashed border-blue-200 rounded-xl p-4 bg-blue-50/30">
@@ -352,7 +358,7 @@ export default function FileUpload({ onParsed }: Props) {
           <button onClick={() => setPasteMode(!pasteMode)} className="text-sm text-blue-600 hover:underline">
             {pasteMode ? '← Back to file upload' : 'Or paste text directly'}
           </button>
-          {!pasteMode && (
+          {!pasteMode && !aiLocked && (
             <button onClick={() => { setBuildMode(true); setError(''); }} className="text-sm font-medium text-blue-600 hover:underline">
               ✨ No outline? Build one with AI
             </button>

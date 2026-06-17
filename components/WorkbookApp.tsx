@@ -118,6 +118,10 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
   // Add-on elements (calendars, SWOT, notes, grids…) are an Agency+ feature —
   // locked on the core-builder plans (Starter and Pro).
   const elementsLocked = currentPlanId === 'starter' || currentPlanId === 'pro';
+  // Self-serve trial (registered via /register, not yet subscribed): downloads are
+  // watermarked and the AI features are locked until they subscribe.
+  const selfServeTrial = branding.id.startsWith('u_') && !!trial;
+  const TRIAL_WATERMARK = 'Trial · The Learning Creative';
   // Returning from a successful Stripe Checkout
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('upgraded')) {
@@ -351,7 +355,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
             </div>
             {step === 1 ? (
               <div className="p-5 space-y-3">
-                <FileUpload onParsed={handleParsed} />
+                <FileUpload onParsed={handleParsed} aiLocked={selfServeTrial} />
                 {/* The interactive demo sample is only for the TLC showcase account. */}
                 {branding.id === 'thelearningcreative' && (
                   <>
@@ -420,6 +424,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
               <div className="p-5 space-y-2">
                 <DownloadButton doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding}
                   atLimit={atLimit}
+                  watermark={selfServeTrial ? TRIAL_WATERMARK : undefined}
                   onBlocked={() => setShowUpgrade(true)}
                   onDownloaded={(counts) => {
                     saveCurrent();

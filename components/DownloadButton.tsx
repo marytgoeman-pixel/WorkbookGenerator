@@ -11,11 +11,12 @@ interface Props {
   onDownloaded?: (counts?: { monthly?: number; lifetime?: number }) => void; // fired after a download; passes the server's counts
   atLimit?: boolean;         // when true, downloading is gated → prompt to upgrade instead
   onBlocked?: () => void;    // fired when a download is attempted at the monthly cap
-  watermark?: string;        // demo mode: stamp a watermark and skip server-side tracking
+  watermark?: string;        // stamp a watermark on the PDF (demo / self-serve trial)
+  skipTracking?: boolean;    // don't record the download (public Try Me, which has no session)
   variant?: 'full' | 'compact'; // compact = small inline button (no helper text), e.g. in a top bar
 }
 
-export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded, atLimit, onBlocked, watermark, variant = 'full' }: Props) {
+export default function DownloadButton({ doc, templateId, colorTheme, branding, onDownloaded, atLimit, onBlocked, watermark, skipTracking, variant = 'full' }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleDownload() {
@@ -33,9 +34,10 @@ export default function DownloadButton({ doc, templateId, colorTheme, branding, 
       URL.revokeObjectURL(url);
       // Record the download and use the server's authoritative monthly count to update
       // the cap (so the count can't drift and let an extra download slip through).
-      // Demo (watermark) mode is public/sessionless — skip server tracking entirely.
+      // Public Try Me is sessionless — skip tracking there; self-serve trials still count
+      // (watermarked) so the download cap is enforced.
       let counts: { monthly?: number; lifetime?: number } | undefined;
-      if (!watermark) {
+      if (!skipTracking) {
         try {
           const res = await fetch('/api/track-download', {
             method: 'POST',

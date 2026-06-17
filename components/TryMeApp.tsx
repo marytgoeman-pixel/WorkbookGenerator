@@ -74,6 +74,7 @@ export default function TryMeApp({ branding }: Props) {
     colorTheme,
     branding,
     watermark: WATERMARK,
+    skipTracking: true, // public demo — no session to track against
     atLimit,
     onBlocked: () => setShowCta(true),
     onDownloaded,

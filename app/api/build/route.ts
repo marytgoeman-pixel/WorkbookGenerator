@@ -3,6 +3,7 @@ import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { buildWorkbookFromBrief } from '@/lib/aiStructure';
 import { recordAiUse } from '@/lib/analytics';
 import { geoFromHeaders } from '@/lib/geo';
+import { getStoredPlan } from '@/lib/planStore';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -13,6 +14,10 @@ const MAX_SOURCE_CHARS = 200_000;
 export async function POST(req: NextRequest) {
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Self-serve trials don't get the AI builder until they subscribe.
+  if (session.clientId.startsWith('u_') && !(await getStoredPlan(session.clientId))) {
+    return NextResponse.json({ error: 'Subscribe to unlock the AI workbook builder.' }, { status: 403 });
+  }
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'AI is not configured.' }, { status: 503 });
   }

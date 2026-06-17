@@ -3,6 +3,7 @@ import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { structureWithAI } from '@/lib/aiStructure';
 import { recordAiUse } from '@/lib/analytics';
 import { geoFromHeaders } from '@/lib/geo';
+import { getStoredPlan } from '@/lib/planStore';
 
 // Cap the input so one oversized upload can't run up a large AI bill (~50k tokens).
 const MAX_INPUT_CHARS = 200_000;
@@ -15,6 +16,11 @@ export async function POST(req: NextRequest) {
   // Require a logged-in client (also keeps the API key usage gated)
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Self-serve trials (registered, not yet subscribed) don't get AI until they subscribe.
+  if (session.clientId.startsWith('u_') && !(await getStoredPlan(session.clientId))) {
+    return NextResponse.json({ error: 'Subscribe to unlock AI auto-format.' }, { status: 403 });
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'AI formatting is not configured.' }, { status: 503 });

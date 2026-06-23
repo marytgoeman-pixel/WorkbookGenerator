@@ -123,7 +123,7 @@ export default function LandingPage() {
             <div className="mt-7 flex flex-wrap gap-3">
               <a href="/try" className="px-5 py-3 rounded-xl font-semibold transition" style={{ backgroundColor: LIME, color: '#10241a' }}>Try it free</a>
               <a href="#pricing" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">See pricing</a>
-              <a href="#inquiry" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">Request access</a>
+              <a href="/register" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">Sign up</a>
             </div>
             <p className="mt-5 text-white/60 text-sm">No per-learner fees · download &amp; distribute to unlimited learners.</p>
           </div>
@@ -206,8 +206,8 @@ export default function LandingPage() {
                     <li key={f} className="flex gap-2"><span style={{ color: GREEN }}>✓</span><span>{f}</span></li>
                   ))}
                 </ul>
-                <a href="#inquiry" className="mt-6 block text-center px-4 py-2.5 rounded-xl font-semibold transition" style={t.highlight ? { backgroundColor: GREEN, color: '#ffffff' } : { color: NAVY, border: `1px solid ${NAVY}` }}>
-                  {t.custom ? 'Contact us' : 'Request access'}
+                <a href={t.custom ? '#inquiry' : '/register'} className="mt-6 block text-center px-4 py-2.5 rounded-xl font-semibold transition" style={t.highlight ? { backgroundColor: GREEN, color: '#ffffff' } : { color: NAVY, border: `1px solid ${NAVY}` }}>
+                  {t.custom ? 'Contact us' : 'Sign up'}
                 </a>
               </div>
             ))}
@@ -221,8 +221,8 @@ export default function LandingPage() {
       {/* INQUIRY */}
       <section id="inquiry" className="max-w-3xl mx-auto px-5 py-16 md:py-20">
         <div className="text-center max-w-2xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Request access</h2>
-          <p className="text-gray-500 mt-3">Tell me a bit about your brand and I’ll get you set up. I’ll reply to the email you provide, or reach me directly at <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
+          <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Prefer we set it up for you?</h2>
+          <p className="text-gray-500 mt-3">You can <a href="/register" className="underline font-semibold" style={{ color: GREEN }}>sign up</a> and build your own template in minutes — or, with the one-time $499 setup, tell me about your brand and I’ll configure your branded workspace and first template for you. I’ll reply to the email you provide, or reach me directly at <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
         </div>
         {sent ? (
           <div className="mt-8 rounded-2xl border p-6 text-center" style={{ borderColor: GREEN, backgroundColor: '#F0F7E6' }}>

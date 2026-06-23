@@ -49,26 +49,33 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
     return () => { active = false; };
   }, [branding.id, savedRefresh, view]);
 
-  // Plan + download usage → drives the upgrade prompt.
+  // Plan + workbook usage → drives the upgrade prompt. The cap counts WORKBOOKS created, not
+  // raw downloads: the first download of a workbook spends a credit, edits + re-downloads of
+  // that same workbook are free (its id stays in `paidIds`).
   const downloadLimit = branding.plan?.downloadsPerMonth ?? null;
-  const [usage, setUsage] = useState(0);              // this calendar month (paid plans)
-  const [lifetimeUsage, setLifetimeUsage] = useState(0); // all-time (free trial cap)
+  const [usage, setUsage] = useState(0);              // workbooks charged this calendar month (paid plans)
+  const [lifetimeUsage, setLifetimeUsage] = useState(0); // distinct workbooks ever charged (free trial cap)
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set()); // saved workbooks already paid for (free to re-download)
   const [showUpgrade, setShowUpgrade] = useState(false);
   function refreshUsage() {
     fetch('/api/usage', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && typeof d.downloads === 'number') setUsage(d.downloads);
-        if (d && typeof d.lifetime === 'number') setLifetimeUsage(d.lifetime);
+        if (!d) return;
+        if (typeof d.workbooks === 'number') setUsage(d.workbooks);
+        if (typeof d.workbooksLifetime === 'number') setLifetimeUsage(d.workbooksLifetime);
+        if (Array.isArray(d.paidIds)) setPaidIds(new Set(d.paidIds as string[]));
       })
       .catch(() => {});
   }
   useEffect(() => { refreshUsage(); }, [branding.id]);
-  // The trial cap is a LIFETIME count (1 download for the whole trial, no monthly reset);
-  // paid plans use the calendar-month count.
+  // The trial cap is a LIFETIME count (no monthly reset); paid plans use the calendar-month count.
   const downloadCount = trial ? lifetimeUsage : usage;
-  // Downloads are blocked when a trial has expired, or when the plan's download cap is hit.
-  const atLimit = trial?.state === 'expired' || (downloadLimit != null && downloadCount >= downloadLimit);
+  // The current workbook is free to re-download once it's been paid for.
+  const currentPaid = !!savedId && paidIds.has(savedId);
+  // Blocked when a trial has expired, or the workbook cap is hit AND this is a new workbook
+  // (re-downloading / editing an already-paid workbook is always allowed).
+  const atLimit = trial?.state === 'expired' || (downloadLimit != null && downloadCount >= downloadLimit && !currentPaid);
 
   // Stripe checkout (with graceful email fallback when billing isn't configured)
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
@@ -180,11 +187,12 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   }
 
-  async function saveCurrent() {
-    if (!doc) return;
+  async function saveCurrent(): Promise<string | undefined> {
+    if (!doc) return undefined;
     const { id } = await saveWorkbook(branding.id, doc, savedId);
     setSavedId(id);
     setSavedRefresh((n) => n + 1);
+    return id;
   }
 
   function openSaved(w: SavedWorkbook) {
@@ -312,12 +320,12 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
         <div className={`px-6 py-2 text-sm flex items-center justify-center gap-3 ${trial.state === 'active' ? 'bg-[#F0F7E6] text-[#163446]' : 'bg-amber-50 text-amber-800 border-b border-amber-200'}`}>
           {trial.state === 'active' ? (
             downloadLimit != null && downloadCount >= downloadLimit ? (
-              <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> · you’ve used your free download — subscribe to download more.</span>
+              <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> · you’ve used your free workbook{downloadLimit === 1 ? '' : 's'} — subscribe to create more.</span>
             ) : (
-              <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> in your free trial{downloadLimit != null ? ` · ${downloadLimit} free download${downloadLimit === 1 ? '' : 's'} included` : ''}.</span>
+              <span>🎁 <b>{trial.daysLeft} day{trial.daysLeft === 1 ? '' : 's'} left</b> in your free trial{downloadLimit != null ? ` · ${downloadLimit} free workbook${downloadLimit === 1 ? '' : 's'} included — edit & re-download free` : ''}.</span>
             )
           ) : (
-            <span>⏳ Your free trial has ended. Subscribe to keep downloading. (You can still edit your workbooks.)</span>
+            <span>⏳ Your free trial has ended. Subscribe to create new workbooks. (You can still edit & re-download your existing ones.)</span>
           )}
           <button onClick={() => setShowUpgrade(true)} className="shrink-0 px-3 py-1 rounded-full text-white text-xs font-semibold" style={{ backgroundColor: branding.colors.accent }}>
             {trial.state === 'active' ? 'Subscribe' : 'Subscribe now'}
@@ -429,15 +437,17 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
                 <DownloadButton doc={doc} templateId={templateId} colorTheme={colorTheme} branding={branding}
                   atLimit={atLimit}
                   watermark={selfServeTrial ? TRIAL_WATERMARK : undefined}
+                  workbookId={savedId}
+                  ensureSaved={saveCurrent}
                   onBlocked={() => setShowUpgrade(true)}
                   onDownloaded={(counts) => {
-                    saveCurrent();
-                    setUsage((u) => (typeof counts?.monthly === 'number' ? counts.monthly : u + 1));
-                    setLifetimeUsage((l) => (typeof counts?.lifetime === 'number' ? counts.lifetime : l + 1));
+                    if (typeof counts?.monthly === 'number') setUsage(counts.monthly);
+                    if (typeof counts?.lifetime === 'number') setLifetimeUsage(counts.lifetime);
+                    if (counts?.charged && counts.workbookId) setPaidIds((s) => new Set(s).add(counts.workbookId!));
                   }} />
                 {downloadLimit != null && (
                   <p className="text-xs text-center text-gray-400">
-                    {downloadCount}/{downloadLimit} {trial ? `free download${downloadLimit === 1 ? '' : 's'} used in your trial` : `downloads used this month on the ${branding.plan?.name} plan`}
+                    {downloadCount}/{downloadLimit} {trial ? `free workbook${downloadLimit === 1 ? '' : 's'} used in your trial` : `workbook${downloadLimit === 1 ? '' : 's'} created this month on the ${branding.plan?.name} plan`} · edits &amp; re-downloads are free
                     {atLimit && <> · <button onClick={() => setShowUpgrade(true)} className="underline" style={{ color: branding.colors.accent }}>upgrade for more</button></>}
                   </p>
                 )}
@@ -472,7 +482,7 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
               <button onClick={() => setShowUpgrade(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
             <p className="text-sm text-gray-500 mt-1">
-              You’re on the <b>{branding.plan?.name ?? 'current'}</b> plan{downloadLimit != null ? (trial ? ` (${downloadLimit} free download, ${downloadCount} used)` : ` (${downloadLimit} downloads/month, ${usage} used)`) : ''}.
+              You’re on the <b>{branding.plan?.name ?? 'current'}</b> plan{downloadLimit != null ? (trial ? ` (${downloadLimit} free workbook${downloadLimit === 1 ? '' : 's'}, ${downloadCount} used)` : ` (${downloadLimit} workbook${downloadLimit === 1 ? '' : 's'}/month, ${usage} used)`) : ''}.
             </p>
 
             <div className="mt-4 inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
@@ -487,9 +497,9 @@ export default function WorkbookApp({ branding, trial, manageable }: Props) {
 
             <div className="mt-4 space-y-3">
               {([
-                { id: 'starter' as const, name: 'Starter', blurb: '1 download/mo · core builder', monthly: '$99/mo', annual: '$1,089/yr' },
-                { id: 'pro' as const, name: 'Pro', blurb: '2 downloads/mo · core builder', monthly: '$180/mo', annual: '$1,980/yr' },
-                { id: 'agency' as const, name: 'Agency', blurb: 'Unlimited downloads · all elements', monthly: '$499/mo', annual: '$5,489/yr' },
+                { id: 'starter' as const, name: 'Starter', blurb: '1 workbook/mo · edit & re-download free · core builder', monthly: '$99/mo', annual: '$1,089/yr' },
+                { id: 'pro' as const, name: 'Pro', blurb: '2 workbooks/mo · edit & re-download free · core builder', monthly: '$180/mo', annual: '$1,980/yr' },
+                { id: 'agency' as const, name: 'Agency', blurb: 'Unlimited workbooks · all elements', monthly: '$499/mo', annual: '$5,489/yr' },
               ]).map((t) => (
                 <div key={t.id} className={`flex items-center justify-between gap-3 border rounded-xl p-3 ${t.id === currentPlanId ? 'border-gray-300 bg-gray-50' : 'border-gray-100'}`}>
                   <div className="min-w-0">

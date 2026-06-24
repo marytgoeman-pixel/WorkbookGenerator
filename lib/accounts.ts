@@ -43,6 +43,35 @@ export async function getAccountById(clientId: string): Promise<Account | null> 
   }
 }
 
+// Every self-serve account (for admin reporting). Found by scanning the `acct:u_*` keys, so
+// it includes accounts created before any index existed — no migration step needed.
+export async function listAccounts(): Promise<Account[]> {
+  const r = getRedis();
+  if (!r) return [];
+  try {
+    const keySet = new Set<string>(); // SCAN can return the same key more than once — dedupe
+    let cursor = '0';
+    let guard = 0; // safety bound so a misbehaving cursor can't hang the admin render
+    do {
+      const res = await r.scan(cursor, { match: 'acct:u_*', count: 200 });
+      cursor = String(res[0]);
+      const batch = res[1];
+      if (Array.isArray(batch)) for (const k of batch as string[]) keySet.add(k);
+    } while (cursor !== '0' && ++guard < 100);
+    const keys = [...keySet];
+    if (keys.length === 0) return [];
+    const raws = await r.mget(...keys);
+    const out: Account[] = [];
+    for (const raw of raws as unknown[]) {
+      const a = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Account | null;
+      if (a && a.clientId) out.push(a);
+    }
+    return out.sort((a, b) => b.createdAt - a.createdAt);
+  } catch {
+    return [];
+  }
+}
+
 export async function getAccountByEmail(email: string): Promise<Account | null> {
   const r = getRedis();
   if (!r) return null;

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 import { clientIds, displayNameForId } from '@/lib/clients';
 import { getStats, getTryStats, getSessions, analyticsConfigured } from '@/lib/analytics';
+import { listAccounts, type Account } from '@/lib/accounts';
 import LogoutButton from '@/components/LogoutButton';
 import ResetTrialButton from '@/components/ResetTrialButton';
 
@@ -14,6 +15,11 @@ function fmt(ts: number | null): string {
     month: 'numeric', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
   }) + ' CT';
+}
+
+// Compact date (no time) for "joined" — Central Time.
+function fmtDate(ts: number): string {
+  return new Date(ts).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: 'numeric', day: 'numeric', year: '2-digit' });
 }
 
 // Human-readable session length.
@@ -33,11 +39,20 @@ export default async function AdminPage() {
   if (!session.isAdmin) redirect('/');
 
   const configured = analyticsConfigured();
-  const stats = configured ? await getStats(clientIds()) : [];
+  // Self-serve sign-ups (Redis) reported alongside the managed/boutique clients (clients.ts).
+  const accounts = configured ? await listAccounts() : [];
+  const acctById = new Map<string, Account>(accounts.map((a) => [a.clientId, a]));
+  const allIds = [...clientIds(), ...accounts.map((a) => a.clientId)];
+  const nameFor = (id: string) => {
+    const a = acctById.get(id);
+    return a ? (a.branding.displayName?.trim() || a.email) : displayNameForId(id);
+  };
+
+  const stats = configured ? await getStats(allIds) : [];
   const tryStats = configured ? await getTryStats() : { opens: 0, downloads: 0, recent: [] };
   const trySessions = configured ? await getSessions('tryme') : [];
   const clientSessions: Record<string, Awaited<ReturnType<typeof getSessions>>> = {};
-  if (configured) await Promise.all(clientIds().map(async (id) => { clientSessions[id] = await getSessions(id); }));
+  if (configured) await Promise.all(allIds.map(async (id) => { clientSessions[id] = await getSessions(id); }));
   const totalDownloads = stats.reduce((n, s) => n + s.downloads, 0);
   const totalLogins = stats.reduce((n, s) => n + s.logins, 0);
   const totalAi = stats.reduce((n, s) => n + s.ais, 0);
@@ -48,7 +63,7 @@ export default async function AdminPage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Logins, downloads &amp; AI credits per client</p>
+            <p className="text-xs text-gray-400 mt-0.5">Logins, downloads &amp; AI credits — managed clients and self-serve sign-ups</p>
           </div>
           <LogoutButton />
         </div>
@@ -80,6 +95,7 @@ export default async function AdminPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="text-3xl font-bold text-gray-900">{stats.length}</div>
             <div className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Clients</div>
+            <div className="text-[11px] text-gray-400 mt-0.5">{accounts.length} self-serve sign-up{accounts.length === 1 ? '' : 's'}</div>
           </div>
         </div>
 
@@ -99,16 +115,27 @@ export default async function AdminPage() {
             <tbody className="divide-y divide-gray-100">
               {stats.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-6 text-center text-gray-400">No data yet.</td></tr>
-              ) : stats.map((s) => (
+              ) : stats.map((s) => {
+                const a = acctById.get(s.clientId);
+                return (
                 <tr key={s.clientId}>
-                  <td className="px-5 py-3 font-medium text-gray-800">{displayNameForId(s.clientId)}</td>
+                  <td className="px-5 py-3">
+                    <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
+                      {nameFor(s.clientId)}
+                      {a && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">self-serve</span>}
+                      {a && !a.verified && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">unverified</span>}
+                      {a && a.boutique && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-50 text-purple-600">boutique</span>}
+                    </div>
+                    {a && <div className="text-xs text-gray-400">{a.email} · {a.branding.plan?.name ?? 'Trial'} · joined {fmtDate(a.createdAt)}{a.configured ? '' : ' · not yet configured'}</div>}
+                  </td>
                   <td className="px-5 py-3 text-right font-semibold" style={{ color: '#E04927' }}>{s.downloads}</td>
                   <td className="px-5 py-3 text-right font-semibold" style={{ color: '#009346' }}>{s.ais}</td>
                   <td className="px-5 py-3 text-right text-gray-700">{s.logins}</td>
                   <td className="px-5 py-3 text-gray-500">{fmt(s.lastSeen)}</td>
-                  <td className="px-5 py-3 text-right"><ResetTrialButton clientId={s.clientId} name={displayNameForId(s.clientId)} /></td>
+                  <td className="px-5 py-3 text-right"><ResetTrialButton clientId={s.clientId} name={nameFor(s.clientId)} /></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -161,7 +188,7 @@ export default async function AdminPage() {
           if (s.recent.length === 0 && sess.length === 0) return null;
           return (
           <div key={s.clientId} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h2 className="font-semibold text-gray-800 mb-3">{displayNameForId(s.clientId)} — recent activity</h2>
+            <h2 className="font-semibold text-gray-800 mb-3">{nameFor(s.clientId)} — recent activity</h2>
             {sess.length > 0 && (
               <div className="mb-3">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sessions (time logged in)</div>

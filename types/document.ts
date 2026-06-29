@@ -110,6 +110,7 @@ export interface ClientBranding {
   coverStyle?: 'band' | 'minimal' | 'photo' | 'bold' | 'sidebar'; // cover layout
   footerStyle?: 'standard' | 'minimal' | 'none'; // footer treatment
   logoPosition?: 'top' | 'bottom';      // brand logo in the top bar vs the footer (interior pages)
+  taglinePosition?: 'footer' | 'header'; // interior-page tagline: footer center (default) vs top-bar right
   calloutStyle?: 'bar' | 'plain' | 'solid'; // callout panel look
   calloutIcon?: string;                 // optional icon key (see lib/icons.ts) for callout panels
   coverLogoScale?: number;              // cover logo size multiplier (0.5–2.5)

@@ -121,11 +121,13 @@ export const CLIENTS: ClientAccount[] = [
       displayName: 'Voyageur University',
       templateId: 'tlc',
       tagline: 'You’re not stuck. The model is.',
+      // Wide logo — keep the tagline off the footer (top-bar right) so it never overlaps it.
+      taglinePosition: 'header',
       logoUrl: '/clients/voyageur/logo.png',
       social: [
         { type: 'website', url: 'https://voyageur-university.com/' },
-        { type: 'linkedin', url: 'https://www.linkedin.com/newsletters/the-fractional-revolution-blog-6971274470556659712/' },
-        { type: 'youtube', url: 'https://www.youtube.com/@VoyageurU' },
+        { type: 'linkedin', url: 'https://www.linkedin.com/in/johnarms/' },
+        { type: 'youtube', url: 'https://www.youtube.com/@voyageuru9914' },
       ],
       colors: {
         header: '#015424',      // brand green — top bar, cover band, H1 titles

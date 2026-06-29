@@ -1382,6 +1382,7 @@ function drawBrandedChrome(
 
   const footerStyle = branding.footerStyle ?? 'standard';
   const logoTop = branding.logoPosition === 'top';
+  const taglineInHeader = branding.taglinePosition === 'header';
 
   // Top bar (brand band). When the logo is positioned "top", it sits on the bar.
   page.drawRectangle({ x: 0, y: tmpl.pageHeight - barH, width: W, height: barH, color: headerColor });
@@ -1389,6 +1390,14 @@ function drawBrandedChrome(
     const th = Math.max(14, barH - 12);
     const scale = th / logo.height;
     page.drawImage(logo, { x: tmpl.marginLeft, y: tmpl.pageHeight - barH + (barH - th) / 2, width: logo.width * scale, height: th });
+  }
+  // Optional: tagline on the top bar, right-aligned (white on the brand band). Used by brands
+  // with a wide logo so the tagline never collides with the footer logo.
+  if (taglineInHeader && branding.tagline) {
+    const tg = sanitize(branding.tagline);
+    const ts = 9;
+    const tw = italicFont.widthOfTextAtSize(tg, ts);
+    page.drawText(tg, { x: W - tmpl.marginRight - tw, y: tmpl.pageHeight - barH / 2 - ts * 0.34, size: ts, font: italicFont, color: rgb(1, 1, 1) });
   }
 
   if (footerStyle === 'none') return; // clean, no footer chrome
@@ -1413,9 +1422,12 @@ function drawBrandedChrome(
   // are centered to it. The logo only appears here when it isn't on the top bar.
   let rowMid = centerY + 5;
   if (!logoTop && logo) {
-    const targetH = 42;
-    const scale = targetH / logo.height;
-    const w = logo.width * scale;
+    // Cap by height AND width so a very wide logo (e.g. a 6:1 wordmark) doesn't sprawl across
+    // the footer or collide with the centered tagline / right-side icons.
+    let targetH = 42;
+    let w = logo.width * (targetH / logo.height);
+    const maxW = 180;
+    if (w > maxW) { targetH *= maxW / w; w = maxW; }
     const logoY = centerY - targetH / 2 + 12;
     page.drawImage(logo, { x: tmpl.marginLeft, y: logoY, width: w, height: targetH });
     rowMid = logoY + targetH / 2;
@@ -1423,11 +1435,13 @@ function drawBrandedChrome(
     page.drawText(sanitize(branding.displayName), { x: tmpl.marginLeft, y: centerY, size: 14, font: boldFont, color: hexToRgb(branding.colors.title) });
   }
 
-  // Tagline (center) — vertically centered to the row. sanitize keeps the middot (·).
-  const tagline = sanitize(branding.tagline);
-  const tagSize = 8.5;
-  const tagWidth = italicFont.widthOfTextAtSize(tagline, tagSize);
-  page.drawText(tagline, { x: (W - tagWidth) / 2, y: rowMid - tagSize * 0.34, size: tagSize, font: italicFont, color: headerColor });
+  // Tagline (center of the footer row) — unless it's been moved to the top bar.
+  if (!taglineInHeader) {
+    const tagline = sanitize(branding.tagline);
+    const tagSize = 8.5;
+    const tagWidth = italicFont.widthOfTextAtSize(tagline, tagSize);
+    page.drawText(tagline, { x: (W - tagWidth) / 2, y: rowMid - tagSize * 0.34, size: tagSize, font: italicFont, color: headerColor });
+  }
 
   // Social icons (right), clickable
   const iconSize = 16;

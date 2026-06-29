@@ -111,6 +111,36 @@ export const CLIENTS: ClientAccount[] = [
     },
   },
   {
+    // Voyageur University (John Arms) — fractional-leadership education.
+    // Default password: Voyageur2026!  (change by replacing the hash)
+    // Comp/unlimited account (see COMP_ACCOUNTS in app/page.tsx): no download cap, no watermark.
+    username: 'voyageur',
+    passwordHash: '$2b$10$kaMkdz62rXRvz.RvFNumxuLqJY2hFzFnfEHIaAoMIAbDK6i9nfnwS',
+    branding: {
+      id: 'voyageur',
+      displayName: 'Voyageur University',
+      templateId: 'tlc',
+      tagline: 'You’re not stuck. The model is.',
+      logoUrl: '/clients/voyageur/logo.png',
+      social: [
+        { type: 'website', url: 'https://voyageur-university.com/' },
+        { type: 'linkedin', url: 'https://www.linkedin.com/newsletters/the-fractional-revolution-blog-6971274470556659712/' },
+        { type: 'youtube', url: 'https://www.youtube.com/@VoyageurU' },
+      ],
+      colors: {
+        header: '#015424',      // brand green — top bar, cover band, H1 titles
+        title: '#015424',       // brand green — main page titles
+        subtitle: '#015424',    // brand green — section labels (crisp on white)
+        accent: '#E19703',      // brand gold — bullets, field borders, accents
+        calloutBg: '#015424',   // green callout box
+        calloutBorder: '#E19703', // gold border pops on the green callout
+        grayBox: '#EAF3EC',     // pale green tint for fillable-field backgrounds
+      },
+      // Comp account — full access, unlimited downloads, no watermark.
+      plan: { name: 'Enterprise', downloadsPerMonth: null },
+    },
+  },
+  {
     // Admin account — sees the analytics dashboard, not a workbook workspace.
     // Password is stored only as a bcrypt hash (changed 2026-06). To change it, generate
     // a new hash: node -e "console.log(require('bcryptjs').hashSync('NEW_PASSWORD',10))"

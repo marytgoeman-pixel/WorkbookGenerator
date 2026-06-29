@@ -121,8 +121,10 @@ export const CLIENTS: ClientAccount[] = [
       displayName: 'Voyageur University',
       templateId: 'tlc',
       tagline: 'You’re not stuck. The model is.',
-      // Wide logo — keep the tagline off the footer (top-bar right) so it never overlaps it.
-      taglinePosition: 'header',
+      // Wide logo — keep the tagline out of the interior chrome entirely (it still shows on the
+      // cover). The cover uses a slate base with the full-color logo (logocover.png).
+      taglinePosition: 'none',
+      coverColor: '#1E1E1E',
       logoUrl: '/clients/voyageur/logo.png',
       social: [
         { type: 'website', url: 'https://voyageur-university.com/' },

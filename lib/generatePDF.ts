@@ -243,6 +243,10 @@ export async function generatePDF(
   const coverWhiteLogo = (branded && branding!.coverLogoWhite && branding!.logoUrlWhite)
     ? (await tryEmbedImage(pdfDoc, branding!.logoUrlWhite)) ?? whiteLogo
     : whiteLogo;
+  // A full-color logo built to read on a dark cover (e.g. white wordmark + colored mark).
+  // When present (logocover.png next to the logo) it's drawn on the cover band instead of the
+  // all-white reversed logo — used with a coverColor slate so the brand colors show.
+  const coverColorLogo = branded ? await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'logocover.png')) : null;
   // Sell It's icon mark (the converging-arrows symbol) in brand blue, drawn beside page titles
   const sellitMark = sellit ? await tryEmbedImage(pdfDoc, branding!.logoUrl.replace(/[^/]*$/, 'sellitmark-blue.png')) : null;
   // The Learning Creative leaf mark — accents callout panels (website-style, not a dark box)
@@ -337,7 +341,7 @@ export async function generatePDF(
     if (sellit) {
       await drawSellItCover(pdfDoc, page, tmpl, doc, branding!, boldFont, font, brandLogo, whiteLogo);
     } else {
-      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, coverWhiteLogo, brandLogo);
+      await drawCoverPage(pdfDoc, page, tmpl, doc, branding!, boldFont, font, italicFont, coverColorLogo ?? coverWhiteLogo, brandLogo);
     }
     hasCover = true;
     newPage();
@@ -1082,7 +1086,7 @@ async function drawCoverPage(
   darkLogo?: PDFImage | null    // original logo, used on light areas (the minimal cover)
 ) {
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
-  const navy = hexToRgb(branding.colors.header);
+  const navy = hexToRgb(branding.coverColor ?? branding.colors.header); // cover band/base (slate override allowed)
   const gold = hexToRgb(branding.colors.accent);
   const pad = tmpl.marginLeft;
   const innerW = W - pad * 2;
@@ -1382,7 +1386,8 @@ function drawBrandedChrome(
 
   const footerStyle = branding.footerStyle ?? 'standard';
   const logoTop = branding.logoPosition === 'top';
-  const taglineInHeader = branding.taglinePosition === 'header';
+  const tagPos = branding.taglinePosition ?? 'footer'; // 'footer' (default) | 'header' | 'none'
+  const taglineInHeader = tagPos === 'header';
 
   // Top bar (brand band). When the logo is positioned "top", it sits on the bar.
   page.drawRectangle({ x: 0, y: tmpl.pageHeight - barH, width: W, height: barH, color: headerColor });
@@ -1435,8 +1440,8 @@ function drawBrandedChrome(
     page.drawText(sanitize(branding.displayName), { x: tmpl.marginLeft, y: centerY, size: 14, font: boldFont, color: hexToRgb(branding.colors.title) });
   }
 
-  // Tagline (center of the footer row) — unless it's been moved to the top bar.
-  if (!taglineInHeader) {
+  // Tagline (center of the footer row) — only in the default 'footer' position.
+  if (tagPos === 'footer') {
     const tagline = sanitize(branding.tagline);
     const tagSize = 8.5;
     const tagWidth = italicFont.widthOfTextAtSize(tagline, tagSize);

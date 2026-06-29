@@ -108,9 +108,10 @@ export interface ClientBranding {
   // Self-serve template-builder choices (optional; managed brands use their template code).
   font?: 'sans' | 'serif' | 'mono';     // base typeface family
   coverStyle?: 'band' | 'minimal' | 'photo' | 'bold' | 'sidebar'; // cover layout
+  coverColor?: string;                  // overrides the cover's dark band/base color (hex); defaults to colors.header
   footerStyle?: 'standard' | 'minimal' | 'none'; // footer treatment
   logoPosition?: 'top' | 'bottom';      // brand logo in the top bar vs the footer (interior pages)
-  taglinePosition?: 'footer' | 'header'; // interior-page tagline: footer center (default) vs top-bar right
+  taglinePosition?: 'footer' | 'header' | 'none'; // interior-page tagline: footer center (default), top-bar right, or hidden
   calloutStyle?: 'bar' | 'plain' | 'solid'; // callout panel look
   calloutIcon?: string;                 // optional icon key (see lib/icons.ts) for callout panels
   coverLogoScale?: number;              // cover logo size multiplier (0.5–2.5)

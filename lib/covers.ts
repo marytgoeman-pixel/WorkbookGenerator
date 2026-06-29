@@ -49,10 +49,26 @@ export const TLC_COVER_IMAGES: CoverImage[] = [
   { id: 'tlc-10', thumb: '/covers/tlc-thumb-10.jpg', cover: '/covers/tlc-10.jpg', label: 'Geometric star dot' },
 ];
 
+// Voyageur University — business / workplace photography (fractional-leadership audience).
+export const VOYAGEUR_COVER_IMAGES: CoverImage[] = [
+  { id: 'voyageur-1', thumb: '/covers/voyageur-thumb-1.jpg', cover: '/covers/voyageur-1.jpg', label: 'Workspace flat-lay with charts' },
+  { id: 'voyageur-2', thumb: '/covers/voyageur-thumb-2.jpg', cover: '/covers/voyageur-2.jpg', label: 'Coffee & notes flat-lay' },
+  { id: 'voyageur-3', thumb: '/covers/voyageur-thumb-3.jpg', cover: '/covers/voyageur-3.jpg', label: 'Professional at her desk' },
+  { id: 'voyageur-4', thumb: '/covers/voyageur-thumb-4.jpg', cover: '/covers/voyageur-4.jpg', label: 'Businesswoman with a tablet' },
+  { id: 'voyageur-5', thumb: '/covers/voyageur-thumb-5.jpg', cover: '/covers/voyageur-5.jpg', label: 'Bright desk with laptop' },
+  { id: 'voyageur-6', thumb: '/covers/voyageur-thumb-6.jpg', cover: '/covers/voyageur-6.jpg', label: 'Team collaboration' },
+  { id: 'voyageur-7', thumb: '/covers/voyageur-thumb-7.jpg', cover: '/covers/voyageur-7.jpg', label: 'Working from a phone' },
+  { id: 'voyageur-8', thumb: '/covers/voyageur-thumb-8.jpg', cover: '/covers/voyageur-8.jpg', label: 'Modern white home office' },
+  { id: 'voyageur-9', thumb: '/covers/voyageur-thumb-9.jpg', cover: '/covers/voyageur-9.jpg', label: 'Open office workspace' },
+  { id: 'voyageur-10', thumb: '/covers/voyageur-thumb-10.jpg', cover: '/covers/voyageur-10.jpg', label: 'Home office with plants' },
+  { id: 'voyageur-11', thumb: '/covers/voyageur-thumb-11.jpg', cover: '/covers/voyageur-11.jpg', label: 'Desk with monitor & lamp' },
+];
+
 // The cover-image set a given client should choose from.
 export function coverImagesFor(brandId: string | undefined): CoverImage[] {
   if (brandId === 'thelearningcreative') return TLC_COVER_IMAGES; // TLC uses its own botanical art
   if (brandId === 'sellit') return SELLIT_COVER_IMAGES;           // Sell It uses the architecture set
+  if (brandId === 'voyageur') return VOYAGEUR_COVER_IMAGES;       // Voyageur uses business/workplace photos
   return COVER_IMAGES;                                            // Jo keeps her real-estate set
 }
 
@@ -60,5 +76,6 @@ export function coverById(id: string | undefined): CoverImage | undefined {
   if (!id) return undefined;
   return COVER_IMAGES.find((c) => c.id === id)
     || SELLIT_COVER_IMAGES.find((c) => c.id === id)
-    || TLC_COVER_IMAGES.find((c) => c.id === id);
+    || TLC_COVER_IMAGES.find((c) => c.id === id)
+    || VOYAGEUR_COVER_IMAGES.find((c) => c.id === id);
 }

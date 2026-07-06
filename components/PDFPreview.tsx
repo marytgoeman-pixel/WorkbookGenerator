@@ -15,6 +15,7 @@ interface Props {
 
 export default function PDFPreview({ doc, templateId, colorTheme, branding, watermark, onSelectSection, scrollTo }: Props) {
   const [pageImages, setPageImages] = useState<string[]>([]);
+  const [totalPages, setTotalPages] = useState(0); // full page count (preview may render fewer)
   const [anchors, setAnchors] = useState<SectionAnchor[]>([]);
   // Native-PDF fallback (used if pdf.js can't render — e.g. older Safari): a blob URL in an <iframe>
   const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
@@ -59,7 +60,10 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding, wate
           const pdf = await loadingTask.promise;
 
           const images: string[] = [];
-          const maxPages = Math.min(pdf.numPages, 10); // cap preview at 10 pages
+          setTotalPages(pdf.numPages);
+          // Render up to 25 pages on-screen for performance; the DOWNLOAD always has every
+          // page. A notice below tells the user when the preview shows fewer than the total.
+          const maxPages = Math.min(pdf.numPages, 25);
           for (let i = 1; i <= maxPages; i++) {
             const page = await pdf.getPage(i);
             const viewport = page.getViewport({ scale: 1.5 });
@@ -192,6 +196,11 @@ export default function PDFPreview({ doc, templateId, colorTheme, branding, wate
                 <div className={`absolute inset-0 rounded ring-2 transition-all pointer-events-none ${highlightPage === i ? 'ring-blue-400' : clickable ? 'ring-transparent group-hover:ring-blue-400/50' : 'ring-transparent'}`} />
               </div>
             ))}
+            {totalPages > pageImages.length && (
+              <div className="w-full max-w-2xl rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs text-center px-4 py-3">
+                Preview shows the first <b>{pageImages.length}</b> of <b>{totalPages}</b> pages. Nothing is cut off — your <b>downloaded PDF includes all {totalPages} pages</b>.
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -32,7 +32,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
 
   // Internal / comp accounts: always full access (their base plan, e.g. Enterprise) with
   // no trial or billing resolution. These are our own working logins.
-  const COMP_ACCOUNTS = new Set(['thelearningcreative', 'trialdemo', 'voyageur']);
+  const COMP_ACCOUNTS = new Set(['thelearningcreative', 'trialdemo', 'voyageur', 'sellit']);
   if (COMP_ACCOUNTS.has(session.clientId)) {
     return <WorkbookApp branding={base} trial={null} manageable={false} />;
   }

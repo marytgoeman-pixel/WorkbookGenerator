@@ -60,8 +60,9 @@ export const CLIENTS: ClientAccount[] = [
         calloutBorder: '#3F69FF',
         grayBox: '#E6EBFF',    // light periwinkle — fillable field background
       },
-      // On the 7-day free trial — starts on next login (ensureTrialStart).
-      plan: { name: 'Trial', downloadsPerMonth: 1, trial: true },
+      // TEMP: comp/unlimited for now (also in COMP_ACCOUNTS) — no cap, no watermark, no trial.
+      // To revert: plan: { name: 'Trial', downloadsPerMonth: 1, trial: true } and drop from COMP_ACCOUNTS.
+      plan: { name: 'Enterprise', downloadsPerMonth: null },
     },
   },
   {

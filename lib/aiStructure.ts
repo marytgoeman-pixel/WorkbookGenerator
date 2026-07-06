@@ -200,12 +200,22 @@ async function runStructuringStream(makeStream: () => any, label: string): Promi
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const response = await makeStream().finalMessage();
+      // Output hit the token ceiling → the JSON is cut off and the tail of the workbook is
+      // missing. Fail loudly (don't return a silent partial) so the user can split the doc.
+      if (response.stop_reason === 'max_tokens') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const err: any = new Error('The document was too long to convert in one pass — the end got cut off. Split it into two shorter uploads (or trim it) and try again.');
+        err.noRetry = true;
+        throw err;
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const textBlock = (response.content as any[]).find((b) => b.type === 'text');
       if (!textBlock) throw new Error(`No ${label} returned`);
       return textBlock.text as string;
     } catch (e) {
       lastErr = e;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((e as any)?.noRetry) break; // retrying a too-long doc would just truncate again
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const status = (e as any)?.status;
       // Retry only transient problems: network/stream drops (no status), timeouts,
@@ -234,7 +244,7 @@ export async function structureWithAI(html: string): Promise<DocumentModel> {
   // connection alive so serverless platforms don't drop it as idle.
   const text = await runStructuringStream(() => client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
+    max_tokens: 64000,
     system: SYSTEM,
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: `Worksheet HTML:\n\n${html}` }],
@@ -266,7 +276,7 @@ export async function buildWorkbookFromBrief(brief: string): Promise<DocumentMod
   const client = new Anthropic();
   const text = await runStructuringStream(() => client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
+    max_tokens: 64000,
     system: BUILD_SYSTEM,
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: brief }],
@@ -328,7 +338,7 @@ export async function refineWithAI(doc: DocumentModel, instruction: string): Pro
 
   const text = await runStructuringStream(() => client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
+    max_tokens: 64000,
     system: REFINE_SYSTEM,
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: `Current workbook JSON:\n\n${current}\n\nInstruction:\n${instruction}` }],

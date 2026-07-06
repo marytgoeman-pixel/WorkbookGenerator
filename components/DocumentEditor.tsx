@@ -33,6 +33,21 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
   const isSellit = branding?.id === 'sellit';
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
+  // Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z (or Ctrl+Y) redo — but let text fields keep their own
+  // native undo when the user is typing in one.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { if (canUndo) { e.preventDefault(); onUndo?.(); } }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { if (canRedo) { e.preventDefault(); onRedo?.(); } }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canUndo, canRedo, onUndo, onRedo]);
+
   // Answer-box preview colors mirror the actual PDF field styling for this client
   const fieldBg = branding?.colors.grayBox ?? '#eef2ff';
   const fieldBorder = branding?.colors.accent ?? '#9ca3af';
@@ -189,15 +204,16 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
 
   return (
     <div className="space-y-4">
-      {/* Undo / Redo */}
+      {/* Undo / Redo — sticky so it stays reachable while scrolling a long editor */}
       {(onUndo || onRedo) && (
-        <div className="flex items-center gap-2">
+        <div className="sticky top-2 z-20 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-gray-100 rounded-xl px-2 py-1.5 shadow-sm">
           <button onClick={onUndo} disabled={!canUndo}
             className="flex items-center gap-1.5 text-xs font-medium rounded-lg border border-gray-200 px-3 py-1.5 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="Undo">↶ Undo</button>
+            title="Undo (Ctrl+Z)">↶ Undo</button>
           <button onClick={onRedo} disabled={!canRedo}
             className="flex items-center gap-1.5 text-xs font-medium rounded-lg border border-gray-200 px-3 py-1.5 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="Redo">↷ Redo</button>
+            title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+          <span className="text-[11px] text-gray-400 ml-1 hidden sm:inline">or press Ctrl+Z</span>
         </div>
       )}
 
@@ -614,6 +630,21 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                             </div>
                           );
                         })()}
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <span className="text-[10px] text-gray-400">Input box size</span>
+                          <div className="flex gap-1">
+                            {([['Normal', 1], ['Tall', 1.6], ['Taller', 2.2]] as const).map(([lbl, v]) => {
+                              const active = (item.table.cellScale ?? 1) === v;
+                              return (
+                                <button key={lbl} onClick={() => updateTable(section.id, item.id, (t) => ({ ...t, cellScale: v }))}
+                                  className={`text-[11px] rounded px-2 py-0.5 border ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>{lbl}</button>
+                              );
+                            })}
+                          </div>
+                          {item.table.fullPage && (item.table.cellScale ?? 1) > 1 && (
+                            <span className="text-[10px] text-gray-400">· grid may span extra pages</span>
+                          )}
+                        </div>
                       </div>
                     )}
 

@@ -634,7 +634,8 @@ export async function generatePDF(
       // Calendar mode: a cell carrying BOTH a date label and a fillable field — give rows
       // enough height to actually type a note inside each day.
       const isCalendar = table.rows.some((r) => r.some((c) => !!(c && c.text && c.field)));
-      const minRowH = isCalendar ? 54 : 30;
+      const cellScale = Math.max(1, Math.min(3, table.cellScale ?? 1)); // taller fill-in boxes (default 1)
+      const minRowH = (isCalendar ? 54 : 30) * cellScale;
       // Calendar day boxes are small — use a smaller field font so more text fits per box.
       const cellFieldSize = isCalendar ? 8 : TFS;
       const headerColor = branded ? hexToRgb(branding.colors.subtitle) : primaryColor;
@@ -653,12 +654,12 @@ export async function generatePDF(
         page.drawRectangle({ x: tmpl.marginLeft, y: y - headerH + 4, width: mainColWidth, height: headerH, color: headerColor, opacity: solidHeader ? 1 : 0.12 });
         const htColor = solidHeader ? rgb(1, 1, 1) : headerColor;
         headerWrapped.forEach((lines, c) => {
-          // Center each header title horizontally in its column and vertically in the row
+          // Left-align each header title in its column (matching the cell content padding),
+          // vertically centered in the header row.
           const blockH = lines.length * cellLineH;
           let cy = y + 4 - (headerH - blockH) / 2 - TFS + 1;
           for (const ln of lines) {
-            const w = boldFont.widthOfTextAtSize(ln, TFS);
-            page.drawText(ln, { x: tmpl.marginLeft + c * colW + (colW - w) / 2, y: cy, size: TFS, font: boldFont, color: htColor });
+            page.drawText(ln, { x: tmpl.marginLeft + c * colW + 5, y: cy, size: TFS, font: boldFont, color: htColor });
             cy -= cellLineH;
           }
         });
@@ -672,11 +673,14 @@ export async function generatePDF(
       // Full-page tables (calendars, SWOT, grids) expand their rows to fill the page.
       if (table.fullPage) {
         // Fill the page from the current y down to the bottom margin, split evenly across
-        // rows — so the whole grid always stays on ONE page (rows shrink to fit if needed).
+        // rows — so the whole grid stays on ONE page at the default size (rows shrink to fit).
         // reserveBelow leaves room for any items added AFTER the table in this section.
+        // cellScale > 1 makes each row taller than the one-page fit — bigger fill-in boxes,
+        // and the grid then flows onto additional pages (headers repeat).
         const avail = y - tmpl.marginBottom - headerH - 4 - reserveBelow;
         const per = Math.max(28, Math.floor(avail / Math.max(1, table.rows.length)));
-        rowHeights = table.rows.map(() => per);
+        const rh = cellScale > 1 ? Math.round(per * cellScale) : per;
+        rowHeights = table.rows.map(() => rh);
       }
 
       // Keep the table together if it fits on a fresh page
@@ -709,7 +713,7 @@ export async function generatePDF(
               fh = Math.max(14, rh - 12);
               fy = rowTop - rh + 4 + 4;
             } else {
-              fh = Math.min(rh - 8, 20);
+              fh = Math.min(rh - 8, 20 * cellScale);
               fy = rowTop - rh + 4 + (rh - fh) / 2;
             }
             if (cell.field.type === 'dropdown' && cell.field.options) {

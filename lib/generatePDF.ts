@@ -192,18 +192,17 @@ export async function generatePDF(
   // 'tlc' reuses the navy-bar + footer chrome (drawBrandedChrome) and the standard cover.
   const branded = jo || sellit || tlc;
 
-  // Sell It uses its own typefaces: Aeonik (bold) for headings, Inter for body.
+  // Sell It: Inter for body; headings use standard Helvetica-Bold (Arial).
+  // The previously embedded Aeonik OTF (CFF/PostScript) subset rendered as garbled glyphs
+  // in some PDF viewers, so headings now use the built-in font that renders everywhere.
   if (sellit) {
     pdfDoc.registerFontkit(fontkit);
     const base = branding!.logoUrl.replace(/[^/]*$/, '');
-    const [aeonik, inter] = await Promise.all([
-      tryFetchBytes(`${base}AeonikPro-Bold.otf`),
-      tryFetchBytes(`${base}Inter-Regular.woff`),
-    ]);
+    const inter = await tryFetchBytes(`${base}Inter-Regular.woff`);
     try {
-      if (aeonik) boldFont = await pdfDoc.embedFont(aeonik, { subset: true });
       if (inter) { font = await pdfDoc.embedFont(inter, { subset: true }); italicFont = font; }
     } catch { /* fall back to Helvetica on any embed error */ }
+    // boldFont stays Helvetica-Bold (set above) — reliable in every viewer.
   }
 
   // Self-serve template font choice (sans is the Helvetica default already set above).

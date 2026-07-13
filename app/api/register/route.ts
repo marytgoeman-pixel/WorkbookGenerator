@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { ClientBranding } from '@/types/document';
 import { createAccount, createVerifyToken } from '@/lib/accounts';
 import { sendVerifyEmail, sendInquiryEmail } from '@/lib/email';
+import { SIGNUPS_OPEN } from '@/lib/flags';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +31,10 @@ function starterBranding(displayName: string): ClientBranding {
 const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 export async function POST(req: NextRequest) {
+  // Self-serve sign-ups are temporarily paused (see lib/flags.ts).
+  if (!SIGNUPS_OPEN) {
+    return NextResponse.json({ error: 'Sign-ups are temporarily paused. Try the live demo (no account needed), or contact us and we can set you up.' }, { status: 403 });
+  }
   const b = await req.json().catch(() => ({}));
   const email = typeof b?.email === 'string' ? b.email.trim() : '';
   const password = typeof b?.password === 'string' ? b.password : '';

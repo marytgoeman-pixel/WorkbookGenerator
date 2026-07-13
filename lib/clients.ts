@@ -41,9 +41,10 @@ export const CLIENTS: ClientAccount[] = [
   },
   {
     // Second client: Sell It (The Growth Accelerator).
-    // Default password: SellIt2025!  (change by replacing the hash)
+    // Password rotated 2026 — stored as a bcrypt hash only (the plaintext is shared with the
+    // client directly). To change it: node -e "console.log(require('bcryptjs').hashSync('NEW',10))"
     username: 'sellit',
-    passwordHash: '$2b$10$QUFb/mc9aIABisNpFYgMHu95RHGn7/0zdjNvB7E5aVNNhFPwUVTaa',
+    passwordHash: '$2b$10$4zLlNKmOsDpDaby9r1RdV.eWNRrnsXiPknvjF2lhBdUgR3NaOdkF6',
     branding: {
       id: 'sellit',
       displayName: 'Sell It',

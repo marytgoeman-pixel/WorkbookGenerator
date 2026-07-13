@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { SIGNUPS_OPEN } from '@/lib/flags';
 
 const NAVY = '#163446', GREEN = '#009346', LIME = '#8DC63D';
 
@@ -32,6 +33,23 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!SIGNUPS_OPEN) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl ring-1 ring-black/5 p-8 text-center">
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: GREEN }}>The Learning Creative</span>
+          <h1 className="text-2xl font-bold mt-1" style={{ color: NAVY }}>Sign-ups are paused</h1>
+          <p className="text-sm text-gray-500 mt-3">We&apos;re not accepting new self-serve accounts right now. You can still see it in action — try the live demo (no account needed), or get in touch and we&apos;ll get you set up.</p>
+          <div className="mt-6 flex flex-col gap-2">
+            <a href="/try" className="py-2.5 rounded-xl font-semibold text-white" style={{ backgroundColor: GREEN }}>Try it free — no sign-up</a>
+            <a href="/login#inquiry" className="py-2.5 rounded-xl font-semibold border" style={{ color: NAVY, borderColor: NAVY }}>Contact us</a>
+          </div>
+          <a href="/login" className="inline-block text-xs text-gray-400 hover:text-gray-700 underline mt-4">Already have an account? Sign in</a>
+        </div>
+      </div>
+    );
   }
 
   return (

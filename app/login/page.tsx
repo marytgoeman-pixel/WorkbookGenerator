@@ -2,8 +2,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { APP_VERSION } from '@/lib/version';
+import { SIGNUPS_OPEN } from '@/lib/flags';
 
 const NAVY = '#163446', GREEN = '#009346', LIME = '#8DC63D';
+// When sign-ups are paused, the "Sign up" CTAs route to the contact form instead of /register.
+const CTA_HREF = SIGNUPS_OPEN ? '/register' : '#inquiry';
+const CTA_LABEL = SIGNUPS_OPEN ? 'Sign up' : 'Request access';
 
 const FEATURES = [
   { icon: '✏️', title: 'Truly fillable PDFs', body: 'Recipients type right into the PDF in any reader, offline. Not a flat printout, and not an online-only link.' },
@@ -123,7 +127,7 @@ export default function LandingPage() {
             <div className="mt-7 flex flex-wrap gap-3">
               <a href="/try" className="px-5 py-3 rounded-xl font-semibold transition" style={{ backgroundColor: LIME, color: '#10241a' }}>Try it free</a>
               <a href="#pricing" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">See pricing</a>
-              <a href="/register" className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">Sign up</a>
+              <a href={CTA_HREF} className="px-5 py-3 rounded-xl font-semibold text-white ring-1 ring-white/30 bg-white/10 hover:bg-white/20 transition">{CTA_LABEL}</a>
             </div>
             <p className="mt-5 text-white/60 text-sm">No per-learner fees · download &amp; distribute to unlimited learners.</p>
           </div>
@@ -160,7 +164,9 @@ export default function LandingPage() {
               <span className="text-xs text-gray-300"> · username is your email</span>
             </div>
             <p className="text-xs text-center text-gray-400 mt-4 pt-4 border-t border-gray-100">
-              New here? <a href="/register" className="font-semibold underline" style={{ color: GREEN }}>Create an account</a> and build your own template.
+              {SIGNUPS_OPEN
+                ? <>New here? <a href="/register" className="font-semibold underline" style={{ color: GREEN }}>Create an account</a> and build your own template.</>
+                : <>New here? <a href="/try" className="font-semibold underline" style={{ color: GREEN }}>Try the live demo</a> — no account needed.</>}
             </p>
           </div>
         </div>
@@ -206,8 +212,8 @@ export default function LandingPage() {
                     <li key={f} className="flex gap-2"><span style={{ color: GREEN }}>✓</span><span>{f}</span></li>
                   ))}
                 </ul>
-                <a href={t.custom ? '#inquiry' : '/register'} className="mt-6 block text-center px-4 py-2.5 rounded-xl font-semibold transition" style={t.highlight ? { backgroundColor: GREEN, color: '#ffffff' } : { color: NAVY, border: `1px solid ${NAVY}` }}>
-                  {t.custom ? 'Contact us' : 'Sign up'}
+                <a href={t.custom ? '#inquiry' : CTA_HREF} className="mt-6 block text-center px-4 py-2.5 rounded-xl font-semibold transition" style={t.highlight ? { backgroundColor: GREEN, color: '#ffffff' } : { color: NAVY, border: `1px solid ${NAVY}` }}>
+                  {t.custom ? 'Contact us' : CTA_LABEL}
                 </a>
               </div>
             ))}
@@ -222,7 +228,7 @@ export default function LandingPage() {
       <section id="inquiry" className="max-w-3xl mx-auto px-5 py-16 md:py-20">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold" style={{ color: NAVY }}>Prefer we set it up for you?</h2>
-          <p className="text-gray-500 mt-3">You can <a href="/register" className="underline font-semibold" style={{ color: GREEN }}>sign up</a> and build your own template in minutes — or, with the one-time $499 setup, tell me about your brand and I’ll configure your branded workspace and first template for you. I’ll reply to the email you provide, or reach me directly at <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
+          <p className="text-gray-500 mt-3">{SIGNUPS_OPEN && <>You can <a href="/register" className="underline font-semibold" style={{ color: GREEN }}>sign up</a> and build your own template in minutes — or, w</>}{!SIGNUPS_OPEN && 'W'}ith the one-time $499 setup, tell me about your brand and I’ll configure your branded workspace and first template for you. I’ll reply to the email you provide, or reach me directly at <a href="mailto:mary@thelearningcreative.com" className="underline" style={{ color: GREEN }}>mary@thelearningcreative.com</a>.</p>
         </div>
         {sent ? (
           <div className="mt-8 rounded-2xl border p-6 text-center" style={{ borderColor: GREEN, backgroundColor: '#F0F7E6' }}>

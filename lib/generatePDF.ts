@@ -555,30 +555,38 @@ export async function generatePDF(
     // (sp / ls / lineH were computed above the heading for orphan control)
 
     // ---- ordered content rendering (preserves document order) ----
-    const renderText = (txt: string, color?: string) => {
+    // Per-item inline formatting: bold/italic pick the matching font, indent shifts x (16pt/level).
+    type Fmt = { bold?: boolean; italic?: boolean; indent?: number };
+    const fmtFont = (fmt?: Fmt) => (fmt?.bold ? boldFont : fmt?.italic ? italicFont : font);
+    const fmtIndent = (fmt?: Fmt) => Math.max(0, Math.min(4, fmt?.indent ?? 0)) * 16;
+
+    const renderText = (txt: string, color?: string, fmt?: Fmt) => {
       // "Pressure"/"Presence" lines render in the default color (coloring removed per request)
       const col = /pressure|presence/i.test(txt) ? rgb(0.1, 0.1, 0.1) : (resolveColor(color) ?? rgb(0.1, 0.1, 0.1));
+      const f = fmtFont(fmt), ind = fmtIndent(fmt);
       // widow/orphan control keeps >=2 lines of a paragraph together across pages
-      placeLines(wrapText(txt, mainColWidth, font, tmpl.bodySize), lineH,
-        (wline) => page.drawText(wline, { x: tmpl.marginLeft, y, size: tmpl.bodySize, font, color: col }));
+      placeLines(wrapText(txt, mainColWidth - ind, f, tmpl.bodySize), lineH,
+        (wline) => page.drawText(wline, { x: tmpl.marginLeft + ind, y, size: tmpl.bodySize, font: f, color: col }));
       y -= tmpl.paragraphSpacing * sp;
     };
 
-    const renderBullet = (txt: string, color?: string) => {
+    const renderBullet = (txt: string, color?: string, fmt?: Fmt) => {
       // "Pressure"/"Presence" lines render in the default color (coloring removed per request)
       const col = /pressure|presence/i.test(txt) ? rgb(0.1, 0.1, 0.1) : (resolveColor(color) ?? rgb(0.1, 0.1, 0.1));
-      const wrapped = wrapText(txt, mainColWidth - tmpl.bulletIndent - 6, font, tmpl.bodySize);
+      const f = fmtFont(fmt), ind = fmtIndent(fmt);
+      const bx = tmpl.marginLeft + tmpl.bulletIndent + ind;
+      const wrapped = wrapText(txt, mainColWidth - tmpl.bulletIndent - 6 - ind, f, tmpl.bodySize);
       ensureSpace(tmpl.lineHeight);
       if (branded) {
-        page.drawRectangle({ x: tmpl.marginLeft + tmpl.bulletIndent, y: y + 1, width: 6, height: 6, color: accentColor });
+        page.drawRectangle({ x: bx, y: y + 1, width: 6, height: 6, color: accentColor });
       } else {
-        page.drawText('•', { x: tmpl.marginLeft + tmpl.bulletIndent, y, size: tmpl.bodySize, font: boldFont, color: secondaryColor });
+        page.drawText('•', { x: bx, y, size: tmpl.bodySize, font: boldFont, color: secondaryColor });
       }
-      page.drawText(wrapped[0], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: col });
+      page.drawText(wrapped[0], { x: bx + 10, y, size: tmpl.bodySize, font: f, color: col });
       y -= tmpl.lineHeight;
       for (let i = 1; i < wrapped.length; i++) {
         ensureSpace(tmpl.lineHeight);
-        page.drawText(wrapped[i], { x: tmpl.marginLeft + tmpl.bulletIndent + 10, y, size: tmpl.bodySize, font, color: col });
+        page.drawText(wrapped[i], { x: bx + 10, y, size: tmpl.bodySize, font: f, color: col });
         y -= tmpl.lineHeight;
       }
     };
@@ -844,11 +852,11 @@ export async function generatePDF(
         if (item.kind === 'text') {
           if (lastWasBox) y -= 12 * sp;
           else if (lastWasBullet) y -= 8 * sp; // breathing room between a bullet list and the text that follows it
-          renderText(item.text, item.color);
+          renderText(item.text, item.color, { bold: item.bold, italic: item.italic, indent: item.indent });
           lastWasBox = false;
           lastWasBullet = false;
         } else if (item.kind === 'bullet') {
-          renderBullet(item.text, item.color);
+          renderBullet(item.text, item.color, { bold: item.bold, italic: item.italic, indent: item.indent });
           lastWasBox = false;
           lastWasBullet = true;
         } else if (item.kind === 'field') {

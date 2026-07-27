@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding, DocTable,
+  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding, DocTable, TextFormat,
 } from '@/types/document';
 import { coverImagesFor } from '@/lib/covers';
 import { ELEMENTS, calendarElement } from '@/lib/elements';
@@ -166,6 +166,40 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
         ? { id: it.id, kind: 'field', field: { id: uid('field'), label: type === 'checkbox' ? it.text : it.text, type, required: false } }
         : it
     ));
+  }
+
+  // Switch a text ⇄ bullet item, keeping its text + formatting.
+  function switchKind(sectionId: string, itemId: string, kind: 'text' | 'bullet') {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    setContent(sectionId, s.content.map((it) =>
+      it.id === itemId && (it.kind === 'text' || it.kind === 'bullet') ? ({ ...it, kind } as ContentItem) : it));
+  }
+
+  // Apply inline formatting (bold/italic/indent/color) to a text or bullet item.
+  function patchTextItem(sectionId: string, itemId: string, patch: Partial<TextFormat>) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    setContent(sectionId, s.content.map((it) =>
+      it.id === itemId && (it.kind === 'text' || it.kind === 'bullet') ? { ...it, ...patch } : it));
+  }
+
+  // Bold / italic / indent + type toggle, shown under text & bullet items.
+  function formatToolbar(sectionId: string, item: Extract<ContentItem, { kind: 'text' | 'bullet' }>) {
+    const indent = item.indent ?? 0;
+    const seg = (active: boolean) => `text-[10px] leading-none rounded px-2 py-1 border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`;
+    return (
+      <div className="flex items-center gap-1 flex-wrap pl-1">
+        <div className="inline-flex rounded overflow-hidden border border-gray-200">
+          <button onClick={() => switchKind(sectionId, item.id, 'text')} className={`text-[10px] px-2 py-1 ${item.kind === 'text' ? 'bg-gray-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>Text</button>
+          <button onClick={() => switchKind(sectionId, item.id, 'bullet')} className={`text-[10px] px-2 py-1 border-l border-gray-200 ${item.kind === 'bullet' ? 'bg-gray-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>Bullet</button>
+        </div>
+        <button onClick={() => patchTextItem(sectionId, item.id, { bold: !item.bold })} className={seg(!!item.bold)} title="Bold"><span className="font-bold">B</span></button>
+        <button onClick={() => patchTextItem(sectionId, item.id, { italic: !item.italic })} className={seg(!!item.italic)} title="Italic"><span className="italic font-serif">I</span></button>
+        <div className="inline-flex items-center border border-gray-200 rounded overflow-hidden">
+          <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.max(0, indent - 1) })} disabled={indent === 0} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40" title="Decrease indent">⇤</button>
+          <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.min(4, indent + 1) })} disabled={indent >= 4} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40 border-l border-gray-200" title="Increase indent">⇥</button>
+        </div>
+      </div>
+    );
   }
 
   function moveSection(index: number, dir: -1 | 1) {
@@ -550,6 +584,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                             className="flex-1 min-w-0 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1 resize-y leading-snug"
                             value={item.text} placeholder="Reading text… (Enter = line break)" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
                         </div>
+                        {formatToolbar(section.id, item)}
                         <div className="flex gap-1.5 pl-1">
                           <button onClick={() => textToField(section.id, item.id, 'textarea')} className="text-[10px] text-gray-500 rounded px-1.5 py-0.5 border border-gray-200 hover:border-blue-400 hover:text-blue-600">→ make a write-in box</button>
                           <button onClick={() => textToField(section.id, item.id, 'checkbox')} className="text-[10px] text-gray-500 rounded px-1.5 py-0.5 border border-gray-200 hover:border-blue-400 hover:text-blue-600">→ make a checkbox</button>
@@ -558,11 +593,14 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                     )}
 
                     {item.kind === 'bullet' && (
-                      <div className="flex items-center gap-2">
-                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Bullet</span>
-                        <input className="flex-1 min-w-0 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
-                          value={item.text} placeholder="Bullet point…" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
-                      </div>
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Bullet</span>
+                          <input className="flex-1 min-w-0 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 px-2 py-1"
+                            value={item.text} placeholder="Bullet point…" onChange={(e) => updateItem(section.id, item.id, { text: e.target.value })} />
+                        </div>
+                        {formatToolbar(section.id, item)}
+                      </>
                     )}
 
                     {item.kind === 'field' && (

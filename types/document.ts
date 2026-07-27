@@ -29,9 +29,12 @@ export type TextCase = 'none' | 'upper' | 'sentence' | 'title';
 
 // A section's content is an ordered list so document order is preserved
 // (e.g. prompt → checkboxes → answer box → next prompt …)
+// Inline formatting shared by text + bullet items (color: hex #E04927 or a name).
+export interface TextFormat { color?: string; bold?: boolean; italic?: boolean; indent?: number }
+
 export type ContentItem =
-  | { id: string; kind: 'text'; text: string; color?: string }   // color: hex (#E04927) or name
-  | { id: string; kind: 'bullet'; text: string; color?: string }
+  | ({ id: string; kind: 'text'; text: string } & TextFormat)
+  | ({ id: string; kind: 'bullet'; text: string } & TextFormat)
   | { id: string; kind: 'field'; field: FormField }
   | { id: string; kind: 'table'; table: DocTable }
   | { id: string; kind: 'lines'; rows?: number };   // ruled notes area (fills the page if rows omitted)

@@ -644,7 +644,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                               <label className="flex items-center gap-2 cursor-pointer text-[11px] font-medium text-gray-600">
                                 <span className="relative inline-flex items-center">
                                   <input type="checkbox" className="peer sr-only" checked={!!calc}
-                                    onChange={(e) => updateFieldProp(section.id, item.id, { calc: e.target.checked ? { op: 'multiply_pct', refs: [] } : undefined })} />
+                                    onChange={(e) => updateFieldProp(section.id, item.id, { calc: e.target.checked ? { op: 'multiply', refs: [] } : undefined })} />
                                   <span className="w-8 h-4 rounded-full bg-gray-300 peer-checked:bg-blue-500 transition-colors" />
                                   <span className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
                                 </span>
@@ -687,6 +687,17 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                                   </div>
                                   <p className="text-[10px] text-gray-400 leading-snug">Fills in automatically in Adobe Acrobat/Reader. In other viewers it stays a normal type-in box.</p>
                                 </div>
+                              )}
+                              {!calc && item.field.type === 'text' && (
+                                <label className="flex items-center gap-2 cursor-pointer text-[11px] font-medium text-gray-600 pt-0.5">
+                                  <span className="relative inline-flex items-center">
+                                    <input type="checkbox" className="peer sr-only" checked={!!item.field.numFormat}
+                                      onChange={(e) => updateFieldProp(section.id, item.id, { numFormat: e.target.checked || undefined })} />
+                                    <span className="w-8 h-4 rounded-full bg-gray-300 peer-checked:bg-blue-500 transition-colors" />
+                                    <span className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+                                  </span>
+                                  🔢 Format as number (commas)
+                                </label>
                               )}
                             </div>
                           );

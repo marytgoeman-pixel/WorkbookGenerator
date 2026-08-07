@@ -658,6 +658,12 @@ export async function generatePDF(
               F: { S: 'JavaScript', JS: PDFString.of('AFNumber_Format(0, 0, 0, 0, "", false);') },
             }));
             calcFieldRefs.push(tf.ref);
+          } else if (field.numFormat) {
+            // Plain number input formatted with commas (no decimals) as the user types (Acrobat).
+            tf.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({
+              F: { S: 'JavaScript', JS: PDFString.of('AFNumber_Format(0, 0, 0, 0, "", false);') },
+              K: { S: 'JavaScript', JS: PDFString.of('AFNumber_Keystroke(0, 0, 0, 0, "", false);') },
+            }));
           }
         }
         y -= fh + 18 * sp;

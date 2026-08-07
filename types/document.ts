@@ -17,6 +17,7 @@ export interface FormField {
   options?: string[];    // for dropdown fields (e.g. ["1".."10"])
   heightScale?: number;  // per-box height multiplier (default 1) for text/textarea answer boxes
   calc?: FieldCalc;      // auto-calculate this box from other fields (Acrobat)
+  numFormat?: boolean;   // format the typed value as a number with commas, no decimals (Acrobat)
 }
 
 // A cell is either static text or a fillable field

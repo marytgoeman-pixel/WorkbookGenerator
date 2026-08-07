@@ -1,4 +1,18 @@
-import { PDFDocument, rgb, degrees, StandardFonts, RGB, PDFString, PDFName, PDFPage, PDFImage } from 'pdf-lib';
+import { PDFDocument, rgb, degrees, StandardFonts, RGB, PDFString, PDFName, PDFRef, PDFPage, PDFImage } from 'pdf-lib';
+import type { FieldCalc } from '@/types/document';
+
+// Build the Acrobat calculation JavaScript for a calculated field. `names` are the full PDF
+// field names of the source fields; the script reads their numbers (stripping $ , %), applies
+// the op, and writes the result (blank when zero/invalid). Runs in Adobe Acrobat/Reader.
+function buildCalcScript(op: FieldCalc['op'], names: string[]): string {
+  const decls = names
+    .map((n, i) => `var v${i} = Number(String(this.getField(${JSON.stringify(n)}).value).replace(/[^0-9.-]/g,"")) || 0;`)
+    .join(' ');
+  const sym = op === 'subtract' ? ' - ' : op === 'add' ? ' + ' : ' * ';
+  let expr = names.map((_, i) => `v${i}`).join(sym) || '0';
+  if (op === 'multiply_pct') expr = `(${expr}) / 100`;
+  return `${decls} var r = ${expr}; event.value = (!r || isNaN(r)) ? "" : Math.round(r * 100) / 100;`;
+}
 import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable, ContentItem } from '@/types/document';
 import { classicTemplate } from './templates/classic';
 import { modernTemplate } from './templates/modern';
@@ -182,6 +196,7 @@ export async function generatePDF(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const form = pdfDoc.getForm();
+  const calcFieldRefs: PDFRef[] = []; // calculated fields, added to the AcroForm /CO order at the end
   let font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   let boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   let italicFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
@@ -630,6 +645,16 @@ export async function generatePDF(
           if (field.type === 'textarea') tf.enableMultiline();
           tf.addToPage(page, { x: tmpl.marginLeft, y: y - fh, width: mainColWidth, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
           tf.setFontSize(IFS);
+          // Auto-calculated field (Acrobat): a /C JavaScript action computes the value from the
+          // referenced sibling fields, and /F formats it with commas + 2 decimals.
+          if (field.calc && field.calc.refs.length > 0) {
+            const names = field.calc.refs.map((rid) => `${section.id}__${rid}`);
+            tf.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({
+              C: { S: 'JavaScript', JS: PDFString.of(buildCalcScript(field.calc.op, names)) },
+              F: { S: 'JavaScript', JS: PDFString.of('AFNumber_Format(2, 0, 0, 0, "", false);') },
+            }));
+            calcFieldRefs.push(tf.ref);
+          }
         }
         y -= fh + 18 * sp;
       }
@@ -950,6 +975,11 @@ export async function generatePDF(
         rotate: degrees(45),
       });
     }
+  }
+
+  // AcroForm calculation order — Acrobat recalculates these fields (in this order) on any change.
+  if (calcFieldRefs.length > 0) {
+    form.acroForm.dict.set(PDFName.of('CO'), pdfDoc.context.obj(calcFieldRefs));
   }
 
   return pdfDoc.save();

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding, DocTable, TextFormat,
+  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding, DocTable, TextFormat, FieldCalc,
 } from '@/types/document';
 import { coverImagesFor } from '@/lib/covers';
 import { ELEMENTS, calendarElement } from '@/lib/elements';
@@ -633,6 +633,58 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                             </span>
                           </div>
                         )}
+                        {(item.field.type === 'text' || item.field.type === 'textarea') && item.kind === 'field' && (() => {
+                          const calc = item.field.calc;
+                          const siblings = section.content.filter(
+                            (it): it is Extract<ContentItem, { kind: 'field' }> =>
+                              it.kind === 'field' && it.id !== item.id && (it.field.type === 'text' || it.field.type === 'textarea' || it.field.type === 'dropdown')
+                          );
+                          return (
+                            <div className="ml-1 rounded-lg border border-gray-100 bg-gray-50/70 px-2 py-1.5 space-y-1.5">
+                              <label className="flex items-center gap-2 cursor-pointer text-[11px] font-medium text-gray-600">
+                                <span className="relative inline-flex items-center">
+                                  <input type="checkbox" className="peer sr-only" checked={!!calc}
+                                    onChange={(e) => updateFieldProp(section.id, item.id, { calc: e.target.checked ? { op: 'multiply_pct', refs: [] } : undefined })} />
+                                  <span className="w-8 h-4 rounded-full bg-gray-300 peer-checked:bg-blue-500 transition-colors" />
+                                  <span className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+                                </span>
+                                🧮 Auto-calculate this box
+                              </label>
+                              {calc && (
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center gap-1.5 text-[11px] text-gray-500 flex-wrap">
+                                    <span>Result =</span>
+                                    <select value={calc.op} onChange={(e) => updateFieldProp(section.id, item.id, { calc: { ...calc, op: e.target.value as FieldCalc['op'] } })}
+                                      className="text-[11px] border rounded px-1 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                                      <option value="multiply">multiply (×)</option>
+                                      <option value="multiply_pct">multiply, one is a % (× then ÷100)</option>
+                                      <option value="add">add (+)</option>
+                                      <option value="subtract">subtract (−)</option>
+                                    </select>
+                                    <span>of these boxes:</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {siblings.length === 0
+                                      ? <span className="text-[10px] text-gray-400">Add the input boxes this should use, then pick them here.</span>
+                                      : siblings.map((sib) => {
+                                          const on = calc.refs.includes(sib.field.id);
+                                          return (
+                                            <button key={sib.id} onClick={() => {
+                                              const refs = on ? calc.refs.filter((r) => r !== sib.field.id) : [...calc.refs, sib.field.id];
+                                              updateFieldProp(section.id, item.id, { calc: { ...calc, refs } });
+                                            }}
+                                              className={`text-[10px] rounded px-1.5 py-0.5 border max-w-[10rem] truncate ${on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                                              {sib.field.label || 'untitled box'}
+                                            </button>
+                                          );
+                                        })}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 leading-snug">Fills in automatically in Adobe Acrobat/Reader. In other viewers it stays a normal type-in box.</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {item.field.type === 'checkbox' && (
                           <div className="flex items-center gap-1.5 text-[11px] text-gray-400 ml-1"><span className="inline-block w-3.5 h-3.5 border rounded-sm" style={{ borderColor: fieldBorder, backgroundColor: fieldBg }} /> tick box</div>
                         )}

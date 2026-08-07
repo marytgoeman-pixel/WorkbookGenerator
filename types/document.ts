@@ -1,5 +1,13 @@
 export type FieldType = 'text' | 'textarea' | 'checkbox' | 'dropdown';
 
+// Auto-calculated field value (works in Adobe Acrobat/Reader; a normal fillable box elsewhere).
+// The result is op applied to the referenced source fields' numeric values. 'multiply_pct'
+// divides the product by 100 (for "A × B%" cases like Sales Price × Commission%).
+export interface FieldCalc {
+  op: 'multiply' | 'multiply_pct' | 'add' | 'subtract';
+  refs: string[];        // FormField ids of the source fields (same section)
+}
+
 export interface FormField {
   id: string;
   label: string;
@@ -7,6 +15,7 @@ export interface FormField {
   required: boolean;
   options?: string[];    // for dropdown fields (e.g. ["1".."10"])
   heightScale?: number;  // per-box height multiplier (default 1) for text/textarea answer boxes
+  calc?: FieldCalc;      // auto-calculate this box from other fields (Acrobat)
 }
 
 // A cell is either static text or a fillable field

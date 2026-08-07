@@ -280,6 +280,16 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
             <option value="sentence">Sentence case</option><option value="title">Capitalize Each Word</option>
           </select>
         </Row>
+        <Row label="Show title">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="relative inline-flex items-center">
+              <input type="checkbox" className="peer sr-only" checked={!doc.hideTitle} onChange={(e) => onChange({ ...doc, hideTitle: !e.target.checked })} />
+              <span className="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-blue-500 transition-colors" />
+              <span className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+            </span>
+            <span className="text-[11px] text-gray-400">on the first page — turn off if the cover already shows it</span>
+          </label>
+        </Row>
         <Row label="Spacing">
           <select value={doc.bodySpacing ?? 'normal'} onChange={(e) => onChange({ ...doc, bodySpacing: e.target.value as Spacing })}
             className="text-xs border rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">

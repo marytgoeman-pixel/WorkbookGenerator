@@ -74,6 +74,7 @@ export interface DocumentModel {
   author: string;
   sections: Section[];
   titleCase?: TextCase;        // case transform for the document title
+  hideTitle?: boolean;         // omit the title header on the first content page (cover already shows it)
   bodySpacing?: Spacing;       // extra vertical space between paragraphs/lines
   cover?: CoverSettings;       // optional branded cover page
   aboutPage?: boolean;         // append an "About Jo" page at the end (Jo only)

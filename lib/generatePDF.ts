@@ -368,47 +368,51 @@ export async function generatePDF(
 
   // Title block — case controlled by doc.titleCase (defaults to UPPER in branded mode).
   // Long titles wrap across lines (and shrink a step if very long) so they never overflow.
-  const titleCase = doc.titleCase ?? (branded ? 'upper' : 'none');
-  // NOTE: don't sanitize here — wrapText() needs the raw text (with any \n) and
-  // sanitizes each line itself. Pre-sanitizing would strip hard line breaks.
-  const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
-  let titleSize = tmpl.titleSize;
-  let titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
-  if (titleLines.length > 2) {
-    titleSize = Math.max(16, tmpl.titleSize - 4);
-    titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
-  }
-  // The main title uses the brand blue (header color) when branded
-  const titleColor = branded ? hexToRgb(branding!.colors.header) : primaryColor;
-  const titleLineH = titleSize + 4;
-  ensureSpace(titleLines.length * titleLineH + 12);
-  for (const tline of titleLines) {
-    page.drawText(tline, { x: tmpl.marginLeft, y, size: titleSize, font: boldFont, color: titleColor });
-    y -= titleLineH;
-  }
+  // Skipped entirely when doc.hideTitle is set — e.g. the cover page already shows the title,
+  // so the first content page shouldn't repeat it.
+  if (!doc.hideTitle) {
+    const titleCase = doc.titleCase ?? (branded ? 'upper' : 'none');
+    // NOTE: don't sanitize here — wrapText() needs the raw text (with any \n) and
+    // sanitizes each line itself. Pre-sanitizing would strip hard line breaks.
+    const rawTitle = applyCase(doc.title || 'Untitled', titleCase);
+    let titleSize = tmpl.titleSize;
+    let titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
+    if (titleLines.length > 2) {
+      titleSize = Math.max(16, tmpl.titleSize - 4);
+      titleLines = wrapText(rawTitle, contentWidth, boldFont, titleSize);
+    }
+    // The main title uses the brand blue (header color) when branded
+    const titleColor = branded ? hexToRgb(branding!.colors.header) : primaryColor;
+    const titleLineH = titleSize + 4;
+    ensureSpace(titleLines.length * titleLineH + 12);
+    for (const tline of titleLines) {
+      page.drawText(tline, { x: tmpl.marginLeft, y, size: titleSize, font: boldFont, color: titleColor });
+      y -= titleLineH;
+    }
 
-  if (doc.author) {
-    page.drawText(sanitize(`by ${doc.author}`), {
-      x: tmpl.marginLeft,
-      y,
-      size: tmpl.bodySize,
-      font,
-      color: secondaryColor,
-    });
-    y -= tmpl.bodySize + 4;
-  }
+    if (doc.author) {
+      page.drawText(sanitize(`by ${doc.author}`), {
+        x: tmpl.marginLeft,
+        y,
+        size: tmpl.bodySize,
+        font,
+        color: secondaryColor,
+      });
+      y -= tmpl.bodySize + 4;
+    }
 
-  // Title underline (skipped in branded mode per Jo's design)
-  if (!branded) {
-    page.drawLine({
-      start: { x: tmpl.marginLeft, y: y - 4 },
-      end: { x: tmpl.marginLeft + contentWidth, y: y - 4 },
-      thickness: 1.5,
-      color: primaryColor,
-    });
-    y -= 18;
-  } else {
-    y -= 10;
+    // Title underline (skipped in branded mode per Jo's design)
+    if (!branded) {
+      page.drawLine({
+        start: { x: tmpl.marginLeft, y: y - 4 },
+        end: { x: tmpl.marginLeft + contentWidth, y: y - 4 },
+        thickness: 1.5,
+        color: primaryColor,
+      });
+      y -= 18;
+    } else {
+      y -= 10;
+    }
   }
 
   for (const section of doc.sections) {

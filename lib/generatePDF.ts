@@ -4,14 +4,17 @@ import type { FieldCalc } from '@/types/document';
 // Build the Acrobat calculation JavaScript for a calculated field. `names` are the full PDF
 // field names of the source fields; the script reads their numbers (stripping $ , %), applies
 // the op, and writes the result (blank when zero/invalid). Runs in Adobe Acrobat/Reader.
-function buildCalcScript(op: FieldCalc['op'], names: string[]): string {
+function buildCalcScript(op: FieldCalc['op'], names: string[], constant?: number): string {
   const decls = names
     .map((n, i) => `var v${i} = Number(String(this.getField(${JSON.stringify(n)}).value).replace(/[^0-9.-]/g,"")) || 0;`)
     .join(' ');
+  const operands = names.map((_, i) => `v${i}`);
+  if (constant != null && isFinite(constant)) operands.push(String(constant)); // × / + / − a fixed number
   const sym = op === 'subtract' ? ' - ' : op === 'add' ? ' + ' : ' * ';
-  let expr = names.map((_, i) => `v${i}`).join(sym) || '0';
+  let expr = operands.join(sym) || '0';
   if (op === 'multiply_pct') expr = `(${expr}) / 100`;
-  return `${decls} var r = ${expr}; event.value = (!r || isNaN(r)) ? "" : Math.round(r * 100) / 100;`;
+  // Whole-number result (no decimals), blank when zero/invalid.
+  return `${decls} var r = ${expr}; event.value = (!r || isNaN(r)) ? "" : Math.round(r);`;
 }
 import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable, ContentItem } from '@/types/document';
 import { classicTemplate } from './templates/classic';
@@ -650,8 +653,9 @@ export async function generatePDF(
           if (field.calc && field.calc.refs.length > 0) {
             const names = field.calc.refs.map((rid) => `${section.id}__${rid}`);
             tf.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({
-              C: { S: 'JavaScript', JS: PDFString.of(buildCalcScript(field.calc.op, names)) },
-              F: { S: 'JavaScript', JS: PDFString.of('AFNumber_Format(2, 0, 0, 0, "", false);') },
+              C: { S: 'JavaScript', JS: PDFString.of(buildCalcScript(field.calc.op, names, field.calc.constant)) },
+              // 0 decimals, comma thousands (e.g. 12,000).
+              F: { S: 'JavaScript', JS: PDFString.of('AFNumber_Format(0, 0, 0, 0, "", false);') },
             }));
             calcFieldRefs.push(tf.ref);
           }

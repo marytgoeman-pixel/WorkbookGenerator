@@ -6,6 +6,7 @@ export type FieldType = 'text' | 'textarea' | 'checkbox' | 'dropdown';
 export interface FieldCalc {
   op: 'multiply' | 'multiply_pct' | 'add' | 'subtract';
   refs: string[];        // FormField ids of the source fields (same section)
+  constant?: number;     // an extra fixed operand applied with the same op (e.g. × 4)
 }
 
 export interface FormField {

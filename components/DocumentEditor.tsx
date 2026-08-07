@@ -679,6 +679,12 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                                           );
                                         })}
                                   </div>
+                                  <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                                    <span>{calc.op === 'add' ? '+' : calc.op === 'subtract' ? '−' : '×'} a fixed number (optional):</span>
+                                    <input type="number" value={calc.constant ?? ''} placeholder="e.g. 4"
+                                      onChange={(e) => { const v = e.target.value.trim(); updateFieldProp(section.id, item.id, { calc: { ...calc, constant: v === '' ? undefined : Number(v) } }); }}
+                                      className="text-[11px] border rounded px-1.5 py-0.5 bg-white w-20 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                  </div>
                                   <p className="text-[10px] text-gray-400 leading-snug">Fills in automatically in Adobe Acrobat/Reader. In other viewers it stays a normal type-in box.</p>
                                 </div>
                               )}

@@ -1001,8 +1001,11 @@ async function drawSellItCover(
   whiteLogo: PDFImage | null
 ) {
   const W = tmpl.pageWidth, H = tmpl.pageHeight;
-  const blue = hexToRgb(branding.colors.header);
-  const ink = hexToRgb(branding.colors.title);
+  // Sell It's brand colors are fixed. Use them directly so the cover always reads correctly —
+  // bright-blue title, near-black "Workbook" — even if a saved template override drifted the
+  // palette to a dark primary.
+  const blue = hexToRgb('#3F69FF'); // Sell It Blue — title, session line, image top-strip
+  const ink = hexToRgb('#0A263A');  // Sell It Ink (near-black) — "Workbook", eyebrow, rule
   const gray = rgb(0.5, 0.54, 0.58);
   const pad = tmpl.marginLeft;
   const innerW = W - pad * 2;

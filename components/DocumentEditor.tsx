@@ -658,6 +658,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                                       className="text-[11px] border rounded px-1 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
                                       <option value="multiply">multiply (×)</option>
                                       <option value="multiply_pct">multiply, one is a % (× then ÷100)</option>
+                                      <option value="divide">divide (÷)</option>
                                       <option value="add">add (+)</option>
                                       <option value="subtract">subtract (−)</option>
                                     </select>
@@ -680,7 +681,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                                         })}
                                   </div>
                                   <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-                                    <span>{calc.op === 'add' ? '+' : calc.op === 'subtract' ? '−' : '×'} a fixed number (optional):</span>
+                                    <span>{calc.op === 'add' ? '+' : calc.op === 'subtract' ? '−' : calc.op === 'divide' ? '÷' : '×'} a fixed number (optional):</span>
                                     <input type="number" value={calc.constant ?? ''} placeholder="e.g. 4"
                                       onChange={(e) => { const v = e.target.value.trim(); updateFieldProp(section.id, item.id, { calc: { ...calc, constant: v === '' ? undefined : Number(v) } }); }}
                                       className="text-[11px] border rounded px-1.5 py-0.5 bg-white w-20 focus:outline-none focus:ring-1 focus:ring-blue-400" />

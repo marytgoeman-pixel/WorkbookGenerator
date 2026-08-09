@@ -9,12 +9,12 @@ function buildCalcScript(op: FieldCalc['op'], names: string[], constant?: number
     .map((n, i) => `var v${i} = Number(String(this.getField(${JSON.stringify(n)}).value).replace(/[^0-9.-]/g,"")) || 0;`)
     .join(' ');
   const operands = names.map((_, i) => `v${i}`);
-  if (constant != null && isFinite(constant)) operands.push(String(constant)); // × / + / − a fixed number
-  const sym = op === 'subtract' ? ' - ' : op === 'add' ? ' + ' : ' * ';
+  if (constant != null && isFinite(constant)) operands.push(String(constant)); // × ÷ + − a fixed number
+  const sym = op === 'subtract' ? ' - ' : op === 'add' ? ' + ' : op === 'divide' ? ' / ' : ' * ';
   let expr = operands.join(sym) || '0';
   if (op === 'multiply_pct') expr = `(${expr}) / 100`;
-  // Whole-number result (no decimals), blank when zero/invalid.
-  return `${decls} var r = ${expr}; event.value = (!r || isNaN(r)) ? "" : Math.round(r);`;
+  // Whole-number result (no decimals); blank when zero, invalid, or divide-by-zero (Infinity/NaN).
+  return `${decls} var r = ${expr}; event.value = (!r || !isFinite(r)) ? "" : Math.round(r);`;
 }
 import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable, ContentItem } from '@/types/document';
 import { classicTemplate } from './templates/classic';

@@ -4,9 +4,9 @@ export type FieldType = 'text' | 'textarea' | 'checkbox' | 'dropdown';
 // The result is op applied to the referenced source fields' numeric values. 'multiply_pct'
 // divides the product by 100 (for "A × B%" cases like Sales Price × Commission%).
 export interface FieldCalc {
-  op: 'multiply' | 'multiply_pct' | 'add' | 'subtract';
+  op: 'multiply' | 'multiply_pct' | 'add' | 'subtract' | 'divide';
   refs: string[];        // FormField ids of the source fields (same section)
-  constant?: number;     // an extra fixed operand applied with the same op (e.g. × 4)
+  constant?: number;     // an extra fixed operand applied with the same op (e.g. × 4, ÷ 2)
 }
 
 export interface FormField {

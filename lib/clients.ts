@@ -147,6 +147,26 @@ export const CLIENTS: ClientAccount[] = [
     },
   },
   {
+    // Maria — blank/neutral starter she customizes via the Template builder.
+    // Default password: Maria2026!  (bcrypt hash only). Comp/unlimited (in COMP_ACCOUNTS).
+    username: 'maria',
+    passwordHash: '$2b$10$dRLkXCVBOlTfLdkp/qXd1.o732SsACubvAMg1CqO3LRprTdKBEzMu',
+    branding: {
+      id: 'maria',
+      displayName: 'Maria',
+      templateId: 'tlc',
+      tagline: '',
+      logoUrl: '',
+      social: [],
+      colors: {
+        header: '#163446', title: '#163446', subtitle: '#334155', accent: '#0EA5E9',
+        calloutBg: '#163446', calloutBorder: '#0EA5E9', grayBox: '#F1F5F9',
+      },
+      // Comp account — unlimited downloads, no watermark, no trial/billing.
+      plan: { name: 'Enterprise', downloadsPerMonth: null },
+    },
+  },
+  {
     // Admin account — sees the analytics dashboard, not a workbook workspace.
     // Password is stored only as a bcrypt hash (changed 2026-06). To change it, generate
     // a new hash: node -e "console.log(require('bcryptjs').hashSync('NEW_PASSWORD',10))"

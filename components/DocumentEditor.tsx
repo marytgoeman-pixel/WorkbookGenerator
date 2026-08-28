@@ -198,6 +198,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
           <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.max(0, indent - 1) })} disabled={indent === 0} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40" title="Decrease indent">⇤</button>
           <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.min(4, indent + 1) })} disabled={indent >= 4} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40 border-l border-gray-200" title="Increase indent">⇥</button>
         </div>
+        <button onClick={() => patchTextItem(sectionId, item.id, { callout: !item.callout })} className={seg(!!item.callout)} title="Put this line in a callout box (consecutive callout lines share one box)">▣ Callout</button>
       </div>
     );
   }

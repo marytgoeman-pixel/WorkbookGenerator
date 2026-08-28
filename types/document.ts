@@ -41,7 +41,9 @@ export type TextCase = 'none' | 'upper' | 'sentence' | 'title';
 // A section's content is an ordered list so document order is preserved
 // (e.g. prompt → checkboxes → answer box → next prompt …)
 // Inline formatting shared by text + bullet items (color: hex #E04927 or a name).
-export interface TextFormat { color?: string; bold?: boolean; italic?: boolean; indent?: number }
+// `callout: true` renders the item (and any consecutive callout items) inside a highlighted
+// callout box — without making the whole section a callout.
+export interface TextFormat { color?: string; bold?: boolean; italic?: boolean; indent?: number; callout?: boolean }
 
 export type ContentItem =
   | ({ id: string; kind: 'text'; text: string } & TextFormat)

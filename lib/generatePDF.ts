@@ -887,7 +887,26 @@ export async function generatePDF(
       // from a "box" (textarea/dropdown/table) above it — and from a bullet list above it.
       let lastWasBox = false;
       let lastWasBullet = false;
-      section.content.forEach((item, idx) => {
+      let idx = 0;
+      while (idx < section.content.length) {
+        const item = section.content[idx];
+        // Inline callout: a run of consecutive text/bullet items flagged as callout renders
+        // together inside one highlighted box (branded templates only).
+        if (branded && (item.kind === 'text' || item.kind === 'bullet') && item.callout) {
+          const group: Array<{ text: string; bullet?: boolean }> = [];
+          while (idx < section.content.length) {
+            const it = section.content[idx];
+            if ((it.kind === 'text' || it.kind === 'bullet') && it.callout) {
+              group.push({ text: it.text, bullet: it.kind === 'bullet' });
+              idx++;
+            } else break;
+          }
+          if (lastWasBox || lastWasBullet) y -= 6 * sp;
+          renderCalloutBox(group);
+          lastWasBox = true;
+          lastWasBullet = false;
+          continue;
+        }
         if (item.kind === 'text') {
           if (lastWasBox) y -= 12 * sp;
           else if (lastWasBullet) y -= 8 * sp; // breathing room between a bullet list and the text that follows it
@@ -916,7 +935,8 @@ export async function generatePDF(
           lastWasBox = true;
           lastWasBullet = false;
         }
-      });
+        idx++;
+      }
     }
 
     y -= tmpl.sectionSpacing * sp;

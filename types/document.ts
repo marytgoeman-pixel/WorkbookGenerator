@@ -33,6 +33,7 @@ export interface DocTable {
   fullPage?: boolean;   // expand rows to fill the page height (calendars, SWOT, grids)
   labelSize?: number;   // point size for in-cell labels (date numbers, quadrant titles)
   cellScale?: number;   // input-box size multiplier for table cells (default 1) — taller fill-in boxes
+  colWidths?: number[]; // relative column widths (weights; default all equal). Length = columns.
 }
 
 export type HeadingStyle = 'accent' | 'brand' | 'plain' | 'title';

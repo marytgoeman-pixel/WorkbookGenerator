@@ -236,6 +236,37 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
   function updateTableCellText(sectionId: string, itemId: string, ri: number, ci: number, value: string) {
     updateTable(sectionId, itemId, (t) => ({ ...t, rows: t.rows.map((row, r) => (r === ri ? row.map((cell, c) => (c === ci ? { ...cell, text: value } : cell)) : row)) }));
   }
+  const tableCols = (t: DocTable) => t.headers.length || (t.rows[0]?.length ?? 0);
+  const tableWeights = (t: DocTable, cols: number) => (t.colWidths && t.colWidths.length === cols) ? [...t.colWidths] : new Array(cols).fill(1);
+  function addTableColumn(sectionId: string, itemId: string) {
+    updateTable(sectionId, itemId, (t) => {
+      const cols = tableCols(t);
+      return {
+        ...t,
+        headers: t.headers.length ? [...t.headers, ''] : t.headers, // only grow headers on a headered table
+        rows: t.rows.map((row) => [...row, { field: { id: uid('field'), label: '', type: 'text' as FieldType, required: false } }]),
+        colWidths: [...tableWeights(t, cols), 1],
+      };
+    });
+  }
+  function deleteTableColumn(sectionId: string, itemId: string, ci: number) {
+    updateTable(sectionId, itemId, (t) => {
+      if (tableCols(t) <= 1) return t; // keep at least one column
+      return {
+        ...t,
+        headers: t.headers.filter((_, i) => i !== ci),
+        rows: t.rows.map((row) => row.filter((_, i) => i !== ci)),
+        colWidths: tableWeights(t, tableCols(t)).filter((_, i) => i !== ci),
+      };
+    });
+  }
+  function setTableColWidth(sectionId: string, itemId: string, ci: number, delta: number) {
+    updateTable(sectionId, itemId, (t) => {
+      const cw = tableWeights(t, tableCols(t));
+      cw[ci] = Math.max(0.5, Math.min(3, Math.round((cw[ci] + delta) * 100) / 100));
+      return { ...t, colWidths: cw };
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -719,19 +750,39 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">{item.table.fullPage ? 'Grid' : 'Table'}</span>
                           <span className="flex-1 text-xs text-gray-600">{item.table.headers.length || item.table.rows[0]?.length || 0} cols × {item.table.rows.length} rows · type-in grid</span>
                         </div>
-                        {item.table.headers.length > 0 && (
-                          <div>
-                            <div className="text-[10px] text-gray-400 mb-0.5">Column headers</div>
-                            <div className="flex flex-wrap gap-1">
-                              {item.table.headers.map((h, ci) => (
-                                <input key={ci} value={h ?? ''}
-                                  onChange={(e) => updateTableHeader(section.id, item.id, ci, e.target.value)}
-                                  placeholder={`Col ${ci + 1}`}
-                                  className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white w-24 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                              ))}
+                        {(() => {
+                          const cols = item.table.headers.length || item.table.rows[0]?.length || 0;
+                          if (cols === 0) return null;
+                          const weights = (item.table.colWidths && item.table.colWidths.length === cols) ? item.table.colWidths : new Array(cols).fill(1);
+                          const headered = item.table.headers.length > 0;
+                          return (
+                            <div>
+                              <div className="text-[10px] text-gray-400 mb-0.5">Columns — header · width · remove</div>
+                              <div className="space-y-1">
+                                {Array.from({ length: cols }).map((_, ci) => (
+                                  <div key={ci} className="flex items-center gap-1">
+                                    {headered ? (
+                                      <input value={item.table.headers[ci] ?? ''}
+                                        onChange={(e) => updateTableHeader(section.id, item.id, ci, e.target.value)}
+                                        placeholder={`Col ${ci + 1}`}
+                                        className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                                    ) : (
+                                      <span className="text-[11px] text-gray-500 flex-1">Col {ci + 1}</span>
+                                    )}
+                                    <span className="inline-flex items-center border border-gray-200 rounded overflow-hidden shrink-0" title="Column width">
+                                      <button onClick={() => setTableColWidth(section.id, item.id, ci, -0.25)} className="text-[11px] px-1.5 py-0.5 bg-white text-gray-500 hover:bg-gray-50">−</button>
+                                      <span className="text-[10px] tabular-nums w-8 text-center text-gray-500">{(weights[ci] ?? 1).toFixed(2)}×</span>
+                                      <button onClick={() => setTableColWidth(section.id, item.id, ci, 0.25)} className="text-[11px] px-1.5 py-0.5 bg-white text-gray-500 hover:bg-gray-50 border-l border-gray-200">+</button>
+                                    </span>
+                                    <button onClick={() => deleteTableColumn(section.id, item.id, ci)} disabled={cols <= 1}
+                                      className="shrink-0 text-gray-300 hover:text-red-600 disabled:opacity-30 text-sm px-1" title="Delete column">✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                              <button onClick={() => addTableColumn(section.id, item.id)} className="mt-1 text-[10px] text-indigo-600 rounded px-1.5 py-0.5 border border-indigo-200 hover:bg-indigo-50">+ Add column</button>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         {(() => {
                           const labels = item.table.rows.flatMap((row, ri) => row.map((cell, ci) => ({ cell, ri, ci })))
                             .filter((x) => x.cell.text && x.cell.text.trim() && isNaN(Number(x.cell.text)));

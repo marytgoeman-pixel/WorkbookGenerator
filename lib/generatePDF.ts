@@ -673,7 +673,12 @@ export async function generatePDF(
     const renderTable = (table: DocTable, reserveBelow = 0) => {
       const cols = table.headers.length || (table.rows[0]?.length ?? 0);
       if (cols === 0) return;
-      const colW = mainColWidth / cols;
+      // Per-column widths from relative weights (default equal). colX = each column's left edge.
+      const weights = (table.colWidths && table.colWidths.length === cols) ? table.colWidths : new Array(cols).fill(1);
+      const wsum = weights.reduce((a, b) => a + (b > 0 ? b : 1), 0) || cols;
+      const colWs = weights.map((w) => mainColWidth * ((w > 0 ? w : 1) / wsum));
+      const colX: number[] = [];
+      { let acc = tmpl.marginLeft; for (let c = 0; c < cols; c++) { colX.push(acc); acc += colWs[c]; } }
       const TFS = 12;          // table font size — kept at the 12pt minimum
       const cellLineH = 15;    // line height for wrapped cell text
       const vpad = 8;          // vertical padding inside a cell
@@ -689,10 +694,10 @@ export async function generatePDF(
       const labelSize = table.labelSize ?? 9;          // in-cell label size (date number / quadrant title)
       const hasHeaders = table.headers.some((h) => h && h.trim());
 
-      const wrapCell = (text: string, f: typeof font) => wrapText(text, colW - 8, f, TFS);
+      const wrapCell = (text: string, f: typeof font, c: number) => wrapText(text, colWs[c] - 8, f, TFS);
 
       // Header height grows to fit wrapped header labels (omitted entirely when there are none)
-      const headerWrapped = table.headers.map((h) => wrapCell(h, boldFont));
+      const headerWrapped = table.headers.map((h, c) => wrapCell(h, boldFont, c));
       const headerLines = Math.max(1, ...headerWrapped.map((l) => l.length));
       const headerH = hasHeaders ? Math.max(28, headerLines * cellLineH + vpad) : 0;
 
@@ -705,7 +710,7 @@ export async function generatePDF(
           const blockH = lines.length * cellLineH;
           let cy = y + 4 - (headerH - blockH) / 2 - TFS + 1;
           for (const ln of lines) {
-            page.drawText(ln, { x: tmpl.marginLeft + c * colW + 5, y: cy, size: TFS, font: boldFont, color: htColor });
+            page.drawText(ln, { x: colX[c] + 5, y: cy, size: TFS, font: boldFont, color: htColor });
             cy -= cellLineH;
           }
         });
@@ -713,7 +718,7 @@ export async function generatePDF(
       };
 
       // Pre-wrap static text cells and compute each row's height
-      const rowWrapped = table.rows.map((row) => row.map((cell) => (cell && cell.text && !cell.field) ? wrapCell(cell.text, font) : ['']));
+      const rowWrapped = table.rows.map((row) => row.map((cell, c) => (cell && cell.text && !cell.field) ? wrapCell(cell.text, font, c) : ['']));
       let rowHeights = rowWrapped.map((cells) => Math.max(minRowH, Math.max(1, ...cells.map((l) => l.length)) * cellLineH + vpad));
 
       // Full-page tables (calendars, SWOT, grids) expand their rows to fill the page.
@@ -741,13 +746,13 @@ export async function generatePDF(
         const rowTop = y;
         for (let c = 0; c < cols; c++) {
           const cell = row[c];
-          const cx = tmpl.marginLeft + c * colW;
-          page.drawRectangle({ x: cx, y: rowTop - rh + 4, width: colW, height: rh, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1) });
+          const cx = colX[c], cw = colWs[c];
+          page.drawRectangle({ x: cx, y: rowTop - rh + 4, width: cw, height: rh, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1) });
           if (!cell) continue;
           if (cell.field) {
             const name = `${section.id}__${cell.field.id}`;
             const hasDate = !!(cell.text && cell.text.trim());
-            const fw = colW - 10, fx = cx + 5;
+            const fw = cw - 10, fx = cx + 5;
             let fh: number, fy: number;
             if (hasDate) {
               // Labelled cell (calendar day / SWOT quadrant): label top-left, fill area below

@@ -773,7 +773,9 @@ export async function generatePDF(
               dd.setFontSize(cellFieldSize);
             } else {
               const tf = form.createTextField(name);
-              if (cell.field.type === 'textarea') tf.enableMultiline();
+              // Table cells wrap: longer entries flow onto multiple lines (and scroll in Acrobat
+              // when they exceed the cell height) instead of being cut off on one line.
+              tf.enableMultiline();
               tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
               tf.setFontSize(cellFieldSize);
             }

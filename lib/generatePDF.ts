@@ -921,6 +921,9 @@ export async function generatePDF(
           lastWasBox = false;
           lastWasBullet = false;
         } else if (item.kind === 'bullet') {
+          // A bullet right after a box (callout panel / answer box) needs clearing space so it
+          // doesn't overlap the box's bottom edge — same treatment a following text line gets.
+          if (lastWasBox) y -= 12 * sp;
           renderBullet(item.text, item.color, { bold: item.bold, italic: item.italic, indent: item.indent });
           lastWasBox = false;
           lastWasBullet = true;

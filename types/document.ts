@@ -34,17 +34,29 @@ export interface DocTable {
   labelSize?: number;   // point size for in-cell labels (date numbers, quadrant titles)
   cellScale?: number;   // input-box size multiplier for table cells (default 1) — taller fill-in boxes
   colWidths?: number[]; // relative column widths (weights; default all equal). Length = columns.
+  headerAlign?: Align[]; // per-column header-row text alignment (default 'left'). Length = columns.
 }
 
 export type HeadingStyle = 'accent' | 'brand' | 'plain' | 'title';
 export type TextCase = 'none' | 'upper' | 'sentence' | 'title';
+
+export type Align = 'left' | 'center' | 'right';
 
 // A section's content is an ordered list so document order is preserved
 // (e.g. prompt → checkboxes → answer box → next prompt …)
 // Inline formatting shared by text + bullet items (color: hex #E04927 or a name).
 // `callout: true` renders the item (and any consecutive callout items) inside a highlighted
 // callout box — without making the whole section a callout.
-export interface TextFormat { color?: string; bold?: boolean; italic?: boolean; indent?: number; callout?: boolean }
+// The callout* fields style the box a run of callout items shares; the renderer reads them
+// from the first item of the run, so the editor sets them on the whole contiguous run.
+export interface TextFormat {
+  color?: string; bold?: boolean; italic?: boolean; indent?: number; callout?: boolean;
+  align?: Align;                // horizontal alignment of this line (and its text inside a callout)
+  calloutBg?: string;           // callout box fill color (hex or name) — overrides the brand default
+  calloutBorder?: string;       // callout box border color (hex or name) — overrides the brand default
+  calloutSpaceBefore?: number;  // extra points of space above the callout box (0–40)
+  calloutSpaceAfter?: number;   // extra points of space below the callout box (0–40)
+}
 
 export type ContentItem =
   | ({ id: string; kind: 'text'; text: string } & TextFormat)
@@ -65,6 +77,10 @@ export interface Section {
   spacing?: number;            // per-section spacing multiplier (default 1) for gaps between blocks
   lineSpacing?: number;        // per-section line-height multiplier (default 1) to tighten/loosen lines
   fieldScale?: number;         // per-section input-box height multiplier (default 1) — bigger/smaller answer boxes
+  headingSpaceBefore?: number; // extra points of space above the section heading (default 0)
+  headingSpaceAfter?: number;  // extra points of space below the section heading (default 0)
+  calloutBg?: string;          // section-callout box fill color (hex or name) — overrides the brand default
+  calloutBorder?: string;      // section-callout box border color (hex or name) — overrides the brand default
 }
 
 export type Spacing = 'compact' | 'normal' | 'relaxed';

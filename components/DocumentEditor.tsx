@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding, DocTable, TextFormat, FieldCalc,
+  DocumentModel, Section, FormField, FieldType, HeadingStyle, TextCase, Spacing, ContentItem, CoverSettings, ClientBranding, DocTable, TextFormat, FieldCalc, Align,
 } from '@/types/document';
 import { coverImagesFor } from '@/lib/covers';
 import { ELEMENTS, calendarElement } from '@/lib/elements';
@@ -175,30 +175,95 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
       it.id === itemId && (it.kind === 'text' || it.kind === 'bullet') ? ({ ...it, kind } as ContentItem) : it));
   }
 
-  // Apply inline formatting (bold/italic/indent/color) to a text or bullet item.
+  // Apply inline formatting (bold/italic/indent/color/align) to a text or bullet item.
   function patchTextItem(sectionId: string, itemId: string, patch: Partial<TextFormat>) {
     const s = doc.sections.find((x) => x.id === sectionId)!;
     setContent(sectionId, s.content.map((it) =>
       it.id === itemId && (it.kind === 'text' || it.kind === 'bullet') ? { ...it, ...patch } : it));
   }
 
-  // Bold / italic / indent + type toggle, shown under text & bullet items.
+  // Apply box styling (fill/border/spacing) to the WHOLE contiguous callout run that contains
+  // itemId — so every line sharing the box gets the same look (the renderer reads the first item).
+  function patchCalloutRun(sectionId: string, itemId: string, patch: Partial<TextFormat>) {
+    const s = doc.sections.find((x) => x.id === sectionId)!;
+    const arr = s.content;
+    const idx = arr.findIndex((it) => it.id === itemId);
+    if (idx < 0) return;
+    const isCallout = (it: ContentItem) => (it.kind === 'text' || it.kind === 'bullet') && !!it.callout;
+    if (!isCallout(arr[idx])) { patchTextItem(sectionId, itemId, patch); return; }
+    let lo = idx, hi = idx;
+    while (lo - 1 >= 0 && isCallout(arr[lo - 1])) lo--;
+    while (hi + 1 < arr.length && isCallout(arr[hi + 1])) hi++;
+    setContent(sectionId, arr.map((it, i) =>
+      (i >= lo && i <= hi && (it.kind === 'text' || it.kind === 'bullet')) ? { ...it, ...patch } : it));
+  }
+
+  // Bold / italic / indent / align + type toggle, shown under text & bullet items.
+  // When the line is a callout, a second row exposes the box's fill, border and spacing.
   function formatToolbar(sectionId: string, item: Extract<ContentItem, { kind: 'text' | 'bullet' }>) {
     const indent = item.indent ?? 0;
+    const align: Align = item.align ?? 'left';
     const seg = (active: boolean) => `text-[10px] leading-none rounded px-2 py-1 border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`;
+    const alignSeg = (a: Align) => `text-[11px] px-1.5 py-1 ${align === a ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`;
+    const spaceBefore = item.calloutSpaceBefore ?? 0;
+    const spaceAfter = item.calloutSpaceAfter ?? 0;
     return (
-      <div className="flex items-center gap-1 flex-wrap pl-1">
-        <div className="inline-flex rounded overflow-hidden border border-gray-200">
-          <button onClick={() => switchKind(sectionId, item.id, 'text')} className={`text-[10px] px-2 py-1 ${item.kind === 'text' ? 'bg-gray-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>Text</button>
-          <button onClick={() => switchKind(sectionId, item.id, 'bullet')} className={`text-[10px] px-2 py-1 border-l border-gray-200 ${item.kind === 'bullet' ? 'bg-gray-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>Bullet</button>
+      <div className="space-y-1.5 pl-1">
+        <div className="flex items-center gap-1 flex-wrap">
+          <div className="inline-flex rounded overflow-hidden border border-gray-200">
+            <button onClick={() => switchKind(sectionId, item.id, 'text')} className={`text-[10px] px-2 py-1 ${item.kind === 'text' ? 'bg-gray-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>Text</button>
+            <button onClick={() => switchKind(sectionId, item.id, 'bullet')} className={`text-[10px] px-2 py-1 border-l border-gray-200 ${item.kind === 'bullet' ? 'bg-gray-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>Bullet</button>
+          </div>
+          <button onClick={() => patchTextItem(sectionId, item.id, { bold: !item.bold })} className={seg(!!item.bold)} title="Bold"><span className="font-bold">B</span></button>
+          <button onClick={() => patchTextItem(sectionId, item.id, { italic: !item.italic })} className={seg(!!item.italic)} title="Italic"><span className="italic font-serif">I</span></button>
+          <div className="inline-flex items-center border border-gray-200 rounded overflow-hidden">
+            <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.max(0, indent - 1) })} disabled={indent === 0} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40" title="Decrease indent">⇤</button>
+            <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.min(4, indent + 1) })} disabled={indent >= 4} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40 border-l border-gray-200" title="Increase indent">⇥</button>
+          </div>
+          {item.kind === 'text' && (
+            <div className="inline-flex items-center border border-gray-200 rounded overflow-hidden" title="Text alignment">
+              <button onClick={() => patchTextItem(sectionId, item.id, { align: 'left' })} className={alignSeg('left')} title="Align left">⯇</button>
+              <button onClick={() => patchTextItem(sectionId, item.id, { align: 'center' })} className={`${alignSeg('center')} border-l border-gray-200`} title="Center">≡</button>
+              <button onClick={() => patchTextItem(sectionId, item.id, { align: 'right' })} className={`${alignSeg('right')} border-l border-gray-200`} title="Align right">⯈</button>
+            </div>
+          )}
+          <button onClick={() => patchTextItem(sectionId, item.id, { callout: !item.callout })} className={seg(!!item.callout)} title="Put this line in a callout box (consecutive callout lines share one box)">▣ Callout</button>
         </div>
-        <button onClick={() => patchTextItem(sectionId, item.id, { bold: !item.bold })} className={seg(!!item.bold)} title="Bold"><span className="font-bold">B</span></button>
-        <button onClick={() => patchTextItem(sectionId, item.id, { italic: !item.italic })} className={seg(!!item.italic)} title="Italic"><span className="italic font-serif">I</span></button>
-        <div className="inline-flex items-center border border-gray-200 rounded overflow-hidden">
-          <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.max(0, indent - 1) })} disabled={indent === 0} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40" title="Decrease indent">⇤</button>
-          <button onClick={() => patchTextItem(sectionId, item.id, { indent: Math.min(4, indent + 1) })} disabled={indent >= 4} className="text-[11px] px-1.5 py-1 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-40 border-l border-gray-200" title="Increase indent">⇥</button>
-        </div>
-        <button onClick={() => patchTextItem(sectionId, item.id, { callout: !item.callout })} className={seg(!!item.callout)} title="Put this line in a callout box (consecutive callout lines share one box)">▣ Callout</button>
+        {item.callout && (
+          <div className="flex items-center gap-2 flex-wrap text-[10px] text-gray-500 bg-slate-50 border border-slate-200 rounded px-2 py-1.5">
+            <span className="font-semibold text-slate-600">Callout box:</span>
+            <label className="inline-flex items-center gap-1" title="Box fill color (applies to the whole box)">
+              Fill
+              <input type="color" value={item.calloutBg ?? '#0a263a'} onChange={(e) => patchCalloutRun(sectionId, item.id, { calloutBg: e.target.value })}
+                className="w-6 h-5 p-0 border border-gray-200 rounded cursor-pointer bg-white" />
+            </label>
+            <label className="inline-flex items-center gap-1" title="Box border color (applies to the whole box)">
+              Border
+              <input type="color" value={item.calloutBorder ?? '#3f69ff'} onChange={(e) => patchCalloutRun(sectionId, item.id, { calloutBorder: e.target.value })}
+                className="w-6 h-5 p-0 border border-gray-200 rounded cursor-pointer bg-white" />
+            </label>
+            {(item.calloutBg || item.calloutBorder) && (
+              <button onClick={() => patchCalloutRun(sectionId, item.id, { calloutBg: undefined, calloutBorder: undefined })}
+                className="text-[10px] text-gray-400 hover:text-blue-600 underline" title="Reset to brand colors">reset colors</button>
+            )}
+            <span className="inline-flex items-center gap-1" title="Space above the box">
+              Space ↑
+              <span className="inline-flex items-center border border-gray-200 rounded overflow-hidden bg-white">
+                <button onClick={() => patchCalloutRun(sectionId, item.id, { calloutSpaceBefore: Math.max(0, spaceBefore - 4) })} className="px-1.5 py-0.5 text-gray-500 hover:bg-gray-50">−</button>
+                <span className="tabular-nums w-6 text-center text-gray-500">{spaceBefore}</span>
+                <button onClick={() => patchCalloutRun(sectionId, item.id, { calloutSpaceBefore: Math.min(40, spaceBefore + 4) })} className="px-1.5 py-0.5 text-gray-500 hover:bg-gray-50 border-l border-gray-200">+</button>
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1" title="Space below the box">
+              Space ↓
+              <span className="inline-flex items-center border border-gray-200 rounded overflow-hidden bg-white">
+                <button onClick={() => patchCalloutRun(sectionId, item.id, { calloutSpaceAfter: Math.max(0, spaceAfter - 4) })} className="px-1.5 py-0.5 text-gray-500 hover:bg-gray-50">−</button>
+                <span className="tabular-nums w-6 text-center text-gray-500">{spaceAfter}</span>
+                <button onClick={() => patchCalloutRun(sectionId, item.id, { calloutSpaceAfter: Math.min(40, spaceAfter + 4) })} className="px-1.5 py-0.5 text-gray-500 hover:bg-gray-50 border-l border-gray-200">+</button>
+              </span>
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -246,6 +311,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
         headers: t.headers.length ? [...t.headers, ''] : t.headers, // only grow headers on a headered table
         rows: t.rows.map((row) => [...row, { field: { id: uid('field'), label: '', type: 'text' as FieldType, required: false } }]),
         colWidths: [...tableWeights(t, cols), 1],
+        headerAlign: t.headerAlign ? [...t.headerAlign, 'left' as Align] : t.headerAlign,
       };
     });
   }
@@ -257,6 +323,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
         headers: t.headers.filter((_, i) => i !== ci),
         rows: t.rows.map((row) => row.filter((_, i) => i !== ci)),
         colWidths: tableWeights(t, tableCols(t)).filter((_, i) => i !== ci),
+        headerAlign: t.headerAlign ? t.headerAlign.filter((_, i) => i !== ci) : t.headerAlign,
       };
     });
   }
@@ -265,6 +332,16 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
       const cw = tableWeights(t, tableCols(t));
       cw[ci] = Math.max(0.5, Math.min(3, Math.round((cw[ci] + delta) * 100) / 100));
       return { ...t, colWidths: cw };
+    });
+  }
+  // Cycle one header column's alignment left → center → right → left.
+  function cycleTableHeaderAlign(sectionId: string, itemId: string, ci: number) {
+    updateTable(sectionId, itemId, (t) => {
+      const cols = tableCols(t);
+      const arr: Align[] = (t.headerAlign && t.headerAlign.length === cols) ? [...t.headerAlign] : new Array(cols).fill('left');
+      const order: Align[] = ['left', 'center', 'right'];
+      arr[ci] = order[(order.indexOf(arr[ci] ?? 'left') + 1) % 3];
+      return { ...t, headerAlign: arr };
     });
   }
 
@@ -590,6 +667,24 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                 </button>
               </div>
 
+              {section.callout && (
+                <div className="flex items-center gap-2 flex-wrap text-[11px] text-gray-500">
+                  <span className="font-medium text-gray-600">Box colors:</span>
+                  <label className="inline-flex items-center gap-1" title="Callout fill color">Fill
+                    <input type="color" value={section.calloutBg ?? '#0a263a'} onChange={(e) => updateSection(section.id, { calloutBg: e.target.value })}
+                      className="w-6 h-5 p-0 border border-gray-200 rounded cursor-pointer bg-white" />
+                  </label>
+                  <label className="inline-flex items-center gap-1" title="Callout border color">Border
+                    <input type="color" value={section.calloutBorder ?? '#3f69ff'} onChange={(e) => updateSection(section.id, { calloutBorder: e.target.value })}
+                      className="w-6 h-5 p-0 border border-gray-200 rounded cursor-pointer bg-white" />
+                  </label>
+                  {(section.calloutBg || section.calloutBorder) && (
+                    <button onClick={() => updateSection(section.id, { calloutBg: undefined, calloutBorder: undefined })}
+                      className="text-[10px] text-gray-400 hover:text-blue-600 underline" title="Reset to brand colors">reset</button>
+                  )}
+                </div>
+              )}
+
               <label className="flex items-center gap-2 text-gray-500" title="Tighten or loosen the gaps between blocks — useful to pull content back from the next page">
                 <span className="shrink-0 w-14 font-medium text-[11px]">Spacing</span>
                 <input type="range" min="0.3" max="2" step="0.1" value={section.spacing ?? 1}
@@ -601,6 +696,18 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                 <input type="range" min="0.7" max="1.6" step="0.05" value={section.lineSpacing ?? 1}
                   onChange={(e) => updateSection(section.id, { lineSpacing: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
                 <span className="shrink-0 w-8 text-right tabular-nums">{(section.lineSpacing ?? 1).toFixed(2)}×</span>
+              </label>
+              <label className="flex items-center gap-2 text-gray-500" title="Extra space ABOVE this section's heading">
+                <span className="shrink-0 w-14 font-medium text-[11px]">Head&nbsp;↑</span>
+                <input type="range" min="0" max="48" step="2" value={section.headingSpaceBefore ?? 0}
+                  onChange={(e) => updateSection(section.id, { headingSpaceBefore: parseInt(e.target.value, 10) })} className="flex-1 accent-blue-500" />
+                <span className="shrink-0 w-8 text-right tabular-nums">{section.headingSpaceBefore ?? 0}pt</span>
+              </label>
+              <label className="flex items-center gap-2 text-gray-500" title="Extra space BELOW this section's heading">
+                <span className="shrink-0 w-14 font-medium text-[11px]">Head&nbsp;↓</span>
+                <input type="range" min="0" max="48" step="2" value={section.headingSpaceAfter ?? 0}
+                  onChange={(e) => updateSection(section.id, { headingSpaceAfter: parseInt(e.target.value, 10) })} className="flex-1 accent-blue-500" />
+                <span className="shrink-0 w-8 text-right tabular-nums">{section.headingSpaceAfter ?? 0}pt</span>
               </label>
             </div>
           )}
@@ -757,7 +864,7 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                           const headered = item.table.headers.length > 0;
                           return (
                             <div>
-                              <div className="text-[10px] text-gray-400 mb-0.5">Columns — header · width · remove</div>
+                              <div className="text-[10px] text-gray-400 mb-0.5">Columns — header · {headered ? 'align · ' : ''}width · remove</div>
                               <div className="space-y-1">
                                 {Array.from({ length: cols }).map((_, ci) => (
                                   <div key={ci} className="flex items-center gap-1">
@@ -768,6 +875,13 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                                         className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-blue-400" />
                                     ) : (
                                       <span className="text-[11px] text-gray-500 flex-1">Col {ci + 1}</span>
+                                    )}
+                                    {headered && (
+                                      <button onClick={() => cycleTableHeaderAlign(section.id, item.id, ci)}
+                                        className="shrink-0 inline-flex items-center justify-center w-6 h-6 border border-gray-200 rounded bg-white text-gray-500 hover:bg-gray-50 text-[12px]"
+                                        title={`Header text align: ${item.table.headerAlign?.[ci] ?? 'left'} — click to change`}>
+                                        {(item.table.headerAlign?.[ci] ?? 'left') === 'center' ? '≡' : (item.table.headerAlign?.[ci] === 'right' ? '⯈' : '⯇')}
+                                      </button>
                                     )}
                                     <span className="inline-flex items-center border border-gray-200 rounded overflow-hidden shrink-0" title="Column width">
                                       <button onClick={() => setTableColWidth(section.id, item.id, ci, -0.25)} className="text-[11px] px-1.5 py-0.5 bg-white text-gray-500 hover:bg-gray-50">−</button>

@@ -16,7 +16,7 @@ function buildCalcScript(op: FieldCalc['op'], names: string[], constant?: number
   // Whole-number result (no decimals); blank when zero, invalid, or divide-by-zero (Infinity/NaN).
   return `${decls} var r = ${expr}; event.value = (!r || !isFinite(r)) ? "" : Math.round(r);`;
 }
-import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable, ContentItem } from '@/types/document';
+import { DocumentModel, TemplateId, ColorTheme, ClientBranding, FormField, DocTable, ContentItem, TextFormat } from '@/types/document';
 import { classicTemplate } from './templates/classic';
 import { modernTemplate } from './templates/modern';
 import { workbookTemplate } from './templates/workbook';
@@ -92,6 +92,17 @@ function resolveColor(color: string | undefined): RGB | null {
   if (/^#?[0-9a-f]{6}$/.test(c)) return hexToRgb(c.startsWith('#') ? c : '#' + c);
   if (NAMED_COLORS[c]) return hexToRgb(NAMED_COLORS[c]);
   return null;
+}
+
+// Pick a legible text color (near-black or white) for a given background, so a custom
+// callout fill never ends up with invisible text. Uses WCAG relative luminance
+// (gamma-corrected sRGB) so bright fills like green/yellow correctly flip to dark text,
+// while the dark brand defaults (navy/green blue) keep white. Threshold 0.4 is chosen so
+// the existing Sell It blue callout (luminance ~0.18) stays white — no regression.
+function readableText(bg: RGB): RGB {
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * lin(bg.red) + 0.7152 * lin(bg.green) + 0.0722 * lin(bg.blue);
+  return L > 0.4 ? rgb(0.1, 0.1, 0.15) : rgb(1, 1, 1);
 }
 
 function getTemplate(id: TemplateId): Template {
@@ -474,6 +485,9 @@ export async function generatePDF(
     if (branded && y < tmpl.pageHeight - tmpl.marginTop - 2) {
       y -= section.level === 1 ? 6 : 2;
     }
+    // Per-heading extra space above (editor "Space above" control). Applied before the
+    // heading is drawn; if it pushes past the page bottom, ensureSpace starts a fresh page.
+    if (y < tmpl.pageHeight - tmpl.marginTop - 2) y -= Math.max(0, section.headingSpaceBefore ?? 0);
 
     // Record where this section's heading lands (for click-to-edit in the preview)
     const recordAnchor = () => {
@@ -506,7 +520,7 @@ export async function generatePDF(
       // Wrap long headings to the content margin instead of overflowing
       const hLines = wrapText(headingText, mainColWidth - (textX - tmpl.marginLeft), boldFont, size);
       // Orphan control: keep the whole heading together with the start of its content
-      ensureSpace(hLines.length * (size + 2) + (section.level === 1 ? 8 : 5) + leadEstimate());
+      ensureSpace(hLines.length * (size + 2) + (section.level === 1 ? 8 : 5) + Math.max(0, section.headingSpaceAfter ?? 0) + leadEstimate());
       recordAnchor();
       if (useMark) {
         // Mark hangs in the left margin, vertically centered on the heading text
@@ -574,21 +588,31 @@ export async function generatePDF(
       y -= tmpl.subheadingSize + 6;
     }
 
+    // Per-heading extra space below (editor "Space below" control).
+    y -= Math.max(0, section.headingSpaceAfter ?? 0);
+
     // (sp / ls / lineH were computed above the heading for orphan control)
 
     // ---- ordered content rendering (preserves document order) ----
     // Per-item inline formatting: bold/italic pick the matching font, indent shifts x (16pt/level).
-    type Fmt = { bold?: boolean; italic?: boolean; indent?: number };
+    type Fmt = { bold?: boolean; italic?: boolean; indent?: number; align?: 'left' | 'center' | 'right' };
     const fmtFont = (fmt?: Fmt) => (fmt?.bold ? boldFont : fmt?.italic ? italicFont : font);
     const fmtIndent = (fmt?: Fmt) => Math.max(0, Math.min(4, fmt?.indent ?? 0)) * 16;
+    // Left edge for a line given its alignment inside an available width.
+    const alignedX = (baseX: number, availW: number, line: string, f: typeof font, size: number, align?: 'left' | 'center' | 'right') => {
+      if (!align || align === 'left') return baseX;
+      const w = f.widthOfTextAtSize(line, size);
+      return align === 'center' ? baseX + (availW - w) / 2 : baseX + (availW - w);
+    };
 
     const renderText = (txt: string, color?: string, fmt?: Fmt) => {
       // "Pressure"/"Presence" lines render in the default color (coloring removed per request)
       const col = /pressure|presence/i.test(txt) ? rgb(0.1, 0.1, 0.1) : (resolveColor(color) ?? rgb(0.1, 0.1, 0.1));
       const f = fmtFont(fmt), ind = fmtIndent(fmt);
+      const availW = mainColWidth - ind;
       // widow/orphan control keeps >=2 lines of a paragraph together across pages
-      placeLines(wrapText(txt, mainColWidth - ind, f, tmpl.bodySize), lineH,
-        (wline) => page.drawText(wline, { x: tmpl.marginLeft + ind, y, size: tmpl.bodySize, font: f, color: col }));
+      placeLines(wrapText(txt, availW, f, tmpl.bodySize), lineH,
+        (wline) => page.drawText(wline, { x: alignedX(tmpl.marginLeft + ind, availW, wline, f, tmpl.bodySize, fmt?.align), y, size: tmpl.bodySize, font: f, color: col }));
       y -= tmpl.paragraphSpacing * sp;
     };
 
@@ -705,12 +729,18 @@ export async function generatePDF(
         page.drawRectangle({ x: tmpl.marginLeft, y: y - headerH + 4, width: mainColWidth, height: headerH, color: headerColor, opacity: solidHeader ? 1 : 0.12 });
         const htColor = solidHeader ? rgb(1, 1, 1) : headerColor;
         headerWrapped.forEach((lines, c) => {
-          // Left-align each header title in its column (matching the cell content padding),
+          // Per-column header alignment (default left), matching the cell content padding,
           // vertically centered in the header row.
+          const hAlign = table.headerAlign?.[c] ?? 'left';
           const blockH = lines.length * cellLineH;
           let cy = y + 4 - (headerH - blockH) / 2 - TFS + 1;
           for (const ln of lines) {
-            page.drawText(ln, { x: colX[c] + 5, y: cy, size: TFS, font: boldFont, color: htColor });
+            let hx = colX[c] + 5;
+            if (hAlign !== 'left') {
+              const w = boldFont.widthOfTextAtSize(ln, TFS);
+              hx = hAlign === 'center' ? colX[c] + (colWs[c] - w) / 2 : colX[c] + colWs[c] - 5 - w;
+            }
+            page.drawText(ln, { x: hx, y: cy, size: TFS, font: boldFont, color: htColor });
             cy -= cellLineH;
           }
         });
@@ -810,8 +840,16 @@ export async function generatePDF(
 
     // Callout content: read-only text + bullets, rendered together INSIDE the panel
     // (bullets used to spill out below the box).
-    const renderCalloutBox = (items: Array<{ text: string; bullet?: boolean }>) => {
+    const renderCalloutBox = (
+      items: Array<{ text: string; bullet?: boolean; align?: 'left' | 'center' | 'right' }>,
+      style?: { bg?: string; border?: string; spaceBefore?: number; spaceAfter?: number },
+    ) => {
       const bulletIndent = 14;
+      // Editor controls: extra space above (before anchoring the top) / below, and color overrides.
+      y -= Math.max(0, style?.spaceBefore ?? 0);
+      const spaceAfter = Math.max(0, style?.spaceAfter ?? 0);
+      const bgOverride = resolveColor(style?.bg);
+      const borderOverride = resolveColor(style?.border);
       // The Learning Creative: a light, leaf-accented panel (matches the website) —
       // pale-green background, a solid green left accent bar, the leaf mark top-left,
       // and navy body text. No dark fill, no dashed border.
@@ -822,13 +860,13 @@ export async function generatePDF(
         const accentW = branding!.calloutStyle === 'plain' ? 0 : 4; // accent left bar
         const cLineH = tmpl.lineHeight * ls;
         const itemGap = cLineH * 0.4;
-        const panelBg = hexToRgb(branding!.colors.grayBox);  // pale lime tint
-        const barColor = hexToRgb(branding!.colors.subtitle);// dark green
-        const textColor = hexToRgb(branding!.colors.header); // navy
+        const panelBg = bgOverride ?? hexToRgb(branding!.colors.grayBox);  // pale lime tint
+        const barColor = borderOverride ?? hexToRgb(branding!.colors.subtitle);// dark green
+        const textColor = style?.bg ? readableText(panelBg) : hexToRgb(branding!.colors.header); // navy, or legible on a custom fill
         const textX = tmpl.marginLeft + accentW + pad;
         const innerW = mainColWidth - accentW - pad * 2;
         const wrapped = items
-          .map((it) => ({ bullet: !!it.bullet, lines: wrapText(it.text, innerW - (it.bullet ? bulletIndent : 0), font, tmpl.bodySize) }))
+          .map((it) => ({ bullet: !!it.bullet, align: it.align, lines: wrapText(it.text, innerW - (it.bullet ? bulletIndent : 0), font, tmpl.bodySize) }))
           .filter((w) => w.lines.join('').trim());
         // Panel mark: TLC's leaf, or a self-serve account's chosen icon, or none.
         const leafW = leafMark ? 30 : 0;
@@ -848,43 +886,49 @@ export async function generatePDF(
         }
         let cy = boxTop - pad - markH - markGap - tmpl.bodySize + 2;
         wrapped.forEach((w, i) => {
-          const lineX = textX + (w.bullet ? bulletIndent : 0);
+          const baseX = textX + (w.bullet ? bulletIndent : 0);
+          const availW = innerW - (w.bullet ? bulletIndent : 0);
           if (w.bullet) page.drawText('•', { x: textX, y: cy, size: tmpl.bodySize, font: boldFont, color: barColor });
-          for (const wline of w.lines) { page.drawText(wline, { x: lineX, y: cy, size: tmpl.bodySize, font, color: textColor }); cy -= cLineH; }
+          for (const wline of w.lines) { page.drawText(wline, { x: w.bullet ? baseX : alignedX(baseX, availW, wline, font, tmpl.bodySize, w.align), y: cy, size: tmpl.bodySize, font, color: textColor }); cy -= cLineH; }
           if (i < wrapped.length - 1) cy -= itemGap;
         });
-        y = boxTop - boxH - tmpl.paragraphSpacing;
+        y = boxTop - boxH - tmpl.paragraphSpacing - spaceAfter;
         return;
       }
-      const calloutBg = hexToRgb(branding!.colors.calloutBg);
+      const calloutBg = bgOverride ?? hexToRgb(branding!.colors.calloutBg);
+      const calloutBorder = borderOverride ?? hexToRgb(branding!.colors.calloutBorder);
+      // Keep the exact prior default (white) when no custom fill is set — brand defaults are dark.
+      // Only auto-pick a legible color when the user overrides the fill, matching the TLC branch.
+      const textCol = bgOverride ? readableText(calloutBg) : rgb(1, 1, 1);
       const pad = 12;
       const innerW = mainColWidth - pad * 2;
       const cLineH = tmpl.lineHeight * ls;          // line spacing controls how tight lines are
       const itemGap = cLineH * 0.4;
       const wrapped = items
-        .map((it) => ({ bullet: !!it.bullet, lines: wrapText(it.text, innerW - (it.bullet ? bulletIndent : 0), font, tmpl.bodySize) }))
+        .map((it) => ({ bullet: !!it.bullet, align: it.align, lines: wrapText(it.text, innerW - (it.bullet ? bulletIndent : 0), font, tmpl.bodySize) }))
         .filter((w) => w.lines.join('').trim());
       const boxH = wrapped.reduce((h, w) => h + w.lines.length * cLineH, 0) + Math.max(0, wrapped.length - 1) * itemGap + pad * 2;
       ensureSpace(boxH + 8);
       const boxTop = y + tmpl.bodySize;
       page.drawRectangle({ x: tmpl.marginLeft, y: boxTop - boxH, width: mainColWidth, height: boxH, color: calloutBg });
-      page.drawRectangle({ x: tmpl.marginLeft + 5, y: boxTop - boxH + 5, width: mainColWidth - 10, height: boxH - 10, borderColor: hexToRgb(branding!.colors.calloutBorder), borderWidth: 1, borderDashArray: [3, 3], color: calloutBg });
+      page.drawRectangle({ x: tmpl.marginLeft + 5, y: boxTop - boxH + 5, width: mainColWidth - 10, height: boxH - 10, borderColor: calloutBorder, borderWidth: 1, borderDashArray: [3, 3], color: calloutBg });
       let cy = boxTop - pad - tmpl.bodySize + 2;
       wrapped.forEach((w, i) => {
-        const lineX = tmpl.marginLeft + pad + (w.bullet ? bulletIndent : 0);
-        if (w.bullet) page.drawText('•', { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font: boldFont, color: rgb(1, 1, 1) });
-        for (const wline of w.lines) { page.drawText(wline, { x: lineX, y: cy, size: tmpl.bodySize, font, color: rgb(1, 1, 1) }); cy -= cLineH; }
+        const baseX = tmpl.marginLeft + pad + (w.bullet ? bulletIndent : 0);
+        const availW = innerW - (w.bullet ? bulletIndent : 0);
+        if (w.bullet) page.drawText('•', { x: tmpl.marginLeft + pad, y: cy, size: tmpl.bodySize, font: boldFont, color: textCol });
+        for (const wline of w.lines) { page.drawText(wline, { x: w.bullet ? baseX : alignedX(baseX, availW, wline, font, tmpl.bodySize, w.align), y: cy, size: tmpl.bodySize, font, color: textCol }); cy -= cLineH; }
         if (i < wrapped.length - 1) cy -= itemGap;
       });
-      y = boxTop - boxH - tmpl.paragraphSpacing;
+      y = boxTop - boxH - tmpl.paragraphSpacing - spaceAfter;
     };
 
     if (branded && section.callout) {
       // Text + bullets go INSIDE the callout panel (in document order); fields/tables below.
       const boxed = section.content
         .filter((i) => i.kind === 'text' || i.kind === 'bullet')
-        .map((i) => ({ text: (i as { text: string }).text, bullet: i.kind === 'bullet' }));
-      if (boxed.length) renderCalloutBox(boxed);
+        .map((i) => ({ text: (i as { text: string }).text, bullet: i.kind === 'bullet', align: (i as TextFormat).align }));
+      if (boxed.length) renderCalloutBox(boxed, { bg: section.calloutBg, border: section.calloutBorder });
       for (const item of section.content) {
         if (item.kind === 'field') renderField(item.field);
         else if (item.kind === 'table') renderTable(item.table);
@@ -900,16 +944,19 @@ export async function generatePDF(
         // Inline callout: a run of consecutive text/bullet items flagged as callout renders
         // together inside one highlighted box (branded templates only).
         if (branded && (item.kind === 'text' || item.kind === 'bullet') && item.callout) {
-          const group: Array<{ text: string; bullet?: boolean }> = [];
+          const group: Array<{ text: string; bullet?: boolean; align?: 'left' | 'center' | 'right' }> = [];
+          // The box's fill/border/spacing come from the first item of the run.
+          let boxStyle: { bg?: string; border?: string; spaceBefore?: number; spaceAfter?: number } | undefined;
           while (idx < section.content.length) {
             const it = section.content[idx];
             if ((it.kind === 'text' || it.kind === 'bullet') && it.callout) {
-              group.push({ text: it.text, bullet: it.kind === 'bullet' });
+              if (!boxStyle) boxStyle = { bg: it.calloutBg, border: it.calloutBorder, spaceBefore: it.calloutSpaceBefore, spaceAfter: it.calloutSpaceAfter };
+              group.push({ text: it.text, bullet: it.kind === 'bullet', align: it.align });
               idx++;
             } else break;
           }
           if (lastWasBox || lastWasBullet) y -= 6 * sp;
-          renderCalloutBox(group);
+          renderCalloutBox(group, boxStyle);
           lastWasBox = true;
           lastWasBullet = false;
           continue;
@@ -917,7 +964,7 @@ export async function generatePDF(
         if (item.kind === 'text') {
           if (lastWasBox) y -= 12 * sp;
           else if (lastWasBullet) y -= 8 * sp; // breathing room between a bullet list and the text that follows it
-          renderText(item.text, item.color, { bold: item.bold, italic: item.italic, indent: item.indent });
+          renderText(item.text, item.color, { bold: item.bold, italic: item.italic, indent: item.indent, align: item.align });
           lastWasBox = false;
           lastWasBullet = false;
         } else if (item.kind === 'bullet') {

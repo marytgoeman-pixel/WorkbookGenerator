@@ -100,6 +100,7 @@ export interface CoverSettings {
   textGapTop?: number;                       // Sell It cover: points between the title and the session/descriptor (default 16)
   textGapBottom?: number;                    // Sell It cover: points between the session/descriptor and the image (default 18)
   textScale?: number;                        // Sell It cover: size multiplier for the session/descriptor text (0.7–1.4, default 1)
+  titleScale?: number;                       // Sell It cover: size multiplier for the title + word-after-title (0.6–1.3, default 1)
 }
 
 export interface DocumentModel {

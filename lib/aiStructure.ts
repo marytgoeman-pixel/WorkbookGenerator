@@ -176,6 +176,15 @@ function mapToDocument(ai: AiDoc): DocumentModel {
             return { text: c.text };
           })
         );
+        // Pad ragged rows up to the column count with blank write-in cells, so a row the
+        // model returned short (e.g. extra "buffer" rows with only a label) still gets a
+        // fillable box in every data column.
+        const colCount = headers.length || rows.reduce((m, r) => Math.max(m, r.length), 0);
+        for (const r of rows) {
+          while (r.length < colCount) {
+            r.push({ text: '', field: { id: uid('field'), label: '', type: 'text', required: false } });
+          }
+        }
         const table: DocTable = { id: uid('table'), headers, rows };
         return { id: uid('c'), kind: 'table', table };
       }

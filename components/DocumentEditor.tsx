@@ -558,6 +558,12 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
             {isSellit && (
               <div className="space-y-2 pt-1">
                 <div className="text-[11px] font-medium text-gray-500">Cover text size &amp; spacing</div>
+                <label className="flex items-center gap-2 text-[11px] text-gray-500" title="Shrink or enlarge the big title and the word after the title (so a long title doesn't run to the edge)">
+                  <span className="shrink-0 w-24">Title size</span>
+                  <input type="range" min="0.6" max="1.3" step="0.05" value={cover.titleScale ?? 1}
+                    onChange={(e) => setCover({ titleScale: parseFloat(e.target.value) })} className="flex-1 accent-blue-500" />
+                  <span className="shrink-0 w-8 text-right tabular-nums">{Math.round((cover.titleScale ?? 1) * 100)}%</span>
+                </label>
                 <label className="flex items-center gap-2 text-[11px] text-gray-500" title="Shrink or enlarge the session / description text under the title (condense to fit)">
                   <span className="shrink-0 w-24">Text size</span>
                   <input type="range" min="0.7" max="1.4" step="0.05" value={cover.textScale ?? 1}

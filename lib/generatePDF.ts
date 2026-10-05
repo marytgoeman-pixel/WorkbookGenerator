@@ -769,6 +769,12 @@ export async function generatePDF(
       const usable = tmpl.pageHeight - tmpl.marginTop - tmpl.marginBottom;
       if (!table.fullPage && y - total < tmpl.marginBottom && total <= usable) newPage();
 
+      // Columns that hold at least one fillable field anywhere. A blank or MISSING cell in
+      // such a column gets an auto write-in box — this fixes ragged AI tables where a data
+      // cell was omitted (e.g. extra "buffer" rows left without an Action box).
+      const colHasField: boolean[] = [];
+      for (let c = 0; c < cols; c++) colHasField[c] = table.rows.some((r) => !!r[c]?.field);
+
       if (hasHeaders) drawHeader();
       table.rows.forEach((row, ri) => {
         const rh = rowHeights[ri];
@@ -778,15 +784,19 @@ export async function generatePDF(
           const cell = row[c];
           const cx = colX[c], cw = colWs[c];
           page.drawRectangle({ x: cx, y: rowTop - rh + 4, width: cw, height: rh, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5, color: rgb(1, 1, 1) });
-          if (!cell) continue;
-          if (cell.field) {
-            const name = `${section.id}__${cell.field.id}`;
-            const hasDate = !!(cell.text && cell.text.trim());
+          const cellText = cell?.text && cell.text.trim() ? cell.text : '';
+          // Auto write-in box for a blank/missing cell in a fillable column (ragged-table fix).
+          const autoFill = !cell?.field && !cellText && colHasField[c];
+          if (!cell?.field && !cellText && !autoFill) continue;
+          if (cell?.field || autoFill) {
+            const dropdown = cell?.field?.type === 'dropdown' ? cell.field : null;
+            const name = cell?.field ? `${section.id}__${cell.field.id}` : `${section.id}__${table.id}_r${ri}c${c}`;
+            const hasDate = !!cellText; // a cell with BOTH a label and a field (calendar/SWOT)
             const fw = cw - 10, fx = cx + 5;
             let fh: number, fy: number;
             if (hasDate) {
               // Labelled cell (calendar day / SWOT quadrant): label top-left, fill area below
-              page.drawText(cell.text!, { x: cx + 5, y: rowTop - labelSize - 3, size: labelSize, font: boldFont, color: branded ? hexToRgb(branding.colors.subtitle) : primaryColor });
+              page.drawText(cellText, { x: cx + 5, y: rowTop - labelSize - 3, size: labelSize, font: boldFont, color: branded ? hexToRgb(branding.colors.subtitle) : primaryColor });
               fh = Math.max(14, rh - labelSize - 14);
               fy = rowTop - rh + 7;
             } else if (table.fullPage) {
@@ -797,8 +807,8 @@ export async function generatePDF(
               fh = Math.min(rh - 8, 20 * cellScale);
               fy = rowTop - rh + 4 + (rh - fh) / 2;
             }
-            if (cell.field.type === 'dropdown' && cell.field.options) {
-              const dd = form.createDropdown(name); dd.addOptions(cell.field.options);
+            if (dropdown && dropdown.options) {
+              const dd = form.createDropdown(name); dd.addOptions(dropdown.options);
               dd.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
               dd.setFontSize(cellFieldSize);
             } else {
@@ -809,7 +819,7 @@ export async function generatePDF(
               tf.addToPage(page, { x: fx, y: fy, width: fw, height: fh, borderColor: branded ? accentColor : primaryColor, backgroundColor: fieldBg });
               tf.setFontSize(cellFieldSize);
             }
-          } else if (cell.text) {
+          } else if (cellText) {
             let cy = rowTop - vpad - TFS + 5;
             for (const ln of rowWrapped[ri][c]) { page.drawText(ln, { x: cx + 4, y: cy, size: TFS, font, color: rgb(0.15, 0.15, 0.15) }); cy -= cellLineH; }
           }
@@ -1140,8 +1150,9 @@ async function drawSellItCover(
   ty -= 50;
 
   // Title (blue) at the left margin; the "Workbook" label renders inline (ink) after it.
-  // (No icon mark on the cover.)
-  let tSize = 38;
+  // (No icon mark on the cover.) titleScale sizes the title AND the word-after-title together.
+  const titleScale = Math.max(0.6, Math.min(1.3, doc.cover?.titleScale ?? 1));
+  let tSize = Math.round(38 * titleScale);
   const title = applyCase(doc.title || 'Untitled', 'none');
   const wbLabel = (doc.cover?.workbookLabel ?? 'Workbook').trim();
   let titleLines = wrapText(title, innerW, boldFont, tSize);

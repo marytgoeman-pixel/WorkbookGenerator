@@ -555,6 +555,23 @@ export default function DocumentEditor({ doc, onChange, branding, focus, onUndo,
                 />
               </div>
             )}
+            {isSellit && (
+              <div className="space-y-2 pt-1">
+                <div className="text-[11px] font-medium text-gray-500">Cover text spacing</div>
+                <label className="flex items-center gap-2 text-[11px] text-gray-500" title="Vertical space between the title and the session / description text">
+                  <span className="shrink-0 w-24">Above text</span>
+                  <input type="range" min="0" max="60" step="2" value={cover.textGapTop ?? 16}
+                    onChange={(e) => setCover({ textGapTop: parseInt(e.target.value, 10) })} className="flex-1 accent-blue-500" />
+                  <span className="shrink-0 w-8 text-right tabular-nums">{cover.textGapTop ?? 16}pt</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-gray-500" title="Vertical space between the session / description text and the cover image (more space = image sits lower)">
+                  <span className="shrink-0 w-24">Below text</span>
+                  <input type="range" min="0" max="90" step="2" value={cover.textGapBottom ?? 18}
+                    onChange={(e) => setCover({ textGapBottom: parseInt(e.target.value, 10) })} className="flex-1 accent-blue-500" />
+                  <span className="shrink-0 w-8 text-right tabular-nums">{cover.textGapBottom ?? 18}pt</span>
+                </label>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -97,6 +97,8 @@ export interface CoverSettings {
   header?: string;                           // Sell It top header / eyebrow text (default = brand tagline)
   workbookLabel?: string;                    // Sell It: word shown inline after the title (default "Workbook")
   descriptor?: string;                       // Sell It: gray descriptor line under the session line
+  textGapTop?: number;                       // Sell It cover: points between the title and the session/descriptor (default 16)
+  textGapBottom?: number;                    // Sell It cover: points between the session/descriptor and the image (default 18)
 }
 
 export interface DocumentModel {

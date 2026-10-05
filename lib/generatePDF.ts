@@ -1164,7 +1164,8 @@ async function drawSellItCover(
     }
     ty -= titleLineH;
   }
-  ty -= 16;
+  // Gap between the title and the session/descriptor text (editor "Space above text").
+  ty -= Math.max(0, doc.cover?.textGapTop ?? 16);
 
   // Session line (blue) + descriptor (gray) — both editable, optional
   const session = doc.cover?.subtitle?.trim();
@@ -1176,8 +1177,9 @@ async function drawSellItCover(
     for (const ln of wrapText(descriptor, innerW, font, 13)) { page.drawText(ln, { x: pad, y: ty, size: 13, font, color: gray }); ty -= 18; }
   }
 
-  // Cover image — framed at content width for EVERY image (cropped left/right, bleeds off the bottom)
-  const frameTop = ty - 18;
+  // Cover image — framed at content width for EVERY image (cropped left/right, bleeds off the bottom).
+  // The gap between the after-title text and the image top is adjustable (editor "Space below text").
+  const frameTop = ty - Math.max(0, doc.cover?.textGapBottom ?? 18);
   const coverSrc = doc.cover?.imageUrl || coverById(doc.cover?.imageId)?.cover;
   const img = coverSrc ? await tryEmbedImage(pdfDoc, coverSrc) : null;
   if (img && frameTop > 130) {
@@ -1197,6 +1199,15 @@ async function drawSellItCover(
       for (let s = 0; s < strips; s++) {
         page.drawRectangle({ x: pad, y: (s / strips) * frameTop, width: innerW, height: frameTop / strips + 0.8, color: blue, opacity: 0.9 * Math.pow(1 - s / strips, 1.25) });
       }
+    }
+    // Feather the image's TOP edge into the white page: without this, a photo with a
+    // dark/blue top reads as a hard horizontal "blue line" right under the text. A short
+    // white→transparent gradient dissolves that edge so the image fades in from the page.
+    const topFeather = Math.min(26, frameTop * 0.12 + 8);
+    const fSteps = 26;
+    for (let s = 0; s < fSteps; s++) {
+      const segH = topFeather / fSteps;
+      page.drawRectangle({ x: pad, y: frameTop - (s + 1) * segH, width: innerW, height: segH + 0.8, color: rgb(1, 1, 1), opacity: Math.pow(1 - s / fSteps, 1.5) });
     }
     // White Sell It logo, bottom-right, over the fade — kept inside the image frame.
     if (whiteLogo) {

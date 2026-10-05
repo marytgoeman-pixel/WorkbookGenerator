@@ -1167,14 +1167,18 @@ async function drawSellItCover(
   // Gap between the title and the session/descriptor text (editor "Space above text").
   ty -= Math.max(0, doc.cover?.textGapTop ?? 16);
 
-  // Session line (blue) + descriptor (gray) — both editable, optional
+  // Session line (blue) + descriptor (gray) — both editable, optional.
+  // textScale condenses/enlarges this after-title text (font size + line height together).
+  const ts = Math.max(0.7, Math.min(1.4, doc.cover?.textScale ?? 1));
   const session = doc.cover?.subtitle?.trim();
   if (session) {
-    for (const ln of wrapText(session, innerW, boldFont, 14)) { page.drawText(ln, { x: pad, y: ty, size: 14, font: boldFont, color: blue }); ty -= 20; }
+    const ss = 14 * ts;
+    for (const ln of wrapText(session, innerW, boldFont, ss)) { page.drawText(ln, { x: pad, y: ty, size: ss, font: boldFont, color: blue }); ty -= 20 * ts; }
   }
   const descriptor = doc.cover?.descriptor?.trim();
   if (descriptor) {
-    for (const ln of wrapText(descriptor, innerW, font, 13)) { page.drawText(ln, { x: pad, y: ty, size: 13, font, color: gray }); ty -= 18; }
+    const ds = 13 * ts;
+    for (const ln of wrapText(descriptor, innerW, font, ds)) { page.drawText(ln, { x: pad, y: ty, size: ds, font, color: gray }); ty -= 18 * ts; }
   }
 
   // Cover image — framed at content width for EVERY image (cropped left/right, bleeds off the bottom).
@@ -1201,13 +1205,14 @@ async function drawSellItCover(
       }
     }
     // Feather the image's TOP edge into the white page: without this, a photo with a
-    // dark/blue top reads as a hard horizontal "blue line" right under the text. A short
-    // white→transparent gradient dissolves that edge so the image fades in from the page.
-    const topFeather = Math.min(26, frameTop * 0.12 + 8);
-    const fSteps = 26;
+    // dark/blue top reads as a hard horizontal "blue line" right under the text. A tall
+    // white→transparent gradient dissolves that edge so the image fades in from the page
+    // with no perceptible line (scaled to the frame; smooth enough to avoid banding).
+    const topFeather = Math.min(70, Math.max(34, frameTop * 0.22));
+    const fSteps = 40;
     for (let s = 0; s < fSteps; s++) {
       const segH = topFeather / fSteps;
-      page.drawRectangle({ x: pad, y: frameTop - (s + 1) * segH, width: innerW, height: segH + 0.8, color: rgb(1, 1, 1), opacity: Math.pow(1 - s / fSteps, 1.5) });
+      page.drawRectangle({ x: pad, y: frameTop - (s + 1) * segH, width: innerW, height: segH + 0.8, color: rgb(1, 1, 1), opacity: Math.pow(1 - s / fSteps, 1.35) });
     }
     // White Sell It logo, bottom-right, over the fade — kept inside the image frame.
     if (whiteLogo) {

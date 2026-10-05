@@ -99,6 +99,7 @@ export interface CoverSettings {
   descriptor?: string;                       // Sell It: gray descriptor line under the session line
   textGapTop?: number;                       // Sell It cover: points between the title and the session/descriptor (default 16)
   textGapBottom?: number;                    // Sell It cover: points between the session/descriptor and the image (default 18)
+  textScale?: number;                        // Sell It cover: size multiplier for the session/descriptor text (0.7–1.4, default 1)
 }
 
 export interface DocumentModel {

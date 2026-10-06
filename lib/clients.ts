@@ -167,6 +167,34 @@ export const CLIENTS: ClientAccount[] = [
     },
   },
   {
+    // Two First Designs — design studio. ONE-WEEK comp: unlimited access + downloads, no
+    // watermark, through the cutoff in TIMED_COMPS (app/page.tsx). After the cutoff it reverts
+    // to the 7-day trial below. Default password: TwoFirst2026!  (bcrypt hash only).
+    username: 'twofirst',
+    passwordHash: '$2b$10$2y75ykNkXr3kmcl0FKSTBu2D7IVglE/H7a7/wH0tQBfEyZiFWLRT.',
+    branding: {
+      id: 'twofirstdesigns',
+      displayName: 'Two First Designs',
+      templateId: 'tlc',
+      tagline: '',
+      logoUrl: '/clients/twofirstdesigns/logo.png',
+      coverStyle: 'minimal', // clean white cover with the full-color logo (design-studio look)
+      social: [],
+      colors: {
+        header: '#4B7AD9',        // brand blue — top bar, H1 titles, table headers
+        title: '#363F50',         // brand slate — big interior page titles (matches the wordmark)
+        subtitle: '#4B7AD9',      // brand blue — section labels / prompts
+        accent: '#65B586',        // brand green — bullets, field borders
+        calloutBg: '#363F50',     // slate callout box (white text)
+        calloutBorder: '#5F60B4', // brand purple — pops on the slate callout
+        grayBox: '#EEF1FB',       // pale blue tint for fillable-field backgrounds
+      },
+      // One week of UNLIMITED access is granted via TIMED_COMPS (app/page.tsx); this trial is
+      // the fallback the account lands on after that week.
+      plan: { name: 'Trial', downloadsPerMonth: 1, trial: true },
+    },
+  },
+  {
     // Admin account — sees the analytics dashboard, not a workbook workspace.
     // Password is stored only as a bcrypt hash (changed 2026-06). To change it, generate
     // a new hash: node -e "console.log(require('bcryptjs').hashSync('NEW_PASSWORD',10))"

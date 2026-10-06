@@ -37,6 +37,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ u
     return <WorkbookApp branding={base} trial={null} manageable={false} />;
   }
 
+  // Time-limited comps: full UNLIMITED access (no cap, no watermark, no trial) through the
+  // cutoff, then the account reverts to its base plan (a trial, in lib/clients.ts). Epoch ms.
+  // To extend: change the date. To make it permanent: move the id into COMP_ACCOUNTS above.
+  const TIMED_COMPS: Record<string, number> = {
+    twofirstdesigns: Date.parse('2026-10-13T23:59:59-05:00'), // one week of full access
+  };
+  const compUntil = TIMED_COMPS[session.clientId];
+  if (compUntil && Date.now() < compUntil) {
+    return <WorkbookApp branding={{ ...base, plan: { name: 'Enterprise', downloadsPerMonth: null } }} trial={null} manageable={false} />;
+  }
+
   // Returning from Stripe Checkout: confirm the session directly and activate the plan
   // immediately (doesn't rely on the webhook landing first).
   const sp = await searchParams;

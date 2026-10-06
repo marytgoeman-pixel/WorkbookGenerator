@@ -66,7 +66,7 @@ export const VOYAGEUR_COVER_IMAGES: CoverImage[] = [
 
 // The cover-image set a given client should choose from.
 export function coverImagesFor(brandId: string | undefined): CoverImage[] {
-  if (brandId === 'thelearningcreative') return TLC_COVER_IMAGES; // TLC uses its own botanical art
+  if (brandId === 'thelearningcreative' || brandId === 'twofirstdesigns') return TLC_COVER_IMAGES; // TLC + Two First Designs use the botanical/geometric pattern set
   if (brandId === 'sellit') return SELLIT_COVER_IMAGES;           // Sell It uses the architecture set
   if (brandId === 'voyageur') return VOYAGEUR_COVER_IMAGES;       // Voyageur uses business/workplace photos
   return COVER_IMAGES;                                            // Jo keeps her real-estate set

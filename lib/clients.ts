@@ -179,15 +179,16 @@ export const CLIENTS: ClientAccount[] = [
       tagline: '',
       logoUrl: '/clients/twofirstdesigns/logo.png',
       coverStyle: 'minimal', // clean white cover with the full-color logo (design-studio look)
+      calloutStyle: 'solid', // filled callout box so the brand purple reads as a solid panel
       social: [],
       colors: {
         header: '#4B7AD9',        // brand blue — top bar, H1 titles, table headers
         title: '#363F50',         // brand slate — big interior page titles (matches the wordmark)
         subtitle: '#4B7AD9',      // brand blue — section labels / prompts
-        accent: '#65B586',        // brand green — bullets, field borders
-        calloutBg: '#363F50',     // slate callout box (white text)
-        calloutBorder: '#5F60B4', // brand purple — pops on the slate callout
-        grayBox: '#EEF1FB',       // pale blue tint for fillable-field backgrounds
+        accent: '#65B586',        // brand green — bullets, field borders, cover accent rule
+        calloutBg: '#5F60B4',     // brand purple callout box (white text) — adds purple
+        calloutBorder: '#65B586', // brand green border on the purple callout — adds green
+        grayBox: '#F1F0F8',       // whisper-of-lavender tint for fillable-field backgrounds
       },
       // One week of UNLIMITED access is granted via TIMED_COMPS (app/page.tsx); this trial is
       // the fallback the account lands on after that week.

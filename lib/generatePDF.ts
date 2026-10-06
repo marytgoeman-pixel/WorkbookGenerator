@@ -1389,6 +1389,20 @@ async function drawCoverPage(
   page.drawRectangle({ x: 0, y: H - topBar, width: W, height: topBar, color: navy });
   page.drawRectangle({ x: 0, y: H - topBar - 3, width: W, height: 3, color: gold });
 
+  // Full-color logo at the top-left on a clean white chip — for brands whose cover art is
+  // LIGHT (e.g. the pattern set), so the color logo reads instead of a washed-out white
+  // wordmark on the band. The chip keeps it legible on any pattern.
+  const colorTop = !!(branding.coverLogoColorTop && darkLogo);
+  if (colorTop) {
+    const lh = 30 * logoScale;
+    const sc = lh / darkLogo!.height;
+    const lw = darkLogo!.width * sc;
+    const lx = pad, ly = H - topBar - 18 - lh;
+    const padX = 14, padY = 11;
+    page.drawRectangle({ x: lx - padX, y: ly - padY, width: lw + padX * 2, height: lh + padY * 2, color: rgb(1, 1, 1), opacity: 0.94 });
+    page.drawImage(darkLogo!, { x: lx, y: ly, width: lw, height: lh });
+  }
+
   // --- Title band along the bottom ---
   const titleCase = doc.titleCase ?? 'upper';
   let tSize = 32;
@@ -1434,7 +1448,8 @@ async function drawCoverPage(
 
   // Logo within the band, if available (white wordmark reads on navy). Size + side are
   // builder-controlled (coverLogoScale / coverLogoAlign); default bottom-right.
-  if (logo) {
+  // Skipped when the color logo is shown at the top instead (coverLogoColorTop).
+  if (logo && !colorTop) {
     const targetH = 50 * logoScale;
     const scale = targetH / logo.height;
     const w = logo.width * scale;

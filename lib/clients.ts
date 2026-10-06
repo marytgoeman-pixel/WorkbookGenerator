@@ -178,7 +178,8 @@ export const CLIENTS: ClientAccount[] = [
       templateId: 'tlc',
       tagline: '',
       logoUrl: '/clients/twofirstdesigns/logo.png',
-      coverStyle: 'band', // photo cover: their chosen background image with a branded band + white logo
+      coverStyle: 'band', // photo cover: their chosen background image with a branded band
+      coverLogoColorTop: true, // full-color logo on a white chip at the top (their cover art is light patterns)
       calloutStyle: 'solid', // filled callout box so the brand purple reads as a solid panel
       social: [],
       colors: {

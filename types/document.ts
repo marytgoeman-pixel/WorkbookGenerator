@@ -157,6 +157,7 @@ export interface ClientBranding {
   coverLogoAlign?: 'left' | 'center' | 'right'; // cover logo horizontal placement
   coverLogoWhite?: boolean;             // draw the logo in white on dark cover areas (band/bold/sidebar)
   logoUrlWhite?: string;                // a white-silhouette version of the logo (data URL), used when coverLogoWhite is on
+  coverLogoColorTop?: boolean;          // band cover: place the full-COLOR logo (on a white chip) at the top on the light art, instead of a white logo in the dark band
 }
 
 export interface ColorTheme {

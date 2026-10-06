@@ -1389,19 +1389,10 @@ async function drawCoverPage(
   page.drawRectangle({ x: 0, y: H - topBar, width: W, height: topBar, color: navy });
   page.drawRectangle({ x: 0, y: H - topBar - 3, width: W, height: 3, color: gold });
 
-  // Full-color logo at the top-left on a clean white chip — for brands whose cover art is
-  // LIGHT (e.g. the pattern set), so the color logo reads instead of a washed-out white
-  // wordmark on the band. The chip keeps it legible on any pattern.
+  // When set, the full-color logo goes in a translucent white band just above the title
+  // band's green line (drawn below, once bandH is known) rather than a white wordmark in
+  // the dark band — for brands whose cover art is LIGHT (e.g. the pattern set).
   const colorTop = !!(branding.coverLogoColorTop && darkLogo);
-  if (colorTop) {
-    const lh = 30 * logoScale;
-    const sc = lh / darkLogo!.height;
-    const lw = darkLogo!.width * sc;
-    const lx = pad, ly = H - topBar - 18 - lh;
-    const padX = 14, padY = 11;
-    page.drawRectangle({ x: lx - padX, y: ly - padY, width: lw + padX * 2, height: lh + padY * 2, color: rgb(1, 1, 1), opacity: 0.94 });
-    page.drawImage(darkLogo!, { x: lx, y: ly, width: lw, height: lh });
-  }
 
   // --- Title band along the bottom ---
   const titleCase = doc.titleCase ?? 'upper';
@@ -1427,6 +1418,17 @@ async function drawCoverPage(
 
   page.drawRectangle({ x: 0, y: 0, width: W, height: bandH, color: navy, opacity: img ? 0.9 : 1 });
   page.drawRectangle({ x: 0, y: bandH - 4, width: W, height: 4, color: gold });
+
+  // Translucent white band directly above the green line (full page width), holding the
+  // full-color logo left-aligned with the title/subtitle below.
+  if (colorTop) {
+    const lh = 30 * logoScale;
+    const sc = lh / darkLogo!.height;
+    const lw = darkLogo!.width * sc;
+    const wbH = lh + 26;
+    page.drawRectangle({ x: 0, y: bandH, width: W, height: wbH, color: rgb(1, 1, 1), opacity: 0.86 });
+    page.drawImage(darkLogo!, { x: pad, y: bandH + (wbH - lh) / 2, width: lw, height: lh });
+  }
 
   let ty = bandH - topPad;
   if (sub) {
